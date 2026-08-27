@@ -13,9 +13,9 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 2 (market-context inputs + the evidence package) in progress — no
-> orders placed yet, no webapp yet. See [TODO.md](TODO.md) for what's next and
-> the project notes for hard development constraints.
+> **Status:** milestone 3 (the pre-trade risk-check engine) done — still no orders placed, no
+> webapp yet. See [TODO.md](TODO.md) for what's next and the project notes for hard
+> development constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
 > spreads enabled); SPY option chain fetch, Greeks/IV, and the delta filter confirmed against
@@ -28,8 +28,15 @@ not just the wins.
 > decision layer. Run `uv run python scripts/check_market_data.py SPY` to print a live one.
 > On 2026-08-27 no tenor on the 7/14/21/30/45-day ladder cleared the 1.5-vol-point VRP
 > threshold, so the agent's verdict was **do not trade** — staying still is a designed
-> behaviour, not a failure. Still pending: the Regolo tool-calling smoke test (written,
-> deliberately not run yet to preserve the daily token quota).
+> behaviour, not a failure.
+>
+> Milestone 3 (2026-08-27): the explicit pre-trade risk check ([`app/risk_check.py`](app/risk_check.py))
+> that every future order must pass. It produces a pass/fail verdict per rule with a plain-language
+> reason — R4 (defined risk: max loss shown before the order, always), R6 (per-trade risk % and
+> max concurrent positions, read from the live account), R7 (3% daily-drawdown stop rejects any
+> new position). Run `uv run python scripts/check_risk.py SPY` to see verdicts against the real
+> paper account. Still pending: the Regolo tool-calling smoke test (written, deliberately not run
+> yet to preserve the daily token quota).
 
 ### Data quality disclosure
 
@@ -64,12 +71,13 @@ is off; only new decisions pause.
   strategy logic, LLM decisions via LiteLLM → Regolo.ai (`Llama-3.3-70B-Instruct`, swappable via
   config). Writes every decision/risk-check/trade directly to Supabase Postgres. No inbound
   network exposure — outbound-only.
-- **Webapp (Next.js App Router on Vercel):** public showcase + authenticated dashboard/backoffice
-  in one deploy, reading from the same Supabase database. Three access levels via Supabase Auth
-  + RLS: public (showcase + limited live view), demo admin (full read-only detail), admin (full
-  control, operator only).
+- **Webapp (Next.js App Router on Vercel):** public homepage + authenticated dashboard/backoffice
+  in one deploy, reading from the same Supabase database. Four access states via Supabase Auth
+  + RLS: anonymous (public homepage only), public user (self-signup, curated dashboard), demo
+  admin (full backoffice, read-only — a shared account for the judges), master admin (full
+  operational control, operator only).
 - **Supabase:** shared Postgres — single source of truth for both sides — plus Auth for the
-  webapp's access levels.
+  webapp's access states.
 
 Strategy: short vertical credit spreads on a **measured** volatility risk premium, always a
 single defined-risk multi-leg order. The agent has no fixed expiry — it scans a ladder of

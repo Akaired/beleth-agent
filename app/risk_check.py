@@ -1,0 +1,280 @@
+"""Explicit pre-trade risk check — the gate every order must pass before it can reach Alpaca.
+
+No order path exists yet (that is a later milestone), but the hard constraint #3 is that
+*every* order passes an explicit risk check whose rejections are logged and surfaced with the
+same prominence as executed trades. This module is that gate, built ahead of the order path so
+the order path can only ever be wired *through* it — never around it.
+
+Same shape as the milestone-2 rules (R1/R2/R3/R8): each rule produces an explicit pass/fail
+verdict with a human-readable reason that names the rule id and quotes the numbers it used, so
+a dashboard reader can see exactly why a candidate was approved or rejected. The module is
+pure — all IO (reading the account and open positions from Alpaca) happens in the caller, which
+passes the numbers in via ``AccountRiskState`` (see ``scripts/check_risk.py``).
+
+Rules implemented here (see ``docs/strategy.md``):
+
+* **R4 — defined risk only.** ``app/options/spreads.py`` already computes the candidate's
+  maximum loss and breakeven; this check *exposes* them on the verdict (top-level ``max_loss``
+  / ``breakeven`` and in the R4 reason) so the number is shown *before* an order is submitted —
+  including when the check approves. A candidate whose max loss cannot be computed (missing leg
+  quotes) is rejected: undefined risk fails closed.
+* **R6 — sizing.** The candidate's own max loss must not exceed
+  ``risk.max_risk_per_trade_pct_of_equity`` percent of account equity, and the number of open
+  positions must stay below ``risk.max_concurrent_positions``. Capital already at risk across
+  open positions is surfaced for transparency; there is no configured aggregate cap, so it is
+  reported, not gated on.
+* **R7 — daily stop.** If the day's drawdown has already reached
+  ``risk.daily_drawdown_stop_pct`` percent of equity, every new candidate is rejected
+  regardless of the other rules, and that is stated as the reason.
+
+R5 (exit rules for open positions) is deliberately not here — it has nothing to act on until an
+order path and real positions exist. See TODO.md.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+from app.options.spreads import SpreadCandidate
+
+
+@dataclass(frozen=True)
+class AccountRiskState:
+    """Real account state the risk check reasons over. The caller reads this from Alpaca.
+
+    ``day_pnl`` is signed (``equity - last_equity``): negative means down on the day.
+    ``capital_at_risk`` is the summed known max loss across open defined-risk positions; it is
+    ``0.0`` until the decision log (Supabase, next milestone) can supply per-spread max loss,
+    since an Alpaca ``Position`` on its own does not carry it.
+    """
+
+    equity: float
+    open_positions: int
+    day_pnl: float
+    capital_at_risk: float = 0.0
+
+
+@dataclass(frozen=True)
+class RuleResult:
+    rule: str  # "R4" | "R6" | "R7"
+    passed: bool
+    reason: str  # human-readable, names the rule and quotes the numbers used
+    detail: dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "rule": self.rule,
+            "passed": self.passed,
+            "reason": self.reason,
+            "detail": self.detail,
+        }
+
+
+@dataclass(frozen=True)
+class RiskVerdict:
+    approved: bool
+    max_loss: float | None  # R4: shown explicitly even on approval
+    breakeven: float | None
+    results: list[RuleResult]
+    candidate: dict[str, Any]
+
+    @property
+    def rejections(self) -> list[RuleResult]:
+        return [r for r in self.results if not r.passed]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "approved": self.approved,
+            "max_loss": self.max_loss,
+            "breakeven": self.breakeven,
+            "rejected_by": [r.rule for r in self.rejections],
+            "results": [r.as_dict() for r in self.results],
+            "candidate": self.candidate,
+        }
+
+
+def _usd(x: float | None) -> str:
+    return "unknown" if x is None else f"${x:,.2f}"
+
+
+def check_r4(candidate: SpreadCandidate) -> RuleResult:
+    """Defined risk only: max loss must be computed and structurally bounded, and is shown
+    on the verdict whatever the outcome."""
+    max_loss = candidate.max_loss
+    breakeven = candidate.breakeven
+    structural_cap = candidate.strike_width * 100  # (width - credit) * 100, credit >= 0
+
+    if max_loss is None:
+        return RuleResult(
+            "R4",
+            False,
+            "R4 (defined risk only): maximum loss cannot be computed for this candidate "
+            "(missing leg quotes). Undefined risk is rejected — the check fails closed.",
+            {"max_loss": None, "strike_width": candidate.strike_width},
+        )
+
+    if max_loss <= 0 or max_loss > structural_cap:
+        return RuleResult(
+            "R4",
+            False,
+            f"R4 (defined risk only): computed max loss {_usd(max_loss)} falls outside the "
+            f"structural bound (0, {_usd(structural_cap)}] for a "
+            f"{candidate.strike_width:.2f}-wide vertical — the structure is malformed.",
+            {
+                "max_loss": max_loss,
+                "structural_cap_usd": structural_cap,
+                "strike_width": candidate.strike_width,
+            },
+        )
+
+    return RuleResult(
+        "R4",
+        True,
+        f"R4 (defined risk only): max loss is defined and bounded at {_usd(max_loss)}, "
+        f"breakeven {breakeven:.2f}, within the {_usd(structural_cap)} structural cap for a "
+        f"{candidate.strike_width:.2f}-wide vertical.",
+        {
+            "max_loss": max_loss,
+            "breakeven": breakeven,
+            "structural_cap_usd": structural_cap,
+            "strike_width": candidate.strike_width,
+        },
+    )
+
+
+def check_r6(
+    candidate: SpreadCandidate,
+    state: AccountRiskState,
+    *,
+    max_risk_per_trade_pct: float,
+    max_concurrent_positions: int,
+) -> RuleResult:
+    """Sizing: per-trade risk within the configured percent of equity, and open-position
+    count below the configured maximum. Both limits come from ``config/strategy.yaml``."""
+    max_loss = candidate.max_loss
+    per_trade_cap = state.equity * max_risk_per_trade_pct / 100
+    pct_of_equity = (
+        max_loss / state.equity * 100
+        if max_loss is not None and state.equity > 0
+        else None
+    )
+
+    detail = {
+        "candidate_max_loss": max_loss,
+        "candidate_pct_of_equity": None if pct_of_equity is None else round(pct_of_equity, 4),
+        "per_trade_cap_usd": round(per_trade_cap, 2),
+        "per_trade_cap_pct": max_risk_per_trade_pct,
+        "equity": state.equity,
+        "open_positions": state.open_positions,
+        "max_concurrent_positions": max_concurrent_positions,
+        "capital_at_risk_current": state.capital_at_risk,
+    }
+
+    problems: list[str] = []
+    if max_loss is None:
+        problems.append("candidate max loss is unknown, so it cannot be sized")
+    elif max_loss > per_trade_cap:
+        problems.append(
+            f"candidate risk {_usd(max_loss)} ({pct_of_equity:.2f}% of equity) exceeds the "
+            f"{max_risk_per_trade_pct:.2f}% per-trade cap ({_usd(per_trade_cap)})"
+        )
+    if state.open_positions >= max_concurrent_positions:
+        problems.append(
+            f"{state.open_positions} positions already open, at or above the "
+            f"{max_concurrent_positions}-position limit"
+        )
+
+    if problems:
+        return RuleResult("R6", False, "R6 (sizing): " + "; ".join(problems) + ".", detail)
+
+    at_risk_note = (
+        f"; {_usd(state.capital_at_risk)} already at risk across open positions"
+        if state.capital_at_risk
+        else ""
+    )
+    return RuleResult(
+        "R6",
+        True,
+        f"R6 (sizing): candidate risk {_usd(max_loss)} is {pct_of_equity:.2f}% of equity, "
+        f"within the {max_risk_per_trade_pct:.2f}% cap ({_usd(per_trade_cap)}); "
+        f"{state.open_positions} of {max_concurrent_positions} position slots used"
+        f"{at_risk_note}.",
+        detail,
+    )
+
+
+def check_r7(
+    state: AccountRiskState,
+    *,
+    daily_drawdown_stop_pct: float,
+) -> RuleResult:
+    """Daily stop: once the day's drawdown reaches the configured percent of equity, no new
+    position is opened for the rest of the day. Reaching the threshold exactly trips it."""
+    stop_usd = state.equity * daily_drawdown_stop_pct / 100
+    drawdown_usd = max(0.0, -state.day_pnl)  # positive magnitude; 0 when flat or up
+    drawdown_pct = drawdown_usd / state.equity * 100 if state.equity > 0 else 0.0
+
+    detail = {
+        "day_pnl": state.day_pnl,
+        "drawdown_usd": round(drawdown_usd, 2),
+        "drawdown_pct": round(drawdown_pct, 4),
+        "stop_pct": daily_drawdown_stop_pct,
+        "stop_usd": round(stop_usd, 2),
+        "equity": state.equity,
+    }
+
+    tripped = stop_usd > 0 and drawdown_usd >= stop_usd
+    if tripped:
+        return RuleResult(
+            "R7",
+            False,
+            f"R7 (daily stop): today's drawdown {_usd(drawdown_usd)} ({drawdown_pct:.2f}% of "
+            f"equity) has reached the {daily_drawdown_stop_pct:.2f}% daily stop "
+            f"({_usd(stop_usd)}) — no new position is opened for the rest of the day, "
+            "regardless of the other rules.",
+            detail,
+        )
+
+    return RuleResult(
+        "R7",
+        True,
+        f"R7 (daily stop): today's drawdown {_usd(drawdown_usd)} ({drawdown_pct:.2f}% of "
+        f"equity) is within the {daily_drawdown_stop_pct:.2f}% daily stop ({_usd(stop_usd)}).",
+        detail,
+    )
+
+
+def evaluate_candidate(
+    candidate: SpreadCandidate,
+    state: AccountRiskState,
+    strategy_config: dict[str, Any],
+) -> RiskVerdict:
+    """Run R4, R6 and R7 against one candidate. Approved only if every rule passes; R7
+    failing on its own is enough to reject (its reason says so explicitly)."""
+    risk_cfg = strategy_config["risk"]
+    results = [
+        check_r4(candidate),
+        check_r6(
+            candidate,
+            state,
+            max_risk_per_trade_pct=risk_cfg["max_risk_per_trade_pct_of_equity"],
+            max_concurrent_positions=risk_cfg["max_concurrent_positions"],
+        ),
+        check_r7(state, daily_drawdown_stop_pct=risk_cfg["daily_drawdown_stop_pct"]),
+    ]
+    return RiskVerdict(
+        approved=all(r.passed for r in results),
+        max_loss=candidate.max_loss,
+        breakeven=candidate.breakeven,
+        results=results,
+        candidate=candidate.as_dict(),
+    )
+
+
+def evaluate_candidates(
+    candidates: list[SpreadCandidate],
+    state: AccountRiskState,
+    strategy_config: dict[str, Any],
+) -> list[RiskVerdict]:
+    return [evaluate_candidate(c, state, strategy_config) for c in candidates]
