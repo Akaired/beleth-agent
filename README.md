@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/beleth-avatar.png" alt="Beleth" width="120">
+</p>
+
 # Beleth Agent
 
 Autonomous AI options-trading agent built for the [Alpaca AI Trading Agents Hackathon](https://lablab.ai)
@@ -9,9 +13,15 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** in development, milestone 1 (agent-side read-only data plumbing — no orders yet,
-> no webapp yet). See [TODO.md](TODO.md) for what's next and the project notes for hard
-> development constraints.
+> **Status:** milestone 1 (agent-side read-only data plumbing) verified against the real paper
+> account and real market data — no orders placed yet, no webapp yet. See [TODO.md](TODO.md) for
+> what's next and the project notes for hard development constraints.
+>
+> Verified 2026-08-27: paper account active with options trading level 3 (multi-leg spreads
+> enabled); SPY option chain fetch, Greeks/IV, and the delta filter all confirmed against live
+> data (1934 contracts in the 1-7 day expiry window → 40 after the delta filter, ~654 tokens).
+> Still pending: the Regolo tool-calling smoke test (written, deliberately not run yet to
+> preserve the daily token quota).
 
 ## Hard constraints
 
@@ -59,8 +69,22 @@ not a bug).
 ├── README.md              # this file
 ├── TODO.md                # task tracking
 ├── .env.example           # required environment variables (copy to .env, never commit .env)
+├── pyproject.toml / uv.lock  # Python project, managed with uv
+├── app/                   # agent package
+│   ├── config.py          # settings + config/strategy.yaml loader
+│   ├── alpaca_client.py   # paper-only Alpaca client wiring
+│   ├── options/           # chain fetch, delta filter, IV rank
+│   └── llm/                # LiteLLM → Regolo client
+├── config/
+│   └── strategy.yaml      # strategy parameters (not hardcoded — see the project notes)
 ├── scripts/
-│   └── fetch_docs.py      # re-downloads the local reference cache/ (gitignored local doc cache)
+│   ├── fetch_docs.py                  # re-downloads the local reference cache/ (gitignored local doc cache)
+│   ├── smoke_test_tool_calling.py     # Regolo tool-calling verification
+│   ├── check_alpaca_connection.py     # paper account/positions read
+│   └── check_options_data.py          # SPY chain + IV rank + delta filter
+├── tests/                 # unit tests (fast, no network) + integration tests (`pytest -m integration`)
+├── assets/
+│   └── beleth-avatar.png  # mascot art used in this README
 └── local reference material at                # local-only: vendored docs, planning material (gitignored)
     ├── docs/               # Alpaca reference docs + vendored repos — see docs/INDEX.md
     └── preprod/            # full the project spec and pre-dev design material
@@ -74,8 +98,16 @@ not a bug).
    ```
    python3 scripts/fetch_docs.py
    ```
-4. Application setup (dependency install, running the backend/frontend) will be documented here
-   once the first working code lands.
+4. Install dependencies and run the read-only checks (requires [`uv`](https://docs.astral.sh/uv/)):
+   ```
+   uv sync
+   uv run python scripts/check_alpaca_connection.py
+   uv run python scripts/check_options_data.py SPY
+   uv run pytest                    # fast unit tests, no network
+   uv run pytest -m integration     # hits the real paper account + market data
+   ```
+5. Agent decision logic, persistence, and the webapp are not built yet — see
+   [TODO.md](TODO.md).
 
 ## License
 
