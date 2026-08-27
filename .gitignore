@@ -1,1 +1,26 @@
 .claude
+
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# local data / persistence artifacts
+*.db
+*.sqlite3
+data/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
