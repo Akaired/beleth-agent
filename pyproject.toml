@@ -1,0 +1,21 @@
+[project]
+name = "beleth-agent"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "alpaca-py>=0.44.0",
+    "litellm>=1.98.0",
+    "pydantic-settings>=2.15.0",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: hits real external APIs (Alpaca paper trading) — needs .env credentials.",
+]

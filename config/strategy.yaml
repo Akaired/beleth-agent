@@ -1,0 +1,39 @@
+# Short vertical credit spread strategy — starting parameters.
+#
+# These are industry-conventional values for this strategy shape, NOT the result of our own
+# backtesting. They will need tuning once we have real paper-trading data. See the spec §5 for the
+# full rationale, including the honest expectation: most trades win, individual losses are
+# structurally larger, and losing days are normal, not a bug.
+
+universe:
+  # Highly liquid underlyings only — a tight bid/ask spread is what makes fills realistic even
+  # in paper trading. Keep this list short.
+  symbols:
+    - SPY
+    - QQQ
+
+entry:
+  # Only enter when IV is rich relative to its own recent range. No entry below this rank.
+  min_iv_rank: 50 # 0-100 percentile of current IV within the lookback window
+  iv_rank_lookback_days: 30
+
+structure:
+  # Always a single defined-risk multi-leg vertical spread order. Never naked legs.
+  short_leg_delta_min: 0.15
+  short_leg_delta_max: 0.25
+  strike_width_usd_min: 1
+  strike_width_usd_max: 5
+  expiry_days_min: 1
+  expiry_days_max: 7
+  expiry_days_preferred_min: 2
+  expiry_days_preferred_max: 5 # avoid 0DTE — too noisy
+
+exit:
+  profit_target_pct_of_max_credit: 50 # close at 50% of max credit captured, don't wait for expiry
+  loss_close_credit_multiple: 2 # close at ~2x the credit received...
+  loss_close_on_short_leg_itm: true # ...or immediately if the short leg goes in-the-money
+
+risk:
+  max_risk_per_trade_pct_of_equity: 2 # 1-2% band; this is the upper bound used as the hard cap
+  max_concurrent_positions: 5
+  daily_drawdown_stop_pct: 3 # stop opening new positions for the day past this drawdown
