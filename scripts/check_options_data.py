@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Fetch SPY's option chain, compute IV rank, and apply the delta filter.
+"""Fetch SPY's option chain across the tenor ladder and apply the delta filter.
 
-Milestone 1, step 4: verify option chain + Greeks/IV retrieval works, and that the delta
-filter actually shrinks the payload enough to respect the Regolo token budget (see
-app/options/filter.py). Also reports the current IV rank status — expect "insufficient
-history" on day 1, since Alpaca has no historical-IV endpoint (see app/options/iv_rank.py).
+Verifies option chain + Greeks/IV retrieval works, and that the delta filter shrinks the
+payload enough to respect the Regolo token budget (see app/options/filter.py). For the full
+market-context picture — VIX regime, realized vol, term structure, per-tenor VRP, spread
+candidates — use scripts/check_market_data.py instead.
 
 Usage:
     python3 scripts/check_options_data.py [SYMBOL]
@@ -20,9 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.alpaca_client import get_option_data_client  # noqa: E402
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.options.chain import fetch_chain  # noqa: E402
+from app.options.chain import fetch_chain_for_ladder  # noqa: E402
 from app.options.filter import filter_relevant_contracts  # noqa: E402
-from app.options.iv_rank import compute_iv_rank  # noqa: E402
 
 
 def main() -> int:
@@ -36,18 +35,12 @@ def main() -> int:
 
     strategy = load_strategy_config()
     structure = strategy["structure"]
-    entry = strategy["entry"]
+    dte_ladder = strategy["tenor_scan"]["dte_ladder"]
 
     client = get_option_data_client(settings)
 
-    print(f"Fetching {symbol} chain, expiry {structure['expiry_days_min']}"
-          f"-{structure['expiry_days_max']} days...")
-    snapshots = fetch_chain(
-        client,
-        symbol,
-        expiry_days_min=structure["expiry_days_min"],
-        expiry_days_max=structure["expiry_days_max"],
-    )
+    print(f"Fetching {symbol} chain covering the DTE ladder {dte_ladder}...")
+    snapshots = fetch_chain_for_ladder(client, symbol, dte_ladder)
     print(f"Chain size: {len(snapshots)} contracts")
 
     with_iv = [s for s in snapshots.values() if s.implied_volatility is not None]
@@ -57,19 +50,6 @@ def main() -> int:
         atm_like = sorted(with_iv, key=lambda s: abs((s.greeks.delta if s.greeks else 1) - 0.5))
         sample_iv = atm_like[0].implied_volatility
         print(f"Sample IV (contract {atm_like[0].symbol}): {sample_iv:.4f}")
-
-        # No persisted history yet on day 1 — see app/options/iv_rank.py docstring.
-        iv_result = compute_iv_rank(
-            history=[], current_iv=sample_iv, lookback_days=entry["iv_rank_lookback_days"]
-        )
-        if iv_result.has_sufficient_history:
-            print(f"IV rank: {iv_result.rank:.1f}")
-        else:
-            print(
-                f"IV rank: insufficient history "
-                f"({iv_result.history_points}/{iv_result.lookback_days} days) — "
-                "will populate as the agent persists daily IV readings."
-            )
     else:
         print("No IV data returned — check the feed/subscription.")
 

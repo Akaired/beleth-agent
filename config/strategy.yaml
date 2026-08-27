@@ -1,32 +1,79 @@
 # Short vertical credit spread strategy — starting parameters.
 #
-# These are industry-conventional values for this strategy shape, NOT the result of our own
-# backtesting. They will need tuning once we have real paper-trading data. See the spec §5 for the
-# full rationale, including the honest expectation: most trades win, individual losses are
-# structurally larger, and losing days are normal, not a bug.
+# Most of these are industry-conventional values for this strategy shape (Strategy level B),
+# NOT the result of our own backtesting. They will need tuning once we have real paper-trading
+# data. See docs/strategy.md for the full rationale and its three reliability tiers, and the spec §5
+# for the honest expectation: most trades win, individual losses are structurally larger, and
+# losing days are normal, not a bug.
 
 universe:
   # Highly liquid underlyings only — a tight bid/ask spread is what makes fills realistic even
-  # in paper trading. Keep this list short.
+  # in paper trading. Keep this list short (Strategy C3).
   symbols:
     - SPY
     - QQQ
 
 entry:
-  # Only enter when IV is rich relative to its own recent range. No entry below this rank.
-  min_iv_rank: 50 # 0-100 percentile of current IV within the lookback window
-  iv_rank_lookback_days: 30
+  # The primary entry gate is the measured volatility risk premium on the candidate tenor
+  # (see tenor_scan.vrp_threshold_vol_points and Strategy R1), not a fixed IV rank. The VIX
+  # percentile (see the vix block below) is a *regime* read, not a per-contract signal
+  # (Strategy A4); this floor is off by default until we have data to tune it.
+  vix_regime_percentile_min: 0 # 0-100; 0 disables the regime floor
+
+tenor_scan:
+  # The agent has no fixed expiry. It scans this ladder of days-to-expiry, measures the premium
+  # available on each, and trades ONLY the tenor whose VRP clears the threshold. If none clears,
+  # it does not trade and says why (Strategy A2 / R1 / R8). 1-7 DTE is deliberately NOT on the
+  # ladder — the VRP there is small and unstable and gamma risk is high (Strategy A3).
+  dte_ladder: [7, 14, 21, 30, 45]
+  # Minimum volatility risk premium, in annualized volatility points (e.g. IV 16.2% vs RV 13.4%
+  # => 2.8 points), for a tenor to be tradable. Default 1.5 (Strategy R1).
+  vrp_threshold_vol_points: 1.5
+  # A contract counts as "at the money" for tenor IV / term-structure purposes if its strike is
+  # within this percentage of the underlying's last price.
+  atm_strike_tolerance_pct: 1.0
+
+regime:
+  # Term structure is derived from the SPY chain itself (we have no VIX futures): compare ATM IV
+  # at the shortest ladder tenor vs the longest (Strategy A5 / evidence pack).
+  #   short ATM IV < long ATM IV  -> contango (normal)
+  #   short ATM IV > long ATM IV  -> backwardation (stress)
+  # |short - long| below this band (absolute IV, e.g. 0.005 = half a vol point) -> "flat".
+  term_structure_flat_band_iv: 0.005
+  # Backwardation is a statistically significant stress signal; contango is not (Strategy A5).
+  # When true, an inverted term structure blocks all new premium-selling positions (Strategy R2).
+  block_new_shorts_on_backwardation: true
+
+macro_calendar:
+  # Known macro events, hand-maintained for the hackathon window — no calendar-provider
+  # integration (Strategy C / R3). Times in US Eastern.
+  events_file: config/macro_events.yaml
+  # Do not open a position whose expiry falls on/after a known macro event if that event is
+  # within this many days (Strategy A4 / R3).
+  block_within_days: 2
+
+realized_vol:
+  # Close-to-close annualized realized volatility windows, computed from SPY daily bars.
+  windows_days: [10, 20, 30]
+  annualization_trading_days: 252
+
+vix:
+  # The VIX does not come from Alpaca — Alpaca does not provide index data and has said it has
+  # no plans to (Strategy A / evidence pack). Source: FRED series VIXCLS, daily history from
+  # 1990, free, no API key required for the CSV endpoint.
+  fred_series_id: VIXCLS
+  fred_csv_url: "https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS"
+  # CBOE publishes the same history as a fallback if FRED is unreachable — we do NOT substitute
+  # a proxy or an ETF for the VIX.
+  cboe_fallback_url: "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv"
+  lookback_trading_days: 252
 
 structure:
-  # Always a single defined-risk multi-leg vertical spread order. Never naked legs.
+  # Always a single defined-risk multi-leg vertical spread order. Never naked legs (Strategy R4).
   short_leg_delta_min: 0.15
   short_leg_delta_max: 0.25
   strike_width_usd_min: 1
   strike_width_usd_max: 5
-  expiry_days_min: 1
-  expiry_days_max: 7
-  expiry_days_preferred_min: 2
-  expiry_days_preferred_max: 5 # avoid 0DTE — too noisy
 
 exit:
   profit_target_pct_of_max_credit: 50 # close at 50% of max credit captured, don't wait for expiry

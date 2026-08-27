@@ -8,7 +8,7 @@ import pytest
 
 from app.alpaca_client import get_option_data_client
 from app.config import get_settings, load_strategy_config
-from app.options.chain import fetch_chain
+from app.options.chain import fetch_chain_for_ladder
 from app.options.filter import filter_relevant_contracts
 
 pytestmark = pytest.mark.integration
@@ -19,13 +19,7 @@ def chain():
     settings = get_settings()
     client = get_option_data_client(settings)
     strategy = load_strategy_config()
-    structure = strategy["structure"]
-    return fetch_chain(
-        client,
-        "SPY",
-        expiry_days_min=structure["expiry_days_min"],
-        expiry_days_max=structure["expiry_days_max"],
-    )
+    return fetch_chain_for_ladder(client, "SPY", strategy["tenor_scan"]["dte_ladder"])
 
 
 def test_chain_is_non_empty(chain):

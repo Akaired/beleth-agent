@@ -13,15 +13,31 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 1 (agent-side read-only data plumbing) verified against the real paper
-> account and real market data — no orders placed yet, no webapp yet. See [TODO.md](TODO.md) for
-> what's next and the project notes for hard development constraints.
+> **Status:** milestone 2 (market-context inputs + the evidence package) in progress — no
+> orders placed yet, no webapp yet. See [TODO.md](TODO.md) for what's next and
+> the project notes for hard development constraints.
 >
-> Verified 2026-08-27: paper account active with options trading level 3 (multi-leg spreads
-> enabled); SPY option chain fetch, Greeks/IV, and the delta filter all confirmed against live
-> data (1934 contracts in the 1-7 day expiry window → 40 after the delta filter, ~654 tokens).
-> Still pending: the Regolo tool-calling smoke test (written, deliberately not run yet to
-> preserve the daily token quota).
+> Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
+> spreads enabled); SPY option chain fetch, Greeks/IV, and the delta filter confirmed against
+> live data.
+>
+> Milestone 2 (2026-08-27): the agent now measures its edge before betting on it. It pulls the
+> VIX regime from FRED, realized volatility from SPY bars, the IV term structure and a
+> per-tenor volatility risk premium from the SPY chain, applies a macro-event gate, and
+> assembles a single **evidence package** ([`docs/strategy.md`](docs/strategy.md)) for the
+> decision layer. Run `uv run python scripts/check_market_data.py SPY` to print a live one.
+> On 2026-08-27 no tenor on the 7/14/21/30/45-day ladder cleared the 1.5-vol-point VRP
+> threshold, so the agent's verdict was **do not trade** — staying still is a designed
+> behaviour, not a failure. Still pending: the Regolo tool-calling smoke test (written,
+> deliberately not run yet to preserve the daily token quota).
+
+### Data quality disclosure
+
+Beleth runs on Alpaca's **Basic** data plan: the options feed is *indicative*, not full OPRA,
+and historical data excludes the most recent 15 minutes. The implied volatility it reasons
+over is therefore less precise than a professional's. The evaluation window is ~5 market days,
+over which P&L is dominated by luck, not skill. Any P&L shown should be read with both facts
+in mind — see [`docs/strategy.md`](docs/strategy.md) notes C2 and C5.
 
 ## Hard constraints
 
@@ -55,11 +71,16 @@ is off; only new decisions pause.
 - **Supabase:** shared Postgres — single source of truth for both sides — plus Auth for the
   webapp's access levels.
 
-Strategy: short vertical credit spreads on elevated implied volatility, short-dated, always a
-single defined-risk multi-leg order. Full parameters in `config/strategy.yaml` (industry-standard
-starting values, not backtested by us — see the spec §5 for the honest read on expected performance:
-most trades win, individual losses are structurally larger, and that's normal for this strategy,
-not a bug).
+Strategy: short vertical credit spreads on a **measured** volatility risk premium, always a
+single defined-risk multi-leg order. The agent has no fixed expiry — it scans a ladder of
+tenors (default 7/14/21/30/45 days), measures the volatility risk premium on each, and trades
+only the tenor whose premium clears a threshold; if none does, it does not trade and says why.
+Regime and event gates (VIX percentile from FRED, IV term structure from the SPY chain, a
+macro-event calendar) sit in front of every entry. Full reasoning with sources in
+[`docs/strategy.md`](docs/strategy.md); parameters in `config/strategy.yaml` (starting values,
+not backtested by us — see the spec §5 for the honest read on expected performance: most trades
+win, individual losses are structurally larger, and that's normal for this strategy, not a
+bug).
 
 ## Repository layout
 
@@ -72,16 +93,24 @@ not a bug).
 ├── pyproject.toml / uv.lock  # Python project, managed with uv
 ├── app/                   # agent package
 │   ├── config.py          # settings + config/strategy.yaml loader
-│   ├── alpaca_client.py   # paper-only Alpaca client wiring
-│   ├── options/           # chain fetch, delta filter, IV rank
+│   ├── alpaca_client.py   # paper-only Alpaca client wiring (trading + stock/option data)
+│   ├── occ.py             # OCC option-symbol parsing (expiry/strike/right)
+│   ├── vrp.py             # per-tenor volatility risk premium scan
+│   ├── evidence.py        # assembles the evidence package for the decision layer
+│   ├── market/            # VIX (FRED), realized vol, IV term structure, macro calendar
+│   ├── options/           # chain fetch, delta filter, IV rank, spread-candidate builder
 │   └── llm/                # LiteLLM → Regolo client
 ├── config/
-│   └── strategy.yaml      # strategy parameters (not hardcoded — see the project notes)
+│   ├── strategy.yaml      # strategy parameters (not hardcoded — see the project notes)
+│   └── macro_events.yaml  # known macro events for the hackathon window (R3 gate)
+├── docs/
+│   └── strategy.md        # strategy reasoning by reliability tier, with sources
 ├── scripts/
 │   ├── fetch_docs.py                  # re-downloads the local reference cache/ (gitignored local doc cache)
 │   ├── smoke_test_tool_calling.py     # Regolo tool-calling verification
 │   ├── check_alpaca_connection.py     # paper account/positions read
-│   └── check_options_data.py          # SPY chain + IV rank + delta filter
+│   ├── check_options_data.py          # SPY chain + delta filter
+│   └── check_market_data.py           # full evidence package (VIX + RV + term structure + VRP + candidates)
 ├── tests/                 # unit tests (fast, no network) + integration tests (`pytest -m integration`)
 ├── assets/
 │   └── beleth-avatar.png  # mascot art used in this README
@@ -103,8 +132,9 @@ not a bug).
    uv sync
    uv run python scripts/check_alpaca_connection.py
    uv run python scripts/check_options_data.py SPY
+   uv run python scripts/check_market_data.py SPY   # full evidence package as JSON
    uv run pytest                    # fast unit tests, no network
-   uv run pytest -m integration     # hits the real paper account + market data
+   uv run pytest -m integration     # hits the real paper account + market data + FRED
    ```
 5. Agent decision logic, persistence, and the webapp are not built yet — see
    [TODO.md](TODO.md).

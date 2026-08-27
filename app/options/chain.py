@@ -28,3 +28,21 @@ def fetch_chain(
         expiration_date_lte=today + timedelta(days=expiry_days_max),
     )
     return client.get_option_chain(request)
+
+
+def fetch_chain_for_ladder(
+    client: OptionHistoricalDataClient,
+    underlying_symbol: str,
+    dte_ladder: list[int],
+    tail_days: int = 3,
+) -> dict[str, OptionsSnapshot]:
+    """Fetch one chain wide enough to cover every tenor on the scan ladder.
+
+    The agent no longer has a fixed expiry — it scans a ladder of DTEs (see
+    `config/strategy.yaml` `tenor_scan.dte_ladder`) and trades only the tenor whose VRP
+    clears the threshold. `tail_days` widens the window a little past the longest ladder
+    tenor so the nearest listed expiry to it is still in range.
+    """
+    lo = max(0, min(dte_ladder) - tail_days)
+    hi = max(dte_ladder) + tail_days
+    return fetch_chain(client, underlying_symbol, expiry_days_min=lo, expiry_days_max=hi)

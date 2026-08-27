@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from alpaca.common.enums import BaseURL
 from alpaca.data.historical.option import OptionHistoricalDataClient
+from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.trading.client import TradingClient
 from alpaca.trading.models import TradeAccount
 
@@ -25,6 +26,15 @@ def get_trading_client(settings: Settings) -> TradingClient:
 
 def get_option_data_client(settings: Settings) -> OptionHistoricalDataClient:
     return OptionHistoricalDataClient(
+        api_key=settings.alpaca_api_key,
+        secret_key=settings.alpaca_secret_key,
+    )
+
+
+def get_stock_data_client(settings: Settings) -> StockHistoricalDataClient:
+    """Historical stock bars — used only to compute the underlying's realized volatility
+    and read its last price. Read-only market data, no trading surface."""
+    return StockHistoricalDataClient(
         api_key=settings.alpaca_api_key,
         secret_key=settings.alpaca_secret_key,
     )

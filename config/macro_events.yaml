@@ -1,0 +1,24 @@
+# Known macro events — hand-maintained for the hackathon window (2026-08-28 .. 2026-09-04).
+#
+# There is no calendar-provider integration for the hackathon: this file is the whole event
+# source (see docs/strategy.md, rule R3 and note C). Keep it small and current.
+#
+# Fields:
+#   name         human-readable event name
+#   datetime_et  release time in US Eastern (naive local time, "America/New_York")
+#   importance   "major" | "minor" — only "major" events drive the R3 tenor block by default
+#   source       where the date/time came from
+#
+# Rule R3: the agent will not open a position whose expiry falls on/after one of these events
+# if the event is within `macro_calendar.block_within_days` days (see config/strategy.yaml).
+
+events:
+  - name: "JOLTS Job Openings (July)"
+    datetime_et: "2026-09-01T10:00:00"
+    importance: minor
+    source: "BLS release schedule — secondary indicator, does not block tenors by default"
+
+  - name: "Nonfarm Payrolls / Employment Situation (August)"
+    datetime_et: "2026-09-04T08:30:00"
+    importance: major
+    source: "BLS Employment Situation release schedule — first Friday of the month, 08:30 ET"
