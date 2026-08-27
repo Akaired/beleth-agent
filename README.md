@@ -9,9 +9,9 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** pre-development. No agent code has been written yet — this repo currently holds
-> project setup, vendored Alpaca documentation, and planning docs. See [TODO.md](TODO.md) for
-> what's next and the project notes for hard development constraints.
+> **Status:** in development, milestone 1 (agent-side read-only data plumbing — no orders yet,
+> no webapp yet). See [TODO.md](TODO.md) for what's next and the project notes for hard
+> development constraints.
 
 ## Hard constraints
 
@@ -28,14 +28,28 @@ the full list:
 - The LLM layer is provider-agnostic (via LiteLLM) — switching models is a config change, never
   a code change.
 
-## Planned stack
+## Architecture
 
-- **Backend:** Python 3.11+, FastAPI (REST + WebSocket for live agent state)
-- **Alpaca integration:** official MCP server / CLI / `alpaca-py` SDK — see `the local reference cache/`
-- **LLM layer:** LiteLLM abstraction, provider selected via config
-- **Persistence:** SQLite or structured JSON (decisions, risk-checks, trades)
-- **Frontend:** vanilla HTML/CSS/JS + Chart.js, no heavy framework
-- **Deploy:** static frontend on a subdomain, backend exposed via Cloudflare Tunnel
+Two independent processes communicating only through Supabase — not a monolith. This keeps the
+public showcase/dashboard reachable (last known state) even if the trading agent's host machine
+is off; only new decisions pause.
+
+- **Agent (Python, runs on a private machine):** Alpaca paper trading via `alpaca-py`, options
+  strategy logic, LLM decisions via LiteLLM → Regolo.ai (`Llama-3.3-70B-Instruct`, swappable via
+  config). Writes every decision/risk-check/trade directly to Supabase Postgres. No inbound
+  network exposure — outbound-only.
+- **Webapp (Next.js App Router on Vercel):** public showcase + authenticated dashboard/backoffice
+  in one deploy, reading from the same Supabase database. Three access levels via Supabase Auth
+  + RLS: public (showcase + limited live view), demo admin (full read-only detail), admin (full
+  control, operator only).
+- **Supabase:** shared Postgres — single source of truth for both sides — plus Auth for the
+  webapp's access levels.
+
+Strategy: short vertical credit spreads on elevated implied volatility, short-dated, always a
+single defined-risk multi-leg order. Full parameters in `config/strategy.yaml` (industry-standard
+starting values, not backtested by us — see the spec §5 for the honest read on expected performance:
+most trades win, individual losses are structurally larger, and that's normal for this strategy,
+not a bug).
 
 ## Repository layout
 
@@ -55,23 +69,13 @@ the full list:
 ## Getting started
 
 1. Clone the repo.
-2. `cp .env.example .env` and fill in your Alpaca paper trading API keys (and an LLM provider
-   key once one is chosen — see open decisions below).
+2. `cp .env.example .env` and fill in your Alpaca paper trading API keys and your Regolo.ai key.
 3. Repopulate the local Alpaca documentation cache (gitignored, not shipped in the repo):
    ```
    python3 scripts/fetch_docs.py
    ```
 4. Application setup (dependency install, running the backend/frontend) will be documented here
    once the first working code lands.
-
-## Open decisions
-
-Tracked in the the project spec (`local design assetsbeleth-agent-prd.md`, §10) and not yet finalized:
-
-1. Exact MVP trading strategy (proposed: systematic hedging overlay on a small liquid basket).
-2. Default LLM provider for initial testing (the layer stays swappable regardless).
-3. Whether/how much to extend into multi-asset portfolio overlays beyond the initial basket.
-4. Exact subdomains for frontend/backend deployment.
 
 ## License
 
