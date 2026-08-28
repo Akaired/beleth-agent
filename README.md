@@ -13,9 +13,9 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 3 (the pre-trade risk-check engine) done — still no orders placed, no
-> webapp yet. See [TODO.md](TODO.md) for what's next and the project notes for hard
-> development constraints.
+> **Status:** milestone 4 (Supabase persistence — every cycle writes its decision, risk
+> checks, positions, and status) done — still no orders placed, no webapp yet. See
+> [TODO.md](TODO.md) for what's next and the project notes for hard development constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
 > spreads enabled); SPY option chain fetch, Greeks/IV, and the delta filter confirmed against
@@ -38,6 +38,17 @@ not just the wins.
 > paper account. Provider note: Regolo was dropped 2026-08-28 (its trial API returned
 > `402 trial_expired` on a fresh account) in favour of OpenRouter free models — a config-only
 > change behind the same OpenAI-compatible client.
+>
+> Milestone 4 (2026-08-28): every cycle is persisted to **Supabase Postgres** — the single
+> source of truth the webapp will read, and the verifiable decision log for judges.
+> [`scripts/check_market_data.py`](scripts/check_market_data.py) now runs a full cycle
+> (evidence package → risk gate → decision) and writes the append-only decision row (with the
+> full evidence package and a strategy-config snapshot), one risk_checks row per
+> (candidate, rule) — rejections are first-class rows — plus the open-positions mirror and the
+> agent-status heartbeat. Schema in [`db/migrations/`](db/migrations/); data dictionary and the
+> dashboard's queries in [`db/README.md`](db/README.md). Until the LLM decision layer lands the
+> action is always `no_trade` with `decision_source='risk_engine'`, and every persisted summary
+> says so explicitly.
 
 ### Data quality disclosure
 
@@ -143,11 +154,12 @@ bug).
    uv sync
    uv run python scripts/check_alpaca_connection.py
    uv run python scripts/check_options_data.py SPY
-   uv run python scripts/check_market_data.py SPY   # full evidence package as JSON
+   uv run python scripts/check_market_data.py SPY   # full cycle: evidence → risk gate → persists to Supabase
+   uv run python scripts/check_supabase_connection.py --smoke   # persistence round trip (needs SUPABASE_* in .env)
    uv run pytest                    # fast unit tests, no network
-   uv run pytest -m integration     # hits the real paper account + market data + FRED
+   uv run pytest -m integration     # hits the real paper account + market data + FRED + Supabase
    ```
-5. Agent decision logic, persistence, and the webapp are not built yet — see
+5. The LLM decision layer, the order path, and the webapp are not built yet — see
    [TODO.md](TODO.md).
 
 ## License
