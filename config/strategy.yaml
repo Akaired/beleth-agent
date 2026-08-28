@@ -74,11 +74,19 @@ structure:
   short_leg_delta_max: 0.25
   strike_width_usd_min: 1
   strike_width_usd_max: 5
-  # The order path prices the spread at the measured (mid) credit MINUS this much slippage —
-  # a mid quote is an indication, not a fillable price, so the limit demands slightly less
-  # credit to be fillable. The measured credit is the strategy's economics; this is the
-  # execution concession (Strategy level B: industry convention, not backtested).
-  credit_slippage_usd: 0.02
+  # The order path prices the spread at the measured (mid) credit MINUS a slippage
+  # concession — a mid quote is an indication, not a fillable price. The concession is the
+  # LARGER of an absolute floor and a fraction of the candidate's own bid/ask width:
+  #   slippage = max(credit_slippage_usd, credit_slippage_frac_of_spread * bid_ask_width)
+  # Fixed 0.02 alone was below the half-spread on 95% of 2026-08-28 candidates, so the one
+  # order sent rested unfilled all day (Strategy level B: industry convention, not backtested).
+  credit_slippage_usd: 0.02 # absolute floor, per share
+  credit_slippage_frac_of_spread: 0.5 # 0.5 = walk the limit to the near touch, not just to the mid; 0 disables
+  # If being marketable would concede more than this fraction of the MEASURED credit, the
+  # cycle does not trade and logs why — an explicit no-trade beats an order that never
+  # fills. Day-1 spread/credit ran to 7.3 in the tail; 0.5 filters that slice by design.
+  # 0 disables the cap.
+  max_slippage_frac_of_credit: 0.5
 
 exit:
   profit_target_pct_of_max_credit: 50 # close at 50% of max credit captured, don't wait for expiry
@@ -94,6 +102,11 @@ risk:
   max_risk_per_trade_pct_of_equity: 2 # 1-2% band; this is the upper bound used as the hard cap
   max_concurrent_positions: 5
   daily_drawdown_stop_pct: 3 # stop opening new positions for the day past this drawdown
+  # Account-level aggregate cap (R11, apply_aggregate_cap): committed risk across open
+  # positions plus a new candidate's max loss must stay within this percent of equity.
+  # 0 = disabled. Ships inert — architectural hygiene, not tuned; set once real
+  # multi-position paper data exists.
+  max_aggregate_risk_pct_of_equity: 0
 
 runner:
   # Resident loop (scripts/run_agent.py, milestone 8). Full cycles run ONLY while the

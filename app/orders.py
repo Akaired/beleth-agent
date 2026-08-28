@@ -86,6 +86,53 @@ def credit_limit_price(credit: float | None, slippage: float) -> float | None:
     return -math.floor(net * 100) / 100
 
 
+def entry_slippage(
+    net_quote_width: float | None,
+    *,
+    floor_usd: float,
+    frac_of_spread: float,
+) -> float:
+    """The per-share credit concession an entry limit gives up to be fillable.
+
+    A mid quote is an indication, not a fillable price; how far off it is scales with
+    the structure's own bid/ask width, not a constant. So the concession is the larger
+    of an absolute floor (``structure.credit_slippage_usd``) and a fraction of the
+    candidate's combined leg width (``structure.credit_slippage_frac_of_spread``).
+
+    Day-1 (2026-08-28) live data: the fixed 0.02 floor was below the half-spread on
+    95.3% of candidates, so the one order sent rested unfilled all day. ``frac_of_spread``
+    of 0.5 walks the limit to the near touch (bid or ask), not just halfway.
+
+    Falls back to the floor alone when the width is unknown/non-positive or the fraction
+    is 0 — so the feature ships inert until ``frac_of_spread`` is set.
+    """
+    if net_quote_width is None or net_quote_width <= 0 or frac_of_spread <= 0:
+        return floor_usd
+    return max(floor_usd, frac_of_spread * net_quote_width)
+
+
+def slippage_within_credit_cap(
+    slippage: float,
+    credit: float | None,
+    *,
+    max_frac_of_credit: float,
+) -> bool:
+    """``False`` -> do not trade: being marketable would concede more than
+    ``max_frac_of_credit`` of the measured credit.
+
+    The measured credit is the strategy's economics; conceding most of it to force a
+    fill is an order that either never fills or fills at a price the thesis no longer
+    supports. Better an explicit, logged no-trade. Day-1 data: median spread/credit was
+    0.59 but the tail ran to 7.3, so a 0.5 cap filters a real slice of candidates — by
+    design. ``max_frac_of_credit`` of 0 disables the cap (feature ships inert).
+    """
+    if max_frac_of_credit <= 0:
+        return True
+    if credit is None or credit <= 0:
+        return False
+    return slippage <= max_frac_of_credit * credit
+
+
 # --- closing (exit) orders --------------------------------------------------------------------
 
 

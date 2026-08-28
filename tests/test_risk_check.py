@@ -8,6 +8,7 @@ default strategy.yaml values the per-trade cap (2%) is $2,000 and the daily-draw
 from app.options.spreads import SpreadCandidate
 from app.risk_check import (
     AccountRiskState,
+    apply_aggregate_cap,
     check_r4,
     check_r6,
     check_r7,
@@ -238,3 +239,48 @@ def test_verdict_as_dict_shape():
     }
     assert d["rejected_by"] == []
     assert len(d["results"]) == 3
+
+
+# --- R11: account-level aggregate risk cap (apply_aggregate_cap) -------------------------
+
+
+def _approved_verdict(max_loss: float = 400.0):
+    return evaluate_candidate(make_candidate(max_loss=max_loss), state(), STRATEGY)
+
+
+def test_aggregate_cap_is_inert_at_zero():
+    out = apply_aggregate_cap([_approved_verdict()], state(capital_at_risk=99_000.0),
+                              max_aggregate_risk_pct=0)
+    assert out[0].approved is True
+    assert not any(r.rule == "R11" for r in out[0].results)
+
+
+def test_aggregate_cap_admits_a_candidate_that_stays_within_the_cap():
+    # cap = 5% of 100k = $5,000; $2,000 already at risk + $400 candidate = $2,400 < cap.
+    out = apply_aggregate_cap([_approved_verdict(max_loss=400.0)],
+                              state(capital_at_risk=2_000.0), max_aggregate_risk_pct=5)
+    assert out[0].approved is True
+    assert not any(r.rule == "R11" for r in out[0].results)
+
+
+def test_aggregate_cap_rejects_with_an_r11_row_when_the_projection_breaches_it():
+    # cap = $5,000; $4,800 at risk + $400 candidate = $5,200 > cap -> reject.
+    out = apply_aggregate_cap([_approved_verdict(max_loss=400.0)],
+                              state(capital_at_risk=4_800.0), max_aggregate_risk_pct=5)
+    verdict = out[0]
+    assert verdict.approved is False
+    r11 = next(r for r in verdict.results if r.rule == "R11")
+    assert r11.passed is False
+    assert r11.detail["projected_capital_at_risk"] == 5_200.0
+    assert r11.detail["aggregate_cap_usd"] == 5_000.0
+    assert verdict.as_dict()["rejected_by"] == ["R11"]
+
+
+def test_aggregate_cap_leaves_already_rejected_and_unknown_max_loss_verdicts_alone():
+    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0),
+                                  STRATEGY)
+    unknown = evaluate_candidate(make_candidate(credit=None, max_loss=None, breakeven=None),
+                                 state(), STRATEGY)  # R4 already fails this
+    out = apply_aggregate_cap([rejected, unknown], state(capital_at_risk=99_000.0),
+                              max_aggregate_risk_pct=5)
+    assert not any(r.rule == "R11" for v in out for r in v.results)

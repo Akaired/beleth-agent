@@ -90,6 +90,8 @@ from app.orders import (  # noqa: E402
     credit_limit_price,
     describe_closing_legs,
     describe_legs,
+    entry_slippage,
+    slippage_within_credit_cap,
     submit_mleg_order,
 )
 from app.persistence import (  # noqa: E402
@@ -105,7 +107,12 @@ from app.persistence import (  # noqa: E402
     supabase_config_from_settings,
     trade_row,
 )
-from app.risk_check import AccountRiskState, block_entries, evaluate_candidates  # noqa: E402
+from app.risk_check import (  # noqa: E402
+    AccountRiskState,
+    apply_aggregate_cap,
+    block_entries,
+    evaluate_candidates,
+)
 from app.vrp import best_tradable_tenor, scan_tenors  # noqa: E402
 
 
@@ -323,18 +330,42 @@ def _prepare_order(
         strategy_config["risk"]["max_risk_per_trade_pct_of_equity"],
         max_loss,
     )
-    slippage = strategy_config["structure"]["credit_slippage_usd"]
-    limit_price = credit_limit_price(credit, slippage)
+    structure = strategy_config["structure"]
+    # Dynamic entry slippage: the larger of the fixed floor and a fraction of the
+    # candidate's own bid/ask width. The fixed 0.02 was below the half-spread on 95% of
+    # 2026-08-28 candidates, so the one order sent rested unfilled all day.
+    slippage = entry_slippage(
+        candidate.net_quote_width,
+        floor_usd=structure["credit_slippage_usd"],
+        frac_of_spread=structure.get("credit_slippage_frac_of_spread", 0.0),
+    )
+    max_frac_of_credit = structure.get("max_slippage_frac_of_credit", 0.0)
 
     if qty < 1:
         return None, (
             f" No order was sent: sizing cannot fit even one spread under the per-trade "
             f"risk cap (max loss {max_loss} at {equity:.2f} equity) — fail-closed."
         )
+    if (
+        credit is not None
+        and credit > 0
+        and not slippage_within_credit_cap(
+            slippage, credit, max_frac_of_credit=max_frac_of_credit
+        )
+    ):
+        return None, (
+            f" No order was sent: to be marketable this spread's limit would concede "
+            f"${slippage:.2f} of its ${credit:.2f} measured credit "
+            f"(bid/ask width {candidate.net_quote_width}), above the "
+            f"{max_frac_of_credit * 100:.0f}% cap — an explicit no-trade beats an order "
+            "that never fills (fail-closed)."
+        )
+
+    limit_price = credit_limit_price(credit, slippage)
     if limit_price is None:
         return None, (
             f" No order was sent: no fillable net-credit limit exists (credit {credit}, "
-            f"slippage {slippage}) — fail-closed."
+            f"slippage {slippage:.2f}) — fail-closed."
         )
 
     request = build_mleg_order(
@@ -342,7 +373,8 @@ def _prepare_order(
     )
     note = (
         f" One multi-leg order ({qty} spread(s) at a {abs(limit_price):.2f} net-credit "
-        "limit) is being sent; the trades log carries the outcome."
+        f"limit — {slippage:.2f} slippage off the {credit:.2f} measured mid) is being "
+        "sent; the trades log carries the outcome."
     )
     return (
         {
@@ -602,6 +634,16 @@ def main() -> int:
     # Anomalies and unsizable open spreads reject every new entry (an extra R6 row) —
     # surfaced in the same risk_checks rows as every other rule, never silent.
     verdicts = block_entries(verdicts, entry_blocks)
+    # Account-level aggregate cap (R11): committed risk across open positions plus this
+    # candidate's max loss must stay within the configured percent of equity. Inert
+    # (cap 0) until a value is set in config/strategy.yaml.
+    verdicts = apply_aggregate_cap(
+        verdicts,
+        risk_state,
+        max_aggregate_risk_pct=strategy["risk"].get(
+            "max_aggregate_risk_pct_of_equity", 0
+        ),
+    )
 
     # --- decision: the LLM weighs the evidence only when it has something to weigh ------
     as_of = datetime.now(timezone.utc)

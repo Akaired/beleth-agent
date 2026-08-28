@@ -21,6 +21,8 @@ from app.orders import (
     credit_limit_price,
     describe_closing_legs,
     describe_legs,
+    entry_slippage,
+    slippage_within_credit_cap,
     submit_mleg_order,
 )
 
@@ -107,6 +109,59 @@ def test_credit_limit_fails_closed_when_slippage_eats_the_whole_credit():
 
 def test_credit_limit_with_zero_slippage_is_the_measured_credit():
     assert credit_limit_price(0.60, 0.0) == -0.60
+
+
+# --- dynamic entry slippage (P1, 2026-08-28 review) ------------------------------------------
+#
+# The three scenarios below are real container-era candidates from the 2026-08-28 decision
+# log (SPY 1-wide verticals, ~42 DTE): (bid/ask width, measured credit).
+#   0.10 / 0.25   -> frac-governed, well inside the credit cap  -> order
+#   0.14 / 0.22   -> frac-governed, inside the credit cap        -> order
+#   0.47 / 0.305  -> frac-governed, concession > half the credit -> explicit no-trade
+
+
+def test_entry_slippage_takes_the_larger_of_floor_and_half_spread():
+    # 0.5 * 0.10 = 0.05 > 0.02 floor.
+    assert entry_slippage(0.10, floor_usd=0.02, frac_of_spread=0.5) == 0.05
+    # 0.5 * 0.14 = 0.07.
+    assert entry_slippage(0.14, floor_usd=0.02, frac_of_spread=0.5) == 0.07
+    # 0.5 * 0.47 = 0.235.
+    assert entry_slippage(0.47, floor_usd=0.02, frac_of_spread=0.5) == 0.235
+
+
+def test_entry_slippage_falls_back_to_the_floor_when_the_spread_is_tiny():
+    # 0.5 * 0.03 = 0.015 < 0.02 floor -> the floor governs (minimum behaviour unchanged).
+    assert entry_slippage(0.03, floor_usd=0.02, frac_of_spread=0.5) == 0.02
+
+
+def test_entry_slippage_ships_inert_without_a_fraction_or_a_width():
+    # frac 0 -> the feature is off: floor only, exactly the pre-P1 behaviour.
+    assert entry_slippage(0.47, floor_usd=0.02, frac_of_spread=0.0) == 0.02
+    # unknown / non-positive width -> floor only.
+    assert entry_slippage(None, floor_usd=0.02, frac_of_spread=0.5) == 0.02
+    assert entry_slippage(0.0, floor_usd=0.02, frac_of_spread=0.5) == 0.02
+
+
+def test_slippage_credit_cap_admits_the_two_narrow_day1_spreads():
+    # 0.05 concession vs 0.25 credit -> 20% < 50% cap.
+    assert slippage_within_credit_cap(0.05, 0.25, max_frac_of_credit=0.5) is True
+    # 0.07 concession vs 0.22 credit -> ~32% < 50% cap.
+    assert slippage_within_credit_cap(0.07, 0.22, max_frac_of_credit=0.5) is True
+
+
+def test_slippage_credit_cap_rejects_the_wide_day1_spread():
+    # 0.235 concession vs 0.305 credit -> 77% > 50% cap: do not trade.
+    assert slippage_within_credit_cap(0.235, 0.305, max_frac_of_credit=0.5) is False
+
+
+def test_slippage_credit_cap_boundary_and_inert_cases():
+    assert slippage_within_credit_cap(0.10, 0.20, max_frac_of_credit=0.5) is True  # exactly 50%
+    assert slippage_within_credit_cap(0.101, 0.20, max_frac_of_credit=0.5) is False
+    # cap 0 disables the gate entirely.
+    assert slippage_within_credit_cap(1.0, 0.05, max_frac_of_credit=0.0) is True
+    # no measured credit and an active cap -> cannot clear it.
+    assert slippage_within_credit_cap(0.02, None, max_frac_of_credit=0.5) is False
+    assert slippage_within_credit_cap(0.02, 0.0, max_frac_of_credit=0.5) is False
 
 
 # --- order construction -----------------------------------------------------------------------

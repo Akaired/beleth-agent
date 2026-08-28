@@ -22,6 +22,17 @@ _STRATEGY = {
     "structure": {"credit_slippage_usd": 0.02},
 }
 
+# The production defaults after the 2026-08-28 review: dynamic entry slippage (half the
+# candidate's bid/ask width, floored at 0.02) plus a no-trade above half the measured credit.
+_PROD_STRATEGY = {
+    "risk": {"max_risk_per_trade_pct_of_equity": 2.0},
+    "structure": {
+        "credit_slippage_usd": 0.02,
+        "credit_slippage_frac_of_spread": 0.5,
+        "max_slippage_frac_of_credit": 0.5,
+    },
+}
+
 
 def _candidate(**overrides):
     from app.options.spreads import SpreadCandidate
@@ -114,6 +125,39 @@ def test_prepare_order_fails_closed_on_a_structure_the_cycle_never_built():
     )
     assert plan is None
     assert "did not carry a candidate this cycle built" in note
+
+
+def test_prepare_order_with_prod_defaults_walks_the_limit_by_half_the_spread():
+    # Real day-1 candidate: bid/ask width 0.10, measured credit 0.25. Dynamic slippage
+    # 0.5 * 0.10 = 0.05 (> 0.02 floor); 0.05 is 20% of the credit, inside the 50% cap.
+    candidate = _candidate(credit=0.25, max_loss=75.0, net_quote_width=0.10)
+    plan, note = _prepare_order(
+        candidate.as_dict(), [candidate], equity=100_000.0, strategy_config=_PROD_STRATEGY
+    )
+    assert plan is not None
+    assert plan["request"].to_request_fields()["limit_price"] == -0.20  # 0.25 - 0.05
+    assert "0.05 slippage off the 0.25 measured mid" in note
+
+
+def test_prepare_order_with_prod_defaults_still_trades_the_0_14_spread():
+    # width 0.14, credit 0.22 -> slippage 0.07 (32% of credit, inside the cap).
+    candidate = _candidate(credit=0.22, max_loss=78.0, net_quote_width=0.14)
+    plan, _ = _prepare_order(
+        candidate.as_dict(), [candidate], equity=100_000.0, strategy_config=_PROD_STRATEGY
+    )
+    assert plan is not None
+    assert plan["request"].to_request_fields()["limit_price"] == -0.15  # 0.22 - 0.07
+
+
+def test_prepare_order_no_trades_when_slippage_would_eat_over_half_the_credit():
+    # Real day-1 candidate: width 0.47, credit 0.305. Slippage 0.235 is 77% of the credit,
+    # past the 50% cap -> explicit no-trade instead of an order that rests unfilled.
+    candidate = _candidate(credit=0.305, max_loss=69.5, net_quote_width=0.47)
+    plan, note = _prepare_order(
+        candidate.as_dict(), [candidate], equity=100_000.0, strategy_config=_PROD_STRATEGY
+    )
+    assert plan is None
+    assert "above the 50% cap" in note and "fail-closed" in note
 
 
 def test_prepare_order_uses_the_candidate_dict_numbers_the_gate_saw():

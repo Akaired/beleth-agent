@@ -21,11 +21,18 @@ Rules implemented here (see ``docs/strategy.md``):
 * **R6 — sizing.** The candidate's own max loss must not exceed
   ``risk.max_risk_per_trade_pct_of_equity`` percent of account equity, and the number of open
   positions must stay below ``risk.max_concurrent_positions``. Capital already at risk across
-  open positions is surfaced for transparency; there is no configured aggregate cap, so it is
-  reported, not gated on.
+  open positions is surfaced here for transparency; it is gated separately by the account-level
+  ``apply_aggregate_cap`` (R11).
 * **R7 — daily stop.** If the day's drawdown has already reached
   ``risk.daily_drawdown_stop_pct`` percent of equity, every new candidate is rejected
   regardless of the other rules, and that is stated as the reason.
+
+One further gate runs *after* the per-candidate rules, in the caller, because it is a
+property of the whole account rather than of one candidate — it emits its own visible
+rejection row and ships inert until configured:
+
+* **R11 — aggregate risk cap** (``apply_aggregate_cap``): committed risk across open positions
+  plus this candidate's max loss must stay within ``risk.max_aggregate_risk_pct_of_equity``.
 
 R5 (exit rules for open positions) is deliberately not here — it has nothing to act on until an
 order path and real positions exist. See TODO.md.
@@ -56,7 +63,7 @@ class AccountRiskState:
 
 @dataclass(frozen=True)
 class RuleResult:
-    rule: str  # "R4" | "R6" | "R7"
+    rule: str  # "R4" | "R6" | "R7" | "R11" (apply_aggregate_cap)
     passed: bool
     reason: str  # human-readable, names the rule and quotes the numbers used
     detail: dict[str, Any] = field(default_factory=dict)
@@ -304,6 +311,68 @@ def block_entries(
                 results=[
                     *verdict.results,
                     RuleResult("R6", False, reason_text, {"reasons": list(reasons)}),
+                ],
+                approved=False,
+            )
+        )
+    return out
+
+
+def apply_aggregate_cap(
+    verdicts: list[RiskVerdict],
+    state: AccountRiskState,
+    *,
+    max_aggregate_risk_pct: float,
+) -> list[RiskVerdict]:
+    """Second-stage, account-level gate (**R11**): reject any still-approved verdict
+    whose own max loss, added to the capital already at risk across open positions,
+    would breach ``risk.max_aggregate_risk_pct_of_equity`` percent of equity.
+
+    Like ``block_entries`` this runs *after* the per-candidate rules and emits one extra
+    visible rejection row — it is not a structural property of the candidate but of the
+    whole book, so it does not belong inside ``evaluate_candidate``. It is a conservative
+    floor: the projection adds a single spread's max loss (quantity is sized down later
+    in ``compute_quantity``), so a pass here never *under*-counts committed risk.
+
+    ``max_aggregate_risk_pct`` of 0 disables the cap — the feature ships inert until the
+    value is set. A verdict whose max loss is unknown is left to R4 (which already fails
+    it); R11 does not double-punish.
+    """
+    if max_aggregate_risk_pct <= 0:
+        return list(verdicts)
+    cap_usd = state.equity * max_aggregate_risk_pct / 100
+    out: list[RiskVerdict] = []
+    for verdict in verdicts:
+        if not verdict.approved or verdict.max_loss is None:
+            out.append(verdict)
+            continue
+        projected = state.capital_at_risk + verdict.max_loss
+        if projected <= cap_usd:
+            out.append(verdict)
+            continue
+        detail = {
+            "candidate_max_loss": verdict.max_loss,
+            "capital_at_risk_current": state.capital_at_risk,
+            "projected_capital_at_risk": round(projected, 2),
+            "aggregate_cap_usd": round(cap_usd, 2),
+            "aggregate_cap_pct": max_aggregate_risk_pct,
+            "equity": state.equity,
+        }
+        out.append(
+            replace(
+                verdict,
+                results=[
+                    *verdict.results,
+                    RuleResult(
+                        "R11",
+                        False,
+                        f"R11 (aggregate risk cap): adding this spread's max loss "
+                        f"{_usd(verdict.max_loss)} to {_usd(state.capital_at_risk)} "
+                        f"already at risk would reach {_usd(projected)}, past the "
+                        f"{max_aggregate_risk_pct:.2f}% aggregate cap ({_usd(cap_usd)}) "
+                        "— no new entry until open risk comes down.",
+                        detail,
+                    ),
                 ],
                 approved=False,
             )
