@@ -13,9 +13,10 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 6 (the order path) done — a trade decision now becomes one real
-> multi-leg order on the paper account, gated and logged. No webapp yet. See
-> [TODO.md](TODO.md) for what's next and the project notes for hard development
+> **Status:** milestone 8 (resident runner + container) done — the agent is a market-hours-aware
+> loop packaged as a Docker image, deploying to its dedicated machine: mechanical exit
+> management (R5), the gated order path, and full decision persistence to Supabase. No webapp
+> yet. See [TODO.md](TODO.md) for what's next and the project notes for hard development
 > constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg

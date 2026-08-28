@@ -94,3 +94,16 @@ risk:
   max_risk_per_trade_pct_of_equity: 2 # 1-2% band; this is the upper bound used as the hard cap
   max_concurrent_positions: 5
   daily_drawdown_stop_pct: 3 # stop opening new positions for the day past this drawdown
+
+runner:
+  # Resident loop (scripts/run_agent.py, milestone 8). Full cycles run ONLY while the
+  # market is open; outside hours the loop heartbeats agent_status ('idle') on the
+  # slower cadence so the dashboard can tell "alive, market closed" from "agent down".
+  open_cycle_interval_minutes: 5
+  closed_heartbeat_interval_minutes: 15
+  # While the master-admin pause switch (agent_status.paused, which the agent never
+  # writes) is on — or until it can be read — the loop polls on this cadence.
+  pause_poll_seconds: 30
+  # One cycle = one subprocess; anything slower than this is killed and the loop moves
+  # on. Generous by design: the cycle makes several outbound API calls.
+  cycle_timeout_seconds: 600

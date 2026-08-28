@@ -1,0 +1,16 @@
+# Keep the build context small and secrets out of the image — the .env file must never
+# be copied in (compose/docker inject it as environment variables at runtime).
+.git
+.env
+.venv
+.claude
+.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
+assets
+db
+tests
+Dockerfile
+compose.yaml
+.dockerignore

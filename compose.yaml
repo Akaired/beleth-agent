@@ -1,0 +1,12 @@
+# Resident deployment for the the trading host (Ubuntu bare metal, Docker).
+# restart: unless-stopped IS the process supervision — a crashed or rebooted host
+# brings the agent back without manual action. No ports: the agent is outbound-only.
+services:
+  beleth-agent:
+    build: .
+    image: beleth-agent:latest
+    container_name: beleth-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    stop_grace_period: 30s
