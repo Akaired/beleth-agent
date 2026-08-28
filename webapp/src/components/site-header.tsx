@@ -21,7 +21,7 @@ export function SiteHeader({ agentStatus }: { agentStatus: AgentStatusRow | null
             BELETH
           </span>
           <span className="hidden text-xs text-dim sm:inline">
-            Autonomous options agent
+            Autonomous options trading agent
           </span>
         </div>
         <nav className="flex items-center gap-5">
