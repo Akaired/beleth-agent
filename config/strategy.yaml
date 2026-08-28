@@ -27,22 +27,20 @@ entry:
     # smaller trade, never a second no-trade path (that is block_below_pct's job alone).
     # taper_floor_frac feeds risk.max_risk_per_trade_pct_of_equity in compute_quantity.
     #
-    # ALL ZERO = DISABLED: with these defaults the multiplier is always 1.0 and nothing
-    # is blocked. Real values to be set once decided together.
-    #
-    # Historical base rates (VIX close, 1990-2026, 252d lookback) behind the shape:
+    # ENABLED 2026-08-29 with the calibrated values below (set any to 0 / floor 1.0 to
+    # disable). Historical base rates (VIX close, 1990-2026, 252d lookback) behind the shape:
     #   percentile < 25 on ~33% of days, usually a multi-week regime (66% of such days in
     #     episodes >= 10 trading days; longest runs 50-78 days: 2003, 2009, 2023) — too
     #     frequent for a hard block, right level to START tapering.
     #   percentile < 3 on ~8% of days, and mostly SHORT episodes (median ~2 trading days)
     #     — a genuine extreme-complacency tail, the right level for the hard block and for
     #     the taper floor.
-    # Intended shape once enabled: taper_upper_pct 25, taper_lower_pct 3,
-    #   taper_floor_frac 0.5, block_below_pct 3.
-    taper_upper_pct: 0 # at or above this 1y percentile -> full size (1.0)
-    taper_lower_pct: 0 # at or below this -> taper_floor_frac (held down to block_below_pct)
-    taper_floor_frac: 1.0 # size multiplier at/below taper_lower_pct (e.g. 0.5 = half size)
-    block_below_pct: 0 # strictly below this -> no new entry at all (R9 rejection row)
+    # NOTE: the VIX 1y percentile was 3.97 on 2026-08-27, so at enable time R9 tapers new
+    # entries to ~0.52x and a small further drop hard-blocks them — intended behaviour.
+    taper_upper_pct: 25 # at or above this 1y percentile -> full size (1.0)
+    taper_lower_pct: 3 # at or below this -> taper_floor_frac (held down to block_below_pct)
+    taper_floor_frac: 0.5 # size multiplier at/below taper_lower_pct (e.g. 0.5 = half size)
+    block_below_pct: 3 # strictly below this -> no new entry at all (R9 rejection row)
 
 tenor_scan:
   # The agent has no fixed expiry. It scans this ladder of days-to-expiry, measures the premium
@@ -128,9 +126,11 @@ risk:
   daily_drawdown_stop_pct: 3 # stop opening new positions for the day past this drawdown
   # Account-level aggregate cap (R11, apply_aggregate_cap): committed risk across open
   # positions plus a new candidate's max loss must stay within this percent of equity.
-  # 0 = disabled. Ships inert — architectural hygiene, not tuned; set once real
-  # multi-position paper data exists.
-  max_aggregate_risk_pct_of_equity: 0
+  # 0 = disabled. Set to 6 on 2026-08-29 (day-1 review): 2x the daily drawdown stop, so
+  # R11 bites at ~3 full-size (2%) concurrent positions — before max_concurrent_positions
+  # — while SPY+QQQ at normal load (~4%) still clears it. SPY/QQQ are ~0.95 correlated, so
+  # aggregate exposure is treated as one directional short-vol bet, not diversified.
+  max_aggregate_risk_pct_of_equity: 6
 
 runner:
   # Resident loop (scripts/run_agent.py, milestone 8). Full cycles run ONLY while the
