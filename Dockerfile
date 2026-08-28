@@ -20,6 +20,11 @@ COPY scripts ./scripts
 COPY config ./config
 COPY docs ./docs
 
+# Writable directory for the mirrored diagnostic log (P6). compose.yaml mounts a named
+# volume here so the stream survives a container recreation; a bare `docker run` still
+# gets a working (ephemeral) log dir.
+RUN mkdir -p /app/logs
+
 # Non-root user; secrets are NOT baked in — they arrive via environment at runtime
 # (docker compose env_file / docker run --env-file).
 RUN useradd --create-home --uid 1000 beleth && chown -R beleth:beleth /app

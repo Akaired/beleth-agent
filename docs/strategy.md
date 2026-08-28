@@ -110,10 +110,42 @@ These are what the agent runs on. Parameters live in `config/strategy.yaml`, nev
   fill (mark + a wider-than-entry slippage concession — a protective close that rests
   unfilled is worse than paying for liquidity). Naked legs, unpaired protective legs, or a
   spread whose entry credit cannot be computed block every new entry until resolved.
-- **R6.** Sizing: risk 1–2% per trade, at most 3–5 open positions.
+- **R6.** Sizing: risk 1–2% per trade, at most 3–5 open positions. R6 is now *only* the
+  per-trade cap and the position count — the account-state entry block is R10 and the
+  aggregate dollar cap is R11 (both below).
 - **R7.** Daily stop: intraday drawdown beyond 3% → stop opening new positions for the day.
 - **R8.** If no tenor clears the threshold, **do not trade** and state the reason in the
   dashboard. An agent that knows how to stay still is part of the project, not a fault.
+- **R9.** VIX-regime size taper. The per-trade risk budget is scaled by a 0.0–1.0
+  multiplier read off the VIX's own 1-year percentile: full size at/above
+  `entry.vix_regime.taper_upper_pct`, a single straight line down to `taper_floor_frac`
+  at/below `taper_lower_pct`, and **0.0 — no new entry** strictly below `block_below_pct`.
+  A partial taper only shrinks the quantity (`compute_quantity`); only the hard block
+  produces a visible R9 rejection row. *Why a taper, not a block:* low VIX is a weak
+  timing signal (Level A, Simon & Wiggins 2001 / CBOE), and on our ~5-day cycle window a
+  blanket block can mean zero trades for a week (Level C cost). *Thresholds:* from the
+  VIX-close history 1990–2026 (252-day lookback, the production window), 1y-percentile
+  < 25 occurs ~33% of days and is usually a multi-week regime (66% of such days sit in
+  runs ≥ 10 trading days; 2003/2009/2023 ran 50–78 days) — too common to block, the right
+  level to *start* tapering; percentile < 3 occurs ~8% of days in mostly short episodes
+  (~2 trading days) — the genuine extreme-complacency tail, the level for the hard block
+  and the taper floor. Intended shape once enabled: 25 / 3 / 0.5 / 3. Ships inert (all
+  keys 0). VIX unavailable → multiplier 1.0; R2 (backwardation) remains the real regime
+  gate. Level C (our choice), calibrated on the historical base rates above.
+- **R10.** Entry blocked by account state (`block_entries`). A resting entry order,
+  unpaired/naked option legs, an open spread whose entry credit cannot be computed, or an
+  unreadable order book each reject every new entry with their own rejection row, tagged
+  by kind (`resting_entry_order` / `position_anomaly` / `open_orders_unreadable`). Split
+  off R6 on 2026-08-28: every "R6" rejection in the first live day was actually this
+  block, never a real sizing failure, so the two were indistinguishable in the dashboard.
+  Exits are never gated by R10. Level C (transparency requirement, constraint #3).
+- **R11.** Aggregate risk cap (`apply_aggregate_cap`). Committed risk across open
+  positions plus a new candidate's max loss must stay within
+  `risk.max_aggregate_risk_pct_of_equity` of equity, else the candidate is rejected with
+  its own R11 row. A conservative floor — it projects one spread's max loss before
+  quantity is sized down. Ships inert (cap 0) until a value is chosen against real
+  multi-position paper data. Level C (architectural hygiene; R6 already bounds each trade
+  and the position count, R11 bounds their sum).
 
 ### How the pieces map to data sources
 

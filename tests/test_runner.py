@@ -17,6 +17,7 @@ from scripts.run_agent import (  # noqa: E402
     chunked_sleep,
     read_paused,
     run_cycle,
+    run_log_config,
     runner_config,
 )
 
@@ -60,6 +61,39 @@ def test_runner_config_reads_overrides():
     assert cfg["closed_heartbeat_interval_minutes"] == 30.0
     assert cfg["pause_poll_seconds"] == 10.0
     assert cfg["cycle_timeout_seconds"] == 120.0
+
+
+# --- run_log_config --------------------------------------------------------------------
+
+
+def test_run_log_config_defaults_without_section():
+    cfg = run_log_config({})
+    assert cfg["enabled"] is True
+    assert cfg["directory"] == "/app/logs"
+    assert cfg["filename"] == "runner.log"
+    assert cfg["max_bytes"] == 5_000_000
+    assert cfg["backup_count"] == 5
+
+
+def test_run_log_config_reads_overrides():
+    cfg = run_log_config(
+        {
+            "runner": {
+                "diagnostic_log": {
+                    "enabled": False,
+                    "dir": "/var/log/beleth",
+                    "filename": "agent.log",
+                    "max_bytes": 1000,
+                    "backup_count": 2,
+                }
+            }
+        }
+    )
+    assert cfg["enabled"] is False
+    assert cfg["directory"] == "/var/log/beleth"
+    assert cfg["filename"] == "agent.log"
+    assert cfg["max_bytes"] == 1000
+    assert cfg["backup_count"] == 2
 
 
 # --- chunked_sleep -----------------------------------------------------------------------

@@ -10,3 +10,26 @@ services:
     env_file:
       - .env
     stop_grace_period: 30s
+    # P6 — cap Docker's own json-file logs so an unattended host cannot fill its disk.
+    # These are still discarded on every `up --build` / recreate; the durable record is
+    # Supabase, and the human-readable narrative is mirrored to the logs volume below.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    # P6 — hard memory ceiling: a leak becomes a clean OOM kill (OOMKilled=true,
+    # RestartCount climbs, restart: unless-stopped brings it back) instead of the agent
+    # slowly starving the the trading host. Day-1 steady state was ~80 MiB; 512 MiB is wide headroom.
+    # Compose v2 applies deploy.resources.limits for `docker compose up` (no swarm needed).
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    # P6 — mirror the runner's stdout/stderr to a rotating file that OUTLIVES a container
+    # recreation, so the ~1 h of narrative lost to every early rebuild cannot happen again.
+    volumes:
+      - beleth-logs:/app/logs
+
+volumes:
+  beleth-logs:

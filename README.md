@@ -156,7 +156,9 @@ bug).
 │   ├── smoke_test_tool_calling.py     # OpenRouter free-model tool-calling verification
 │   ├── check_alpaca_connection.py     # paper account/positions read
 │   ├── check_options_data.py          # SPY chain + delta filter
-│   └── check_market_data.py           # full evidence package (VIX + RV + term structure + VRP + candidates)
+│   ├── check_market_data.py           # full evidence package (VIX + RV + term structure + VRP + candidates)
+│   ├── run_agent.py                   # resident runner loop (one cycle per symbol per interval)
+│   └── deploy_guard.py                # refuses a container rebuild while the market is open
 ├── tests/                 # unit tests (fast, no network) + integration tests (`pytest -m integration`)
 ├── assets/
 │   └── beleth-avatar.png  # mascot art used in this README
@@ -186,6 +188,38 @@ bug).
    ```
 5. The authenticated webapp dashboard (public-user / demo-admin / master-admin views) is not
    built yet — the public homepage is live in [webapp/](webapp/). See [TODO.md](TODO.md).
+
+## Running the resident agent (the trading host)
+
+The agent runs as a single Docker service defined in [`compose.yaml`](compose.yaml) —
+outbound-only, no exposed ports, `restart: unless-stopped` as the process supervision.
+
+```
+python scripts/deploy_guard.py && docker compose up -d --build   # rebuild only when the market is closed
+docker compose logs -f beleth-agent                              # live narrative (also mirrored to the logs volume)
+docker compose stop beleth-agent                                 # graceful SIGTERM stop
+```
+
+Operational notes:
+
+- **Never rebuild during market hours.** `docker compose up --build` recreates the
+  container, killing the in-flight cycle and the resting-order guard's live view.
+  `scripts/deploy_guard.py` exits non-zero while the market is open (`--force` overrides
+  for an emergency fix).
+- **Logs.** Docker's own `json-file` logs are capped (`max-size: 10m`, `max-file: 5`)
+  and are still discarded on every recreate. The runner also mirrors its stdout/stderr
+  to a rotating file in the `beleth-logs` named volume (`/app/logs/runner.log`,
+  `5 MB × 5`), which survives a rebuild. Cadence and log settings live in
+  `config/strategy.yaml` under `runner:`.
+- **Memory.** The service has a hard 512 MiB limit, so a leak surfaces as a clean OOM
+  kill (`docker inspect` → `OOMKilled=true`, `RestartCount` climbs) rather than starving
+  the host. Day-1 steady state was ~80 MiB.
+- **Kill switch.** Set `agent_status.paused = true` in Supabase to suspend cycles
+  without stopping the container; the loop polls it every 30 s and the agent never
+  writes that column itself.
+- The durable record (decisions, risk-check outcomes, trades, heartbeat) is in Supabase
+  and survives every container recreation — the mirrored log is a debugging convenience,
+  not the source of truth.
 
 ## License
 

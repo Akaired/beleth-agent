@@ -144,3 +144,14 @@ runner:
   # One cycle = one subprocess; anything slower than this is killed and the loop moves
   # on. Generous by design: the cycle makes several outbound API calls.
   cycle_timeout_seconds: 600
+  # P6 — the runner mirrors its own stdout/stderr to a rotating file in this directory
+  # so the diagnostic narrative survives a container recreation (Docker's json-file logs
+  # are dropped on every `up --build`). compose.yaml mounts a named volume at /app/logs.
+  # Fail-open: if the directory is not writable the runner logs a warning and keeps
+  # going with console output only. Set enabled=false to disable the on-disk mirror.
+  diagnostic_log:
+    enabled: true
+    dir: /app/logs
+    filename: runner.log
+    max_bytes: 5000000
+    backup_count: 5

@@ -35,6 +35,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.alpaca_client import get_trading_client  # noqa: E402
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.runlog import install_run_log  # noqa: E402
 from app.persistence import (  # noqa: E402
     PersistenceError,
     agent_status_row,
@@ -50,6 +51,12 @@ DEFAULT_OPEN_CYCLE_MINUTES = 5.0
 DEFAULT_CLOSED_HEARTBEAT_MINUTES = 15.0
 DEFAULT_PAUSE_POLL_SECONDS = 30.0
 DEFAULT_CYCLE_TIMEOUT_SECONDS = 600.0
+
+# Diagnostic-log fallbacks — real values in config/strategy.yaml (``runner.diagnostic_log``).
+DEFAULT_LOG_DIR = "/app/logs"
+DEFAULT_LOG_FILENAME = "runner.log"
+DEFAULT_LOG_MAX_BYTES = 5_000_000
+DEFAULT_LOG_BACKUP_COUNT = 5
 
 
 class _StopRequested:
@@ -88,6 +95,22 @@ def runner_config(strategy: Mapping[str, Any]) -> dict[str, float]:
         ),
         "pause_poll_seconds": float(cfg.get("pause_poll_seconds", DEFAULT_PAUSE_POLL_SECONDS)),
         "cycle_timeout_seconds": float(cfg.get("cycle_timeout_seconds", DEFAULT_CYCLE_TIMEOUT_SECONDS)),
+    }
+
+
+def run_log_config(strategy: Mapping[str, Any]) -> dict[str, Any]:
+    """Diagnostic-log settings from ``config/strategy.yaml`` (``runner.diagnostic_log``).
+
+    Missing section or missing keys fall back to the module defaults; ``enabled`` false
+    turns the on-disk mirror off entirely (console output is unchanged).
+    """
+    cfg = ((strategy.get("runner") or {}).get("diagnostic_log")) or {}
+    return {
+        "enabled": bool(cfg.get("enabled", True)),
+        "directory": str(cfg.get("dir", DEFAULT_LOG_DIR)),
+        "filename": str(cfg.get("filename", DEFAULT_LOG_FILENAME)),
+        "max_bytes": int(cfg.get("max_bytes", DEFAULT_LOG_MAX_BYTES)),
+        "backup_count": int(cfg.get("backup_count", DEFAULT_LOG_BACKUP_COUNT)),
     }
 
 
@@ -176,6 +199,18 @@ def main() -> int:
         print(exc, file=sys.stderr)
         return 1
 
+    log_cfg = run_log_config(strategy)
+    stop_logging: Callable[[], None] = lambda: None  # noqa: E731
+    if log_cfg["enabled"]:
+        # Tee stdout/stderr to a rotating file in a volume-backed dir so the diagnostic
+        # stream outlives a container recreation (Docker's json-file logs do not).
+        stop_logging = install_run_log(
+            directory=log_cfg["directory"],
+            filename=log_cfg["filename"],
+            max_bytes=log_cfg["max_bytes"],
+            backup_count=log_cfg["backup_count"],
+        )
+
     cfg = runner_config(strategy)
     symbols = [
         str(symbol).upper()
@@ -254,6 +289,7 @@ def main() -> int:
             chunked_sleep(sleep_seconds, should_stop=stop)
 
     print("runner stopped gracefully", flush=True)
+    stop_logging()
     return 0
 
 
