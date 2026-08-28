@@ -17,6 +17,7 @@ from app.persistence import (
     position_rows,
     risk_check_rows,
     supabase_config_from_settings,
+    trade_row,
 )
 from app.risk_check import RuleResult, RiskVerdict
 
@@ -248,6 +249,76 @@ def test_agent_status_row_includes_decision_and_detail():
 def test_agent_status_row_rejects_unknown_state():
     with pytest.raises(PersistenceError):
         agent_status_row(state="dancing", last_cycle_at=datetime(2026, 8, 28, tzinfo=timezone.utc))
+
+
+# --- trade rows -------------------------------------------------------------------------------
+
+
+_ORDER_DUMP = {
+    "id": "0b5c6a4e-0000-0000-0000-000000000001",
+    "client_order_id": "beleth-abc123",
+    "status": "accepted",
+    "qty": "3",
+    "filled_qty": "0",
+    "filled_avg_price": None,
+    "submitted_at": "2026-08-28T14:05:00Z",
+    "filled_at": None,
+    "legs": [{"symbol": "SPY260918P00440000", "side": "sell"}],
+}
+
+_LEGS = [{"role": "short", "symbol": "SPY260918P00440000", "strike": 440.0}]
+
+
+def test_trade_row_carries_the_order_fields():
+    row = trade_row(
+        decision_id="dec-1",
+        underlying="SPY",
+        qty=3,
+        credit=0.98,
+        max_loss=400.0,
+        legs=_LEGS,
+        order=_ORDER_DUMP,
+    )
+    assert row["decision_id"] == "dec-1"
+    assert row["underlying"] == "SPY"
+    assert row["qty"] == 3
+    assert row["credit"] == 0.98  # the net credit the limit demanded
+    assert row["max_loss"] == 400.0
+    assert row["legs"] == _LEGS
+    assert row["alpaca_order_id"] == _ORDER_DUMP["id"]
+    assert row["client_order_id"] == "beleth-abc123"
+    assert row["status"] == "accepted"
+    assert row["filled_qty"] == 0.0  # Alpaca numerics arrive as strings
+    assert row.get("filled_avg_price") is None
+    assert row["submitted_at"] == "2026-08-28T14:05:00Z"
+    assert "filled_at" not in row  # nullable column, key simply absent
+    assert row["raw"]["id"] == _ORDER_DUMP["id"]
+
+
+def test_trade_row_marks_a_submission_failure_without_an_order():
+    row = trade_row(
+        decision_id="dec-1",
+        underlying="SPY",
+        qty=3,
+        credit=0.98,
+        max_loss=400.0,
+        legs=_LEGS,
+        failure="APIError: 403 not authorized",
+    )
+    assert row["status"] == "submission_failed"
+    assert "alpaca_order_id" not in row
+    assert row["raw"] == {"error": "APIError: 403 not authorized"}
+    # The plan itself is still on the row — what the cycle *tried* to send is auditable.
+    assert row["qty"] == 3
+    assert row["legs"] == _LEGS
+
+
+def test_trade_row_converts_datetime_values_in_the_order_dump():
+    order = dict(_ORDER_DUMP, submitted_at=datetime(2026, 8, 28, 14, 5, tzinfo=timezone.utc))
+    row = trade_row(
+        decision_id="dec-1", underlying="SPY", qty=1, credit=0.98, max_loss=400.0, order=order
+    )
+    assert row["submitted_at"] == "2026-08-28T14:05:00+00:00"
 
 
 # --- config dataclass ------------------------------------------------------------------------

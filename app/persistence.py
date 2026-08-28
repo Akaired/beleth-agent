@@ -256,6 +256,65 @@ def _float_or_none(value: Any) -> float | None:
     return None if value is None else float(value)
 
 
+def _datetime_or_none(value: Any) -> str | None:
+    """Alpaca timestamps arrive as ISO strings (mode="json" dumps) or datetimes."""
+    if value is None:
+        return None
+    return value.isoformat() if isinstance(value, datetime) else str(value)
+
+
+def trade_row(
+    *,
+    decision_id: str,
+    underlying: str,
+    qty: float,
+    credit: float | None,
+    max_loss: float | None,
+    legs: Sequence[Mapping[str, Any]] | None = None,
+    order: Mapping[str, Any] | None = None,
+    failure: str | None = None,
+) -> dict[str, Any]:
+    """Shape the ``trades`` row for one decision's order.
+
+    ``order`` is the Alpaca order dump from ``app.orders.submit_mleg_order`` (parent order
+    with nested legs); ``failure`` is the message when the submission never produced an
+    order (``status='submission_failed'``, no Alpaca id — the rejection is a first-class
+    row, constraint #3). ``credit`` stores the net credit the limit demanded (positive
+    number); Alpaca's raw ``filled_avg_price`` (signed, per the mleg debit/credit
+    convention) stays in the ``filled_avg_price`` column and the ``raw`` dump.
+    """
+    row: dict[str, Any] = {
+        "decision_id": decision_id,
+        "underlying": underlying,
+        "qty": qty,
+        "credit": credit,
+        "max_loss": max_loss,
+        "legs": _ensure_json_safe(list(legs) if legs else None),
+    }
+    if order is not None:
+        row.update(
+            {
+                "alpaca_order_id": order.get("id"),
+                "client_order_id": order.get("client_order_id"),
+                "status": order.get("status"),
+                "filled_qty": _float_or_none(order.get("filled_qty")),
+                "filled_avg_price": _float_or_none(order.get("filled_avg_price")),
+                "submitted_at": _datetime_or_none(order.get("submitted_at")),
+                "filled_at": _datetime_or_none(order.get("filled_at")),
+                "raw": _ensure_json_safe(order),
+            }
+        )
+    else:
+        row.update(
+            {
+                "status": "submission_failed",
+                "raw": {"error": failure or "unknown submission failure"},
+            }
+        )
+    # Absent keys take the columns' DB defaults (NULL) — no explicit nulls on the wire.
+    return {k: v for k, v in row.items() if v is not None}
+
+
 def agent_status_row(
     *,
     state: str,
@@ -299,6 +358,12 @@ def persist_risk_checks(
         return 0
     _request(config, "POST", "risk_checks", json_body=rows)
     return len(rows)
+
+
+def persist_trade(config: SupabaseConfig, row: Mapping[str, Any]) -> None:
+    """Insert one trades row for an already-persisted decision (the caller owns ordering:
+    the decision row must exist first — the trades FK references it)."""
+    _request(config, "POST", "trades", json_body=[_ensure_json_safe(dict(row))])
 
 
 def mirror_positions(
@@ -382,6 +447,19 @@ def fetch_risk_checks(
             "decision_id": f"eq.{decision_id}",
             "order": "candidate_index.asc,rule.asc",
         },
+    )
+    return data or []
+
+
+def fetch_trades_for_decision(
+    config: SupabaseConfig,
+    decision_id: str,
+    *,
+    select: str = "underlying,alpaca_order_id,client_order_id,status,qty,filled_qty,"
+    "filled_avg_price,credit,max_loss,legs,submitted_at",
+) -> list[dict[str, Any]]:
+    data = _request(
+        config, "GET", "trades", params={"select": select, "decision_id": f"eq.{decision_id}"}
     )
     return data or []
 

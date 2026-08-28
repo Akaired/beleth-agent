@@ -30,7 +30,7 @@ hand from the dashboard.
 |---|---|---|
 | `decisions` | agent, one row per cycle, append-only | the decision (action, plain-language `summary`), denormalized `equity`/`day_pnl`/`market_open` for the P&L curve, the **full evidence package** and a snapshot of `config/strategy.yaml` as JSONB, nullable `llm_*` columns for the LLM milestone |
 | `risk_checks` | agent, one row per (decision, candidate, rule) | `rule` (`R4`/`R6`/`R7`), `passed`, human-readable `reason`, structured `detail`, the full `candidate` — rejections are first-class rows, queryable independently and shown with the same prominence as fills |
-| `trades` | agent, once the order path exists (schema only today) | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload |
+| `trades` | agent, when a cycle submits an order | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload |
 | `positions` | agent, mirrored every cycle (upsert + per-symbol delete of closed ones) | current open positions; `first_seen_at` is derived by trigger, never client-sent |
 | `agent_status` | agent, single row `id=1` upserted every cycle | `state` (vocabulary in `app/persistence.py`), `paused` (master-admin switch — the agent never writes it), `last_decision_id` |
 

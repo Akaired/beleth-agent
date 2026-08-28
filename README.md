@@ -13,9 +13,9 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 5 (LLM decision layer — the model weighs the evidence and records a
-> structured choice among risk-approved candidates) done — still no orders placed, no webapp
-> yet. See [TODO.md](TODO.md) for what's next and the project notes for hard development
+> **Status:** milestone 6 (the order path) done — a trade decision now becomes one real
+> multi-leg order on the paper account, gated and logged. No webapp yet. See
+> [TODO.md](TODO.md) for what's next and the project notes for hard development
 > constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
@@ -57,8 +57,18 @@ not just the wins.
 > degrades to the deterministic no-trade, never to a trade. The full
 > [`docs/strategy.md`](docs/strategy.md) reasoning is injected into its system prompt; its
 > reasoning and token usage are persisted with every decision. The R2 regime gate
-> (backwardation) is now enforced in the candidate pipeline, not just reported. No order path
-> exists yet, so a `trade` decision says so in its own summary and sends nothing.
+> (backwardation) is now enforced in the candidate pipeline, not just reported.
+>
+> Milestone 6 (2026-08-28): the **order path** ([`app/orders.py`](app/orders.py)) is live.
+> A `trade` decision becomes exactly one multi-leg `mleg` limit order on the Alpaca paper
+> account — the chosen candidate's own two legs inside a single order (short sell-to-open,
+> long buy-to-open, never split, never naked), sized by `risk.max_risk_per_trade_pct_of_equity`
+> and priced at the measured credit minus a configured slippage. The order is submitted only
+> after the decision row is persisted; sizing or pricing that cannot respect the cap fails
+> closed with the reason in the persisted summary, and a submission rejection is persisted as
+> a first-class `submission_failed` trades row. The API contract (mleg semantics, negative
+> limit = net credit, day-only TIF) was verified live: one qty-1 probe order accepted by the
+> paper account, left unfilled by design, canceled cleanly.
 
 ### Data quality disclosure
 
@@ -164,12 +174,13 @@ bug).
    uv sync
    uv run python scripts/check_alpaca_connection.py
    uv run python scripts/check_options_data.py SPY
-   uv run python scripts/check_market_data.py SPY   # full cycle: evidence → risk gate → persists to Supabase
+   uv run python scripts/check_market_data.py SPY   # full cycle: evidence → risk gate → decision → (order) → persists to Supabase
+   uv run python scripts/check_order_path.py --dry-run   # build the mleg order a trade decision would send; submits nothing
    uv run python scripts/check_supabase_connection.py --smoke   # persistence round trip (needs SUPABASE_* in .env)
    uv run pytest                    # fast unit tests, no network
    uv run pytest -m integration     # hits the real paper account + market data + FRED + Supabase
    ```
-5. The LLM decision layer, the order path, and the webapp are not built yet — see
+5. The R5 exit rules and the webapp are not built yet — see
    [TODO.md](TODO.md).
 
 ## License

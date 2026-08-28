@@ -11,8 +11,9 @@ Two decision sources share one ``DecisionDraft``:
   to the deterministic no-trade — never to a trade.
 
 Summaries are the plain-language verdicts the anonymous homepage renders, so they must stand
-alone and stay honest (constraint #10): they always disclose which layer decided,
-and a ``trade`` decision always discloses that no order path is wired yet.
+alone and stay honest (constraint #10): they always disclose which layer decided.
+A ``trade`` decision describes the structure and the risk-approved size; the order outcome
+lives in the trades log the same cycle writes, so the summary never pre-claims a fill.
 """
 
 from __future__ import annotations
@@ -132,6 +133,10 @@ class DecisionDraft:
     llm_model: str | None = None
     llm_reasoning: str | None = None
     llm_usage: dict[str, Any] | None = None
+    # Set on a 'trade' decision: the chosen candidate's dict, handed to the order path so
+    # sizing and submission act on exactly the structure the decision picked. Always None
+    # on a no_trade — the caller must treat a trade without one as a fail-closed fault.
+    chosen_candidate: dict[str, Any] | None = None
 
 
 def decide_from_risk_engine(
@@ -229,7 +234,8 @@ def _verdict_summary(verdicts: Sequence[RiskVerdict]) -> str:
     smallest = min(losses) if losses else 0.0
     return (
         f"No trade: {len(approved)} of {len(verdicts)} candidate(s) passed the risk gate "
-        f"(smallest max loss ${smallest:,.2f}) but no order path is wired yet."
+        f"(smallest max loss ${smallest:,.2f}) but the cycle stood down without sending "
+        "an order."
     )
 
 
@@ -350,7 +356,7 @@ def _trade_summary(verdict: RiskVerdict, reasoning: str) -> str:
         f"Trade: sell a {_direction(c)} vertical on {c['symbol']} — {c['strikes'][0]}/"
         f"{c['strikes'][1]} strikes expiring {c['expiry']} ({c['dte']} DTE), "
         f"{_credit_text(c)}, defined max loss {_usd(verdict.max_loss)} per spread. "
-        f"Why: {reasoning.strip()} No order is sent yet — the order path is the next milestone."
+        f"Why: {reasoning.strip()}"
     )
 
 
@@ -497,6 +503,11 @@ def decide_from_llm(
             llm_model=settings.openrouter_model,
             llm_reasoning=_reasoning_trail(texts, args),
             llm_usage={**usage, "model": settings.openrouter_model},
+            chosen_candidate=(
+                approved[args["candidate_index"]].candidate
+                if args["action"] == "trade"
+                else None
+            ),
         )
 
     return _llm_fallback(

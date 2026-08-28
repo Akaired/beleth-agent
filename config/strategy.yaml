@@ -74,6 +74,11 @@ structure:
   short_leg_delta_max: 0.25
   strike_width_usd_min: 1
   strike_width_usd_max: 5
+  # The order path prices the spread at the measured (mid) credit MINUS this much slippage —
+  # a mid quote is an indication, not a fillable price, so the limit demands slightly less
+  # credit to be fillable. The measured credit is the strategy's economics; this is the
+  # execution concession (Strategy level B: industry convention, not backtested).
+  credit_slippage_usd: 0.02
 
 exit:
   profit_target_pct_of_max_credit: 50 # close at 50% of max credit captured, don't wait for expiry

@@ -152,7 +152,7 @@ def test_all_rejected_names_the_rejecting_rules():
     assert "2 candidate(s) built, all rejected by the risk gate (R6, R7)." in draft.summary
 
 
-def test_approved_candidates_reported_but_no_order_path():
+def test_approved_candidates_reported_but_stood_down():
     verdicts = [
         _verdict(approved=False, rules=[("R4", True), ("R6", False), ("R7", True)]),
         _verdict(approved=True, rules=[("R4", True), ("R6", True), ("R7", True)]),
@@ -160,7 +160,7 @@ def test_approved_candidates_reported_but_no_order_path():
     draft = _decide(verdicts=verdicts)
     assert "1 of 2 candidate(s) passed the risk gate" in draft.summary
     assert "$400.00" in draft.summary
-    assert "no order path is wired yet" in draft.summary
+    assert "stood down without sending an order" in draft.summary
 
 
 def test_deterministic_summary_discloses_the_llm_was_not_consulted():
@@ -269,9 +269,23 @@ def test_llm_trade_decision_is_persisted_with_full_provenance():
         "model": "fake-model",
     }
     assert "max loss $400.00" in draft.summary
-    assert "No order is sent yet" in draft.summary
     assert "submit_decision args" in draft.llm_reasoning
     assert "Premium is there" in draft.llm_reasoning
+    # The order path consumes this: the chosen candidate travels with the decision, so
+    # sizing and submission act on exactly the structure the model picked.
+    assert draft.chosen_candidate == _APPROVED[0].candidate
+
+
+def test_llm_decline_carries_no_chosen_candidate():
+    scripted = _ScriptedLLM(
+        _response(
+            tool_args={"action": "no_trade", "reasoning": "Credit too thin for the risk."},
+            usage=(90, 15, 105),
+        )
+    )
+    draft = _llm_decide(scripted)
+    assert draft.action == "no_trade"
+    assert draft.chosen_candidate is None
 
 
 def test_llm_decline_is_a_first_class_llm_decision():

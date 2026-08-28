@@ -3,7 +3,7 @@
 This is *candidate generation*, not trade selection: it turns raw contracts into a short
 list of well-formed vertical spreads with their max loss, credit, and breakeven already
 computed, so the evidence package carries concrete structures rather than a raw chain. The
-LLM decision layer (choosing whether and which to trade) is a later milestone.
+LLM decision layer chooses whether and which to trade on top of this list.
 
 Every candidate here is a single two-leg vertical: short one option in the target delta band,
 long one further out of the money by the configured strike width. Max loss is bounded to
@@ -57,6 +57,11 @@ class SpreadCandidate:
     max_loss: float | None  # per one-contract spread, in dollars
     breakeven: float | None
     net_quote_width: float | None  # combined bid/ask width of the two legs, per share
+    # The two legs' real OCC contract symbols as they appeared in the chain snapshot —
+    # carried through so the order path submits exactly the contracts it measured, and
+    # never rebuilds a symbol from (expiry, strike, right).
+    short_symbol: str = ""
+    long_symbol: str = ""
 
     def as_dict(self) -> dict:
         return {
@@ -73,6 +78,8 @@ class SpreadCandidate:
             "bid_ask_spread": None
             if self.net_quote_width is None
             else round(self.net_quote_width, 4),
+            "short_symbol": self.short_symbol,
+            "long_symbol": self.long_symbol,
         }
 
 
@@ -180,6 +187,8 @@ def _build_one_side(
         max_loss=max_loss,
         breakeven=breakeven,
         net_quote_width=net_quote_width,
+        short_symbol=short_leg.symbol,
+        long_symbol=long_leg.symbol,
     )
 
 
