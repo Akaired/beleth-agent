@@ -1,0 +1,223 @@
+@import "tailwindcss";
+
+/*
+ * Beleth design tokens — taken 1:1 from the approved mockup
+ * (the design mockup).
+ * Near-black surfaces, one desaturated green / one desaturated red for
+ * P&L and pass/fail, one gold accent tied to Beleth and "live" elements,
+ * everything else grayscale. The restraint is the point.
+ */
+@theme inline {
+  /* surfaces */
+  --color-bg: #0b0e11;
+  --color-panel: #0f1317;
+  --color-panel-head: #141a20;
+  --color-table-head: #0d1114;
+  --color-inset: #11161a;
+  --color-hoverbg: #151c22;
+  --color-chipbg: #1b2530;
+  --color-line: #1f262c;
+  --color-rowline: #171d22;
+  --color-track: #1b2228;
+  --color-inputline: #232b32;
+  --color-hoverline: #3a444c;
+  --color-emphline: #2a333a;
+  --color-killline: #5a2c27;
+
+  /* text */
+  --color-txt: #dde3e8;
+  --color-sec: #8c959d;
+  --color-dim: #5d666e;
+  --color-faint: #4e575e;
+  --color-honesty: #7c858c;
+  --color-pre-input: #8fa39a;
+  --color-pre-output: #c6cdd3;
+
+  /* semantic */
+  --color-up: #35a67c;
+  --color-down: #e0584c;
+  --color-acc: #d9a03c;
+  --color-blocked: #7a3a34;
+  --color-neutralbar: #39424a;
+  --color-sel: rgba(217, 160, 60, 0.28);
+  --color-rowtint: rgba(53, 166, 124, 0.05);
+  --color-chartarea: rgba(53, 166, 124, 0.12);
+
+  /* type */
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), monospace;
+  --font-serif: var(--font-newsreader), Georgia, serif;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-txt);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+::selection {
+  background: var(--color-sel);
+}
+
+/* Scrollbars, per the mockup (10px, near-invisible track). */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0e11;
+}
+::-webkit-scrollbar-thumb {
+  background: #232b32;
+  border-radius: 2px;
+}
+
+/*
+ * Mascot motion — extracted verbatim from the mockup's helmet CSS. The SVG is
+ * inlined (src/components/beleth-svg.ts) so these reach the named groups.
+ */
+.beleth-sprite svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+#beleth {
+  animation: bfloat 4.6s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 30px 40px;
+}
+#wing {
+  animation: bflap 1.9s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 30px 44px;
+}
+#tail {
+  animation: btail 3.4s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 40px 52px;
+}
+#head {
+  animation: bhead 4.6s ease-in-out infinite;
+  transform-box: view-box;
+  transform-origin: 30px 34px;
+}
+#sigil {
+  animation: bsigil 2.6s ease-in-out infinite;
+}
+#eyes {
+  animation: bblink 5.4s steps(1, end) infinite;
+}
+#flame {
+  animation: bflame 0.7s steps(2, end) infinite;
+  transform-box: view-box;
+  transform-origin: 30px 17px;
+}
+
+@keyframes bfloat {
+  0%,
+  100% {
+    transform: translateY(0.9px);
+  }
+  50% {
+    transform: translateY(-0.9px);
+  }
+}
+@keyframes bflap {
+  0%,
+  100% {
+    transform: scaleX(1) scaleY(1);
+  }
+  50% {
+    transform: scaleX(0.84) scaleY(1.05);
+  }
+}
+@keyframes bflame {
+  0% {
+    transform: scaleY(1) scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleY(1.2) scaleX(0.9);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scaleY(0.92) scaleX(1.08);
+    opacity: 1;
+  }
+}
+@keyframes bblink {
+  0%,
+  92% {
+    opacity: 1;
+  }
+  93%,
+  96% {
+    opacity: 0;
+  }
+  97%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes bsigil {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes btail {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+@keyframes bhead {
+  0%,
+  100% {
+    transform: translateY(0.35px);
+  }
+  50% {
+    transform: translateY(-0.35px);
+  }
+}
+
+/* Thought bubbles — one visible at a time on a 13s cycle, staggered by delay. */
+@keyframes bubble {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  3% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  14% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  19% {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+.thought-bubble {
+  opacity: 0;
+  animation: bubble 13s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
