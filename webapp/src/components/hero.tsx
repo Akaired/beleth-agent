@@ -47,7 +47,7 @@ export function Hero({
   bubbles: ThoughtBubble[];
 }) {
   return (
-    <section className="grid md:grid-cols-2 gap-6 md:gap-[clamp(24px,4vw,56px)] px-4 md:px-[clamp(16px,3vw,40px)] py-[clamp(40px,6vw,80px)]">
+    <section className="grid md:grid-cols-2 items-center gap-6 md:gap-[clamp(24px,4vw,56px)] px-4 md:px-[clamp(16px,3vw,40px)] py-[clamp(40px,6vw,80px)]">
       <div>
         <h1
           className="font-serif font-light text-[clamp(34px,4.4vw,60px)] leading-[1.06] tracking-[-0.02em] max-w-[21ch]"
@@ -95,9 +95,11 @@ export function Hero({
           </div>
         )}
       </div>
-      <div className="relative max-w-[300px] mx-auto md:ml-auto md:mr-0 w-full">
-        <BelethSprite />
-        <ThoughtBubbles bubbles={bubbles} />
+      <div className="flex items-center justify-center">
+        <div className="relative w-full max-w-[300px]">
+          <BelethSprite />
+          <ThoughtBubbles bubbles={bubbles} />
+        </div>
       </div>
     </section>
   );
