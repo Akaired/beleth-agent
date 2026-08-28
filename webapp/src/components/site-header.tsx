@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { agentStateLine } from "@/lib/queries";
 import type { AgentStatusRow } from "@/lib/queries";
 
@@ -31,6 +32,12 @@ export function SiteHeader({ agentStatus }: { agentStatus: AgentStatusRow | null
         >
           Method
         </a>
+        <Link
+          href="/dashboard"
+          className="text-[12.5px] text-sec hover:text-acc transition-colors"
+        >
+          Dashboard
+        </Link>
         {state && (
           <span className="hidden md:flex items-center gap-2 font-mono text-[10px] tracking-[0.08em] text-sec">
             <span className={`w-1.5 h-1.5 rounded-full ${STATE_TONE[state.tone]}`} />
