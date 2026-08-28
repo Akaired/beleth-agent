@@ -13,10 +13,11 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 8 (resident runner + container) done — the agent is a market-hours-aware
-> loop packaged as a Docker image, deploying to its dedicated machine: mechanical exit
-> management (R5), the gated order path, and full decision persistence to Supabase. No webapp
-> yet. See [TODO.md](TODO.md) for what's next and the project notes for hard development
+> **Status:** milestone 9 started — the webapp scaffold is in ([webapp/](webapp/), Next.js +
+> Tailwind v4): the public homepage reads the live decision log from Supabase and deploys to
+> Vercel. The agent itself is live: a market-hours-aware Docker loop with mechanical exit
+> management (R5), the gated order path, and full decision persistence to Supabase. See
+> [TODO.md](TODO.md) for what's next and the project notes for hard development
 > constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
@@ -106,11 +107,13 @@ is off; only new decisions pause.
   swappable via config). Writes every decision/risk-check/trade directly to Supabase Postgres.
   No inbound
   network exposure — outbound-only.
-- **Webapp (Next.js App Router on Vercel):** public homepage + authenticated dashboard/backoffice
-  in one deploy, reading from the same Supabase database. Four access states via Supabase Auth
-  + RLS: anonymous (public homepage only), public user (self-signup, curated dashboard), demo
-  admin (full backoffice, read-only — a shared account for the judges), master admin (full
-  operational control, operator only).
+- **Webapp ([webapp/](webapp/), Next.js App Router on Vercel):** public homepage + authenticated
+  dashboard/backoffice in one deploy, reading from the same Supabase database. Four access
+  states via Supabase Auth + RLS: anonymous (public homepage only), public user (self-signup,
+  curated dashboard), demo admin (full backoffice, read-only — a shared account for the
+  judges), master admin (full operational control, operator only). Anonymous reads are opened
+  by permissive SELECT policies (`db/migrations/0003_anon_read_policies.sql`); writes stay
+  service-role only.
 - **Supabase:** shared Postgres — single source of truth for both sides — plus Auth for the
   webapp's access states.
 
@@ -181,8 +184,8 @@ bug).
    uv run pytest                    # fast unit tests, no network
    uv run pytest -m integration     # hits the real paper account + market data + FRED + Supabase
    ```
-5. The R5 exit rules and the webapp are not built yet — see
-   [TODO.md](TODO.md).
+5. The authenticated webapp dashboard (public-user / demo-admin / master-admin views) is not
+   built yet — the public homepage is live in [webapp/](webapp/). See [TODO.md](TODO.md).
 
 ## License
 
