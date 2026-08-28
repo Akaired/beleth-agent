@@ -20,6 +20,7 @@ from app.persistence import (
     delete_position,
     fetch_agent_status,
     fetch_decision,
+    fetch_latest_decision,
     fetch_position,
     fetch_risk_checks,
     fetch_table_names,

@@ -430,8 +430,10 @@ def delete_position(config: SupabaseConfig, symbol: str) -> None:
 def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
     """Self-cleaning round trip: write a marked decision + 3 risk checks, read them back,
     exercise the agent_status and positions upserts (``first_seen_at`` preservation), then
-    delete everything. Restores any pre-existing ``agent_status`` row. Marked rows carry
-    ``agent_version='smoke-test'`` and a ``[smoke]`` summary so a leak is identifiable.
+    delete everything. Restores any pre-existing ``agent_status`` row and any pre-existing
+    ``positions`` rows (``mirror_positions``' stale-cleanup would otherwise delete every
+    symbol not in the smoke payload). Marked rows carry ``agent_version='smoke-test'`` and a
+    ``[smoke]`` summary so a leak is identifiable.
     """
     from app.decision import DecisionDraft
     from app.risk_check import RuleResult, RiskVerdict
@@ -439,6 +441,11 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
     results: dict[str, bool] = {}
     smoke_config = replace(config, agent_version="smoke-test")
     previous_status = fetch_agent_status(config)
+    preexisting_positions = [
+        row
+        for row in (_request(config, "GET", "positions") or [])
+        if row["symbol"] != "SMOKE-BELETH"
+    ]
     decision_id = str(uuid.uuid4())
     smoke_position = {
         "symbol": "SMOKE-BELETH",
@@ -490,12 +497,16 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
             and rows[-1]["passed"] is False
         )
 
+        # Two-step upsert: write, read first_seen_at, update, read again — the DB trigger
+        # must keep first_seen_at stable across the update while qty moves to 5.
+        mirror_positions(smoke_config, [smoke_position])
         first_seen = fetch_position(smoke_config, smoke_position["symbol"])
         mirror_positions(smoke_config, [smoke_position | {"qty": "5"}])
         second_seen = fetch_position(smoke_config, smoke_position["symbol"])
         results["positions upsert preserves first_seen_at"] = (
             first_seen is not None
             and second_seen is not None
+            and float(second_seen["qty"]) == 5.0
             and first_seen["first_seen_at"] == second_seen["first_seen_at"]
         )
 
@@ -520,6 +531,17 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
     finally:
         delete_decision(smoke_config, decision_id)
         delete_position(config, "SMOKE-BELETH")
+        if preexisting_positions:
+            # Re-upsert the snapshot verbatim. first_seen_at survives: an insert uses the
+            # payload's value, and the trigger preserves the existing one on update.
+            _request(
+                config,
+                "POST",
+                "positions",
+                params={"on_conflict": "symbol"},
+                json_body=preexisting_positions,
+                prefer="resolution=merge-duplicates",
+            )
         if previous_status is None:
             _request(config, "DELETE", "agent_status", params={"id": "eq.1"})
         else:
