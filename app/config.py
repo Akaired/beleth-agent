@@ -41,6 +41,24 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
 
+    # Optional: persistence is off until these are set — read-only scripts still run without
+    # them. app/persistence.py raises PersistenceConfigError if it is used unconfigured.
+    supabase_url: str | None = None
+    supabase_service_role_key: str | None = None
+
+    # Build identifier written onto every persisted decision. Set AGENT_VERSION in the env
+    # (e.g. to a git sha) once the agent loop lands; "dev" is the local default.
+    agent_version: str = "dev"
+
+    @field_validator("supabase_url")
+    @classmethod
+    def _normalise_supabase_url(cls, v: str | None) -> str | None:
+        if not v:
+            return v
+        if not v.startswith("https://"):
+            raise ValueError("SUPABASE_URL must be an https:// Supabase project URL")
+        return v.rstrip("/")
+
     @field_validator("alpaca_base_url")
     @classmethod
     def _must_be_paper_endpoint(cls, v: str) -> str:

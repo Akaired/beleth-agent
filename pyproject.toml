@@ -5,6 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "alpaca-py>=0.44.0",
+    "httpx>=0.28",
     "openai>=1.60.0",
     "pydantic-settings>=2.15.0",
     "pyyaml>=6.0.3",
@@ -18,5 +19,5 @@ dev = [
 
 [tool.pytest.ini_options]
 markers = [
-    "integration: hits real external APIs (Alpaca paper trading) — needs .env credentials.",
+    "integration: hits real external APIs (Alpaca paper trading / Supabase) — needs .env credentials.",
 ]

@@ -33,6 +33,29 @@ def test_rejects_non_paper_endpoint():
         )
 
 
+def test_supabase_fields_are_optional():
+    settings = Settings(
+        _env_file=None,
+        alpaca_api_key="k",
+        alpaca_secret_key="s",
+        openrouter_key="r",
+    )
+    assert settings.supabase_url is None
+    assert settings.supabase_service_role_key is None
+    assert settings.agent_version == "dev"
+
+
+def test_supabase_url_must_be_https():
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            alpaca_api_key="k",
+            alpaca_secret_key="s",
+            openrouter_key="r",
+            supabase_url="http://abc.supabase.co",
+        )
+
+
 def test_strategy_config_loads_expected_shape():
     config = load_strategy_config()
     assert "SPY" in config["universe"]["symbols"]

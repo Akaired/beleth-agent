@@ -58,6 +58,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "alpaca-py" },
+    { name = "httpx" },
     { name = "openai" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
@@ -72,6 +73,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alpaca-py", specifier = ">=0.44.0" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "openai", specifier = ">=1.60.0" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
