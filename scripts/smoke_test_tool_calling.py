@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke test: does Regolo's Llama-3.3-70B-Instruct actually do reliable tool calling?
+"""Smoke test: does the configured OpenRouter free model actually do reliable tool calling?
 
-This MUST pass before any real agent logic gets built on top of Regolo. Regolo's own
-tutorial documents tool-calling support, but we have not verified it ourselves — see
-the resolved product decisions #2.
+This MUST pass before any real agent logic gets built on top of the LLM layer. OpenRouter
+exposes tool calling on its OpenAI-compatible endpoint, but free models vary in how well
+they honour it — we verify the configured model ourselves. See the project notes "Resolved product
+decisions" #2.
 
 Three fake trading-shaped tools are offered to the model, structurally similar to what the
 real agent will use (account/chain read, order placement) but entirely fake — nothing here
@@ -161,13 +162,13 @@ def main() -> int:
     total_tokens = 0
     max_turns = 6
 
-    print(f"Model under test: {settings.regolo_model} @ {settings.regolo_base_url}\n")
+    print(f"Model under test: {settings.openrouter_model} @ {settings.openrouter_base_url}\n")
 
     for turn in range(1, max_turns + 1):
         try:
             response = complete(settings, messages, tools=TOOLS, tool_choice="auto")
         except Exception as exc:  # noqa: BLE001
-            print(f"Turn {turn}: request to Regolo failed: {exc}", file=sys.stderr)
+            print(f"Turn {turn}: request to OpenRouter failed: {exc}", file=sys.stderr)
             return 1
 
         usage = getattr(response, "usage", None)

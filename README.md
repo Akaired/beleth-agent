@@ -35,8 +35,9 @@ not just the wins.
 > reason — R4 (defined risk: max loss shown before the order, always), R6 (per-trade risk % and
 > max concurrent positions, read from the live account), R7 (3% daily-drawdown stop rejects any
 > new position). Run `uv run python scripts/check_risk.py SPY` to see verdicts against the real
-> paper account. Still pending: the Regolo tool-calling smoke test (written, deliberately not run
-> yet to preserve the daily token quota).
+> paper account. Provider note: Regolo was dropped 2026-08-28 (its trial API returned
+> `402 trial_expired` on a fresh account) in favour of OpenRouter free models — a config-only
+> change behind the same OpenAI-compatible client.
 
 ### Data quality disclosure
 
@@ -58,7 +59,8 @@ the full list:
   positions.
 - Every agent decision (input, reasoning, outcome, risk-check result) is persisted as a
   verifiable artifact.
-- The LLM layer is provider-agnostic (via LiteLLM) — switching models is a config change, never
+- The LLM layer is provider-agnostic (OpenAI-compatible endpoint) — switching models is a
+  config change, never
   a code change.
 
 ## Architecture
@@ -68,8 +70,9 @@ public showcase/dashboard reachable (last known state) even if the trading agent
 is off; only new decisions pause.
 
 - **Agent (Python, runs on a private machine):** Alpaca paper trading via `alpaca-py`, options
-  strategy logic, LLM decisions via LiteLLM → Regolo.ai (`Llama-3.3-70B-Instruct`, swappable via
-  config). Writes every decision/risk-check/trade directly to Supabase Postgres. No inbound
+  strategy logic, LLM decisions via the OpenAI SDK → OpenRouter (a free tool-calling model,
+  swappable via config). Writes every decision/risk-check/trade directly to Supabase Postgres.
+  No inbound
   network exposure — outbound-only.
 - **Webapp (Next.js App Router on Vercel):** public homepage + authenticated dashboard/backoffice
   in one deploy, reading from the same Supabase database. Four access states via Supabase Auth
@@ -107,7 +110,7 @@ bug).
 │   ├── evidence.py        # assembles the evidence package for the decision layer
 │   ├── market/            # VIX (FRED), realized vol, IV term structure, macro calendar
 │   ├── options/           # chain fetch, delta filter, IV rank, spread-candidate builder
-│   └── llm/                # LiteLLM → Regolo client
+│   └── llm/                # OpenAI SDK → OpenRouter client
 ├── config/
 │   ├── strategy.yaml      # strategy parameters (not hardcoded — see the project notes)
 │   └── macro_events.yaml  # known macro events for the hackathon window (R3 gate)
@@ -115,7 +118,7 @@ bug).
 │   └── strategy.md        # strategy reasoning by reliability tier, with sources
 ├── scripts/
 │   ├── fetch_docs.py                  # re-downloads the local reference cache/ (gitignored local doc cache)
-│   ├── smoke_test_tool_calling.py     # Regolo tool-calling verification
+│   ├── smoke_test_tool_calling.py     # OpenRouter free-model tool-calling verification
 │   ├── check_alpaca_connection.py     # paper account/positions read
 │   ├── check_options_data.py          # SPY chain + delta filter
 │   └── check_market_data.py           # full evidence package (VIX + RV + term structure + VRP + candidates)
@@ -130,7 +133,7 @@ bug).
 ## Getting started
 
 1. Clone the repo.
-2. `cp .env.example .env` and fill in your Alpaca paper trading API keys and your Regolo.ai key.
+2. `cp .env.example .env` and fill in your Alpaca paper trading API keys and your OpenRouter key.
 3. Repopulate the local Alpaca documentation cache (gitignored, not shipped in the repo):
    ```
    python3 scripts/fetch_docs.py

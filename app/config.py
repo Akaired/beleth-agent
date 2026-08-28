@@ -37,9 +37,9 @@ class Settings(BaseSettings):
     alpaca_secret_key: str
     alpaca_base_url: str = PAPER_BASE_URL
 
-    regolo_key: str
-    regolo_base_url: str = "https://api.regolo.ai/v1"
-    regolo_model: str = "Llama-3.3-70B-Instruct"
+    openrouter_key: str
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
 
     @field_validator("alpaca_base_url")
     @classmethod

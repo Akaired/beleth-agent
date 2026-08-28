@@ -1,9 +1,9 @@
 """Cut an option chain down to what's actually relevant before anything reaches the LLM.
 
-Regolo's free-tier token budget is tight (~1M/day, ~800k/day estimated use — see the project notes).
-A full SPY chain snapshot is easily thousands of contracts; sending that to the model every
-cycle would burn the budget in a handful of calls. This filters to contracts whose short-leg
-delta falls in the strategy's target band.
+The LLM runs on OpenRouter free models, whose rate limits come from shared upstream pools
+(see the project notes). A full SPY chain snapshot is easily thousands of contracts; sending that to
+the model every cycle would blow through those limits in a handful of calls. This filters to
+contracts whose short-leg delta falls in the strategy's target band.
 """
 
 from __future__ import annotations

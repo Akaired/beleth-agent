@@ -2,7 +2,7 @@
 """Fetch SPY's option chain across the tenor ladder and apply the delta filter.
 
 Verifies option chain + Greeks/IV retrieval works, and that the delta filter shrinks the
-payload enough to respect the Regolo token budget (see app/options/filter.py). For the full
+payload enough to respect the free-model token budget (see app/options/filter.py). For the full
 market-context picture — VIX regime, realized vol, term structure, per-tenor VRP, spread
 candidates — use scripts/check_market_data.py instead.
 
