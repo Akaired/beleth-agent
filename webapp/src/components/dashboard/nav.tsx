@@ -1,15 +1,24 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { roleAtLeast, type Role } from "@/lib/roles";
+import {
+  IconOverview,
+  IconDecisions,
+  IconStrategy,
+  IconControls,
+} from "@/components/icons";
 
-type Item = { href: string; label: string; min: Role };
+type IconProps = { size?: number; weight?: "regular" | "bold" | "fill"; className?: string };
+type Item = { href: string; label: string; min: Role; Icon: ComponentType<IconProps> };
 
 const ITEMS: Item[] = [
-  { href: "/dashboard", label: "Overview", min: "public_user" },
-  { href: "/dashboard/decisions", label: "Decisions", min: "demo_admin" },
-  { href: "/dashboard/strategy", label: "Strategy", min: "demo_admin" },
+  { href: "/dashboard", label: "Overview", min: "public_user", Icon: IconOverview },
+  { href: "/dashboard/decisions", label: "Decisions", min: "demo_admin", Icon: IconDecisions },
+  { href: "/dashboard/strategy", label: "Strategy", min: "demo_admin", Icon: IconStrategy },
+  { href: "/dashboard/controls", label: "Controls", min: "master_admin", Icon: IconControls },
 ];
 
 export function DashboardNav({ role }: { role: Role }) {
@@ -25,12 +34,11 @@ export function DashboardNav({ role }: { role: Role }) {
           <Link
             key={it.href}
             href={it.href}
-            className={`px-2.5 py-1 rounded text-[12.5px] transition-colors ${
-              active
-                ? "bg-chipbg text-txt"
-                : "text-sec hover:text-txt"
+            className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[12.5px] transition-colors ${
+              active ? "bg-chipbg text-txt" : "text-sec hover:text-txt"
             }`}
           >
+            <it.Icon size={14} weight={active ? "bold" : "regular"} />
             {it.label}
           </Link>
         );

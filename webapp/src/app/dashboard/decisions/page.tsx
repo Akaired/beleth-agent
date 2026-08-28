@@ -7,6 +7,11 @@ import {
   ForbiddenPanel,
   formatUsd,
 } from "@/components/dashboard/ui";
+import {
+  IconCaretLeft,
+  IconCaretRight,
+  IconDecisions,
+} from "@/components/icons";
 
 export const metadata: Metadata = { title: "Decisions — Beleth backoffice" };
 
@@ -39,7 +44,8 @@ export default async function DecisionsPage({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-[18px] font-serif font-light">
+        <h1 className="flex items-center gap-2 text-[18px] font-light">
+          <IconDecisions size={17} weight="bold" className="text-acc" />
           Decision history
         </h1>
         <span className="font-mono text-[10.5px] text-dim">
@@ -131,18 +137,28 @@ export default async function DecisionsPage({
 
       <div className="flex items-center justify-between font-mono text-[11px]">
         {page > 1 ? (
-          <Link href={`/dashboard/decisions${qs(page - 1)}`} className="text-acc hover:underline">
-            ← newer
+          <Link
+            href={`/dashboard/decisions${qs(page - 1)}`}
+            className="flex items-center gap-1 text-acc hover:underline"
+          >
+            <IconCaretLeft size={12} weight="bold" /> newer
           </Link>
         ) : (
-          <span className="text-faint">← newer</span>
+          <span className="flex items-center gap-1 text-faint">
+            <IconCaretLeft size={12} weight="bold" /> newer
+          </span>
         )}
         {page < pages ? (
-          <Link href={`/dashboard/decisions${qs(page + 1)}`} className="text-acc hover:underline">
-            older →
+          <Link
+            href={`/dashboard/decisions${qs(page + 1)}`}
+            className="flex items-center gap-1 text-acc hover:underline"
+          >
+            older <IconCaretRight size={12} weight="bold" />
           </Link>
         ) : (
-          <span className="text-faint">older →</span>
+          <span className="flex items-center gap-1 text-faint">
+            older <IconCaretRight size={12} weight="bold" />
+          </span>
         )}
       </div>
     </div>

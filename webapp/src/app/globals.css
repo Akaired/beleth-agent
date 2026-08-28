@@ -43,10 +43,12 @@
   --color-rowtint: rgba(53, 166, 124, 0.05);
   --color-chartarea: rgba(53, 166, 124, 0.12);
 
-  /* type */
-  --font-sans: var(--font-inter), system-ui, sans-serif;
-  --font-mono: var(--font-plex-mono), monospace;
-  --font-serif: var(--font-newsreader), Georgia, serif;
+  /* type — TradingView's stack: system sans (SF / Trebuchet MS), Roboto as
+     the loaded fallback; Roboto Mono for every number and tabular field. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Trebuchet MS",
+    var(--font-roboto), Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-roboto-mono), "Roboto Mono", ui-monospace, Menlo,
+    "SFMono-Regular", monospace;
 }
 
 body {

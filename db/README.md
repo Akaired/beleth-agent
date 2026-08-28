@@ -7,8 +7,10 @@ reads the same database. There is no other store — no local SQLite, no JSON fi
 - The agent talks to PostgREST over HTTPS (`app/persistence.py`): inserts and upserts only.
 - Tables are created **with row level security enabled and zero policies**: anonymous and
   authenticated roles see nothing. The service role bypasses RLS, so the agent is unaffected.
-  Per-role policies (anonymous / public user / demo admin / master admin) are the webapp
-  milestone's work.
+  `0003` then adds permissive SELECT policies for the webapp's read path; `0004` adds the
+  `profiles` role table; `0005` adds the one write path — a `SECURITY DEFINER` function that
+  lets `master_admin` flip `agent_status.paused` and nothing else. There is still no
+  INSERT/UPDATE/DELETE policy on any table for `anon`/`authenticated`.
 
 ## Applying a migration
 
@@ -39,7 +41,8 @@ Or by hand from the dashboard:
 | `risk_checks` | agent, one row per (decision, candidate, rule) — plus one R5 row per open spread | `rule` (`R4`/`R6`/`R7`/`R5`), `passed`, human-readable `reason`, structured `detail`, the full `candidate` — rejections are first-class rows, queryable independently and shown with the same prominence as fills. On an R5 row, `passed` means the spread is within the exit rules and `approved` means a close is demanded |
 | `trades` | agent, when a cycle submits an order (entry or R5 close) | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload. `kind` is `entry` (default) or `exit`; on an exit row `exit_reason` carries the fired R5 rule and `credit`/`max_loss` are null (a close has no entry economics of its own) |
 | `positions` | agent, mirrored every cycle (upsert + per-symbol delete of closed ones) | current open positions; `first_seen_at` is derived by trigger, never client-sent |
-| `agent_status` | agent, single row `id=1` upserted every cycle | `state` (vocabulary in `app/persistence.py`), `paused` (master-admin switch — the agent never writes it), `last_decision_id` |
+| `agent_status` | agent, single row `id=1` upserted every cycle | `state` (vocabulary in `app/persistence.py`), `paused` (master-admin switch — the agent reads and obeys it fail-closed, never writes it), `last_decision_id` |
+| `agent_control_events` | the `beleth_set_agent_paused()` function (`0005`), one row per kill-switch flip | `actor` / `actor_email`, `action` (`pause`/`resume`), `created_at` — the audit trail behind the webapp's only write path; readable by `demo_admin` and `master_admin` |
 
 ## Queries the webapp runs
 

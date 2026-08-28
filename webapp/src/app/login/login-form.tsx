@@ -6,6 +6,7 @@ import {
   signUpAction,
   type AuthState,
 } from "@/app/login/actions";
+import { IconEnvelope, IconLock } from "@/components/icons";
 
 const INITIAL: AuthState = { error: null, notice: null };
 
@@ -39,7 +40,10 @@ export function LoginForm({ next }: { next: string }) {
       <form action={formAction} className="flex flex-col gap-3">
         <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-sec">Email</span>
+          <span className="flex items-center gap-1.5 text-[11px] text-sec">
+            <IconEnvelope size={12} />
+            Email
+          </span>
           <input
             className={field}
             type="email"
@@ -49,7 +53,10 @@ export function LoginForm({ next }: { next: string }) {
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] text-sec">Password</span>
+          <span className="flex items-center gap-1.5 text-[11px] text-sec">
+            <IconLock size={12} />
+            Password
+          </span>
           <input
             className={field}
             type="password"

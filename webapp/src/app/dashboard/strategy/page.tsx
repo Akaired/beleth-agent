@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchLatestStrategyConfig } from "@/lib/dashboard-queries";
 import { ForbiddenPanel, Panel } from "@/components/dashboard/ui";
+import { IconStrategy } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Strategy — Beleth backoffice" };
 
@@ -14,7 +15,8 @@ export default async function StrategyPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-[18px] font-serif font-light">
+        <h1 className="flex items-center gap-2 text-[18px] font-light">
+          <IconStrategy size={17} weight="bold" className="text-acc" />
           Strategy configuration
         </h1>
         <span className="font-mono text-[10.5px] text-dim">

@@ -258,3 +258,42 @@ export async function fetchLatestStrategyConfig(): Promise<{
     agentVersion: row?.agent_version ?? null,
   };
 }
+
+export type AgentControlEvent = {
+  id: string;
+  actor_email: string | null;
+  action: "pause" | "resume";
+  created_at: string;
+};
+
+export type ControlPanel = {
+  agentStatus: AgentStatusRow | null;
+  events: AgentControlEvent[];
+};
+
+/**
+ * The master-admin control panel: current agent state + the kill-switch
+ * audit trail. The audit table is readable by demo_admin and up (0005), so
+ * this query is safe to run for the read-only backoffice too; the page layer
+ * decides who may actually flip the switch.
+ */
+export async function fetchControlPanel(): Promise<ControlPanel> {
+  const supabase = await createClient();
+  const [status, events] = await Promise.all([
+    supabase
+      .from("agent_status")
+      .select("state,paused,last_cycle_at,detail")
+      .eq("id", 1)
+      .maybeSingle(),
+    supabase
+      .from("agent_control_events")
+      .select("id,actor_email,action,created_at")
+      .order("created_at", { ascending: false })
+      .limit(25),
+  ]);
+
+  return {
+    agentStatus: (status.data as AgentStatusRow | null) ?? null,
+    events: (events.data as AgentControlEvent[] | null) ?? [],
+  };
+}

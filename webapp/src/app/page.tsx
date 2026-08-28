@@ -49,11 +49,13 @@ export default async function Home() {
     <div className="flex flex-col flex-1 min-h-screen">
       <SiteHeader agentStatus={data.agentStatus} />
       {!live && (
-        <div className="px-4 md:px-[clamp(16px,3vw,40px)] py-2 border-b border-line font-mono text-[10.5px] text-dim">
-          LIVE DATA UNAVAILABLE — SHOWING PLACEHOLDER COUNTERS
+        <div className="border-b border-line font-mono text-[10.5px] text-dim">
+          <div className="mx-auto w-full max-w-6xl px-4 md:px-[clamp(16px,3vw,40px)] py-2">
+            LIVE DATA UNAVAILABLE — SHOWING PLACEHOLDER COUNTERS
+          </div>
         </div>
       )}
-      <main>
+      <main className="mx-auto w-full max-w-6xl">
         <Hero latestDecision={data.latestDecision} bubbles={thoughtBubbles(data.latestDecision)} />
         <Tearsheet stats={stats} />
         <Method />

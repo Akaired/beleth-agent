@@ -50,7 +50,7 @@ export function Hero({
     <section className="grid md:grid-cols-2 items-center gap-6 md:gap-[clamp(24px,4vw,56px)] px-4 md:px-[clamp(16px,3vw,40px)] py-[clamp(40px,6vw,80px)]">
       <div>
         <h1
-          className="font-serif font-light text-[clamp(34px,4.4vw,60px)] leading-[1.06] tracking-[-0.02em] max-w-[21ch]"
+          className="font-sans font-light text-[clamp(34px,4.4vw,60px)] leading-[1.06] tracking-[-0.02em] max-w-[21ch]"
         >
           It measures the edge before it takes the trade.
         </h1>
@@ -75,21 +75,26 @@ export function Hero({
           </a>
         </div>
         {latestDecision && (
-          <div className="mt-10 border-l-2 border-line pl-3">
-            <div className="flex items-baseline gap-3 font-mono text-[10px] tracking-[0.08em]">
-              <span className="text-faint">LATEST CYCLE</span>
-              <span
-                className={
-                  latestDecision.action === "trade" ? "text-up" : "text-dim"
-                }
-              >
+          <div className="mt-10 max-w-[60ch] rounded-xl bg-white px-5 py-4 text-[#0b0e11]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[0.08em] text-[#3a3f45]">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${
+                    latestDecision.action === "trade"
+                      ? "bg-[#1e9e6a]"
+                      : "bg-[#9aa0a6]"
+                  }`}
+                />
+                LATEST CYCLE
+              </span>
+              <span className="font-medium text-[#0b0e11]">
                 {latestDecision.action.replace("_", " ").toUpperCase()}
               </span>
-              <span className="text-faint">
+              <span>
                 {latestDecision.symbol} · {utcStamp(latestDecision.created_at)}
               </span>
             </div>
-            <p className="mt-1.5 text-[13px] leading-[1.55] text-sec max-w-[60ch]">
+            <p className="mt-2 text-[13px] leading-[1.55] text-[#2b2f34]">
               {latestDecision.summary}
             </p>
           </div>

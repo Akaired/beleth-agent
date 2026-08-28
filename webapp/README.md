@@ -12,7 +12,8 @@ every write.
 - `src/lib/queries.ts` — typed homepage reads + evidence-package mapping
 - `src/lib/supabase/{server,client}.ts` — `@supabase/ssr` clients for the dashboard
 - `src/lib/auth.ts` — session + role data-access layer (server only); `src/lib/roles.ts` — the client-safe role helper
-- `src/lib/dashboard-queries.ts` — authenticated reads (overview, decision history/detail, strategy snapshot)
+- `src/lib/dashboard-queries.ts` — authenticated reads (overview, decision history/detail, strategy snapshot, control panel)
+- `src/app/dashboard/controls/` — master-admin kill switch: `page.tsx`, `actions.ts` (`setAgentPausedAction`); `src/components/dashboard/kill-switch.tsx` is the client toggle
 - `src/proxy.ts` — Next 16 proxy (renamed middleware): refreshes the auth session, gates `/dashboard/*`
 - `public/beleth.png`, `public/beleth-animated.svg` — the mascot
 
@@ -26,11 +27,23 @@ a `role`:
 |---|---|---|
 | `public_user` | curated dashboard: overview, equity curve, latest + recent decisions | default on signup |
 | `demo_admin` | the above **plus** the read-only backoffice: full decision history, per-decision risk-check detail, raw LLM reasoning, strategy-config snapshot | manual `update public.profiles set role='demo_admin' where email=…` (service role / Management API) |
-| `master_admin` | the above **plus** operational control (pause, config edit, Alpaca) | manual, same way — **write paths not built yet** |
+| `master_admin` | the above **plus** `/dashboard/controls` — the agent kill switch (pause / resume). Config editing and Alpaca account detail still to come | manual, same way |
 
 Role changes are out of band: no RLS policy lets a user change their own role,
 and the webapp never can. `db/migrations/0004_auth_roles.sql` adds the table,
 the signup trigger, and the `public.beleth_role()` helper.
+
+### The kill switch (`/dashboard/controls`)
+
+The webapp's only write path. `db/migrations/0005_master_admin_kill_switch.sql`
+adds `public.beleth_set_agent_paused(boolean)` — a `SECURITY DEFINER` function
+that checks `beleth_role() = 'master_admin'`, flips **only** `agent_status.paused`,
+and appends the change to `public.agent_control_events` (an audit log readable
+by `demo_admin` and up). No UPDATE policy is added to `agent_status`; the
+function is the only non-service-role writer. The resident runner reads
+`paused` at the top of every cycle and obeys it fail-closed — a paused agent
+writes a heartbeat and produces no decisions; nothing is cancelled. The
+`setAgentPausedAction` server action re-checks the role before calling the RPC.
 
 ### Project auth config (set via the Management API / PAT)
 

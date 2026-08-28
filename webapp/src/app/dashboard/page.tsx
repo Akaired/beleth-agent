@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
@@ -11,16 +11,38 @@ import {
   formatUsd,
   timeAgo,
 } from "@/components/dashboard/ui";
+import {
+  IconArrowRight,
+  IconOverview,
+  IconCalendar,
+  IconCycles,
+  IconEquity,
+  IconPositions,
+  IconPulse,
+  IconRefused,
+  IconTrades,
+  IconTrendDown,
+  IconTrendUp,
+  IconWarning,
+} from "@/components/icons";
 
 export const metadata: Metadata = { title: "Overview — Beleth dashboard" };
+
+type IconType = ComponentType<{
+  size?: number;
+  weight?: "regular" | "bold" | "fill";
+  className?: string;
+}>;
 
 function Stat({
   label,
   value,
+  Icon,
   tone = "txt",
 }: {
   label: string;
   value: ReactNode;
+  Icon: IconType;
   tone?: "txt" | "up" | "down" | "acc";
 }) {
   const c =
@@ -33,8 +55,11 @@ function Stat({
           : "text-txt";
   return (
     <div>
-      <div className={`font-mono text-[22px] leading-none ${c}`}>{value}</div>
-      <div className="mt-1.5 text-[11px] text-sec">{label}</div>
+      <div className="flex items-center gap-1.5 text-[11px] text-sec">
+        <Icon size={13} className="text-dim" />
+        {label}
+      </div>
+      <div className={`mt-1.5 font-mono text-[22px] leading-none ${c}`}>{value}</div>
     </div>
   );
 }
@@ -49,37 +74,62 @@ export default async function DashboardOverview() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="text-[18px] font-serif font-light">Overview</h1>
+        <h1 className="flex items-center gap-2 text-[18px] font-light">
+          <IconOverview size={17} weight="bold" className="text-acc" />
+          Overview
+        </h1>
         <span className="font-mono text-[10.5px] text-dim">
           cycle {timeAgo(d.agentStatus?.last_cycle_at ?? null)}
         </span>
       </div>
 
       {d.agentStatus?.paused && (
-        <div className="border border-killline bg-blocked/15 rounded px-3 py-2 font-mono text-[11px] tracking-[0.06em] text-down">
-          AGENT PAUSED — the master-admin kill switch is engaged. No new
-          decisions are being produced.
+        <div className="flex items-center justify-between gap-3 rounded border border-killline bg-blocked/15 px-3 py-2 font-mono text-[11px] tracking-[0.06em] text-down">
+          <span className="flex items-center gap-2">
+            <IconWarning size={14} weight="fill" className="shrink-0" />
+            AGENT PAUSED — the master-admin kill switch is engaged. No new
+            decisions are being produced.
+          </span>
+          {ctx.role === "master_admin" && (
+            <Link
+              href="/dashboard/controls"
+              className="flex shrink-0 items-center gap-1 underline"
+            >
+              Manage <IconArrowRight size={12} weight="bold" />
+            </Link>
+          )}
         </div>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 border border-line rounded-md bg-panel p-5">
-        <Stat label="Equity" value={formatUsd(equity, 0)} />
+        <Stat label="Equity" Icon={IconEquity} value={formatUsd(equity, 0)} />
         <Stat
           label="Day P&L"
+          Icon={dayPnl < 0 ? IconTrendDown : IconTrendUp}
           value={formatUsd(dayPnl, 0)}
           tone={dayPnl > 0 ? "up" : dayPnl < 0 ? "down" : "txt"}
         />
-        <Stat label="Open positions" value={d.openPositions} />
-        <Stat label="Days live" value={daysLive(d.firstDecisionAt)} />
-        <Stat label="Cycles run" value={d.cyclesRun} />
-        <Stat label="Trades submitted" value={d.tradesSubmitted} />
+        <Stat label="Open positions" Icon={IconPositions} value={d.openPositions} />
+        <Stat
+          label="Days live"
+          Icon={IconCalendar}
+          value={daysLive(d.firstDecisionAt)}
+        />
+        <Stat label="Cycles run" Icon={IconCycles} value={d.cyclesRun} />
+        <Stat
+          label="Trades submitted"
+          Icon={IconTrades}
+          value={d.tradesSubmitted}
+        />
         <Stat
           label="Refused by risk checks"
+          Icon={IconRefused}
           value={d.refused}
           tone="acc"
         />
         <Stat
           label="Agent state"
+          Icon={IconPulse}
           value={
             <span className="font-mono text-[12px]">
               {(d.agentStatus?.state ?? "unknown").replace(/_/g, " ")}

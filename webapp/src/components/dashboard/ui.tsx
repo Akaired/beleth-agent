@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Role } from "@/lib/roles";
+import { IconCheckCircle, IconProhibit, IconXCircle } from "@/components/icons";
 
 export function Panel({
   title,
@@ -52,22 +53,27 @@ export function RoleChip({ role }: { role: Role }) {
 }
 
 export function ActionBadge({ action }: { action: "trade" | "no_trade" }) {
+  const isTrade = action === "trade";
+  const Icon = isTrade ? IconCheckCircle : IconProhibit;
   return (
     <span
-      className={`font-mono text-[10px] tracking-[0.08em] uppercase rounded px-1.5 py-0.5 ${
-        action === "trade"
-          ? "bg-up/15 text-up"
-          : "bg-chipbg text-sec"
+      className={`inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.08em] uppercase rounded px-1.5 py-0.5 ${
+        isTrade ? "bg-up/15 text-up" : "bg-chipbg text-sec"
       }`}
     >
-      {action === "trade" ? "TRADE" : "NO TRADE"}
+      <Icon size={11} weight="bold" />
+      {isTrade ? "TRADE" : "NO TRADE"}
     </span>
   );
 }
 
 export function PassFail({ ok, label }: { ok: boolean; label?: string }) {
+  const Icon = ok ? IconCheckCircle : IconXCircle;
   return (
-    <span className={ok ? "text-up" : "text-down"}>
+    <span
+      className={`inline-flex items-center gap-1 ${ok ? "text-up" : "text-down"}`}
+    >
+      <Icon size={12} weight="fill" />
       {label ?? (ok ? "pass" : "fail")}
     </span>
   );
