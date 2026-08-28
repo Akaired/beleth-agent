@@ -7,6 +7,11 @@ the tenors that clear the VRP threshold — the point here is to exercise the ri
 produce a trade signal), runs each candidate through the risk check, and prints the verdicts.
 Places no orders and calls no LLM.
 
+This script deliberately persists nothing: its whole-ladder candidates are gate exercises, not
+trade candidates, and flooding the persisted risk-check log with them would bury the real
+rejections. The cycle that produces the VRP-filtered candidates is what writes decisions and
+risk checks — see scripts/check_market_data.py.
+
 Usage:
     python3 scripts/check_risk.py [SYMBOL]
 """

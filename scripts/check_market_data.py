@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Assemble and print the full evidence package (milestone 2).
+"""Run one full agent cycle and persist the decision (milestone 4).
 
-Read-only end to end: pulls the VIX regime from FRED, realized volatility from real SPY
-bars, the IV term structure and per-tenor VRP from the real SPY chain, applies the macro
-calendar gate, builds defined-risk spread candidates, reads the paper account, and prints
-the assembled evidence package as JSON. Places no orders and calls no LLM.
+Builds the evidence package (milestone 2 pipeline), runs the pre-trade risk gate (R4/R6/R7)
+over the candidates it carries, then persists to Supabase: the append-only decision row
+(with the full evidence package and a strategy-config snapshot), one risk_checks row per
+(candidate, rule), the open-positions mirror, and the agent_status heartbeat. Places no
+orders and calls no LLM — the LLM decision layer is the next milestone, so the action is
+always no_trade with decision_source='risk_engine'.
+
+Persistence is skipped with a stderr warning when Supabase is not configured (read-only
+usage keeps working); a persistence *failure* prints the evidence and exits 1 — persisting
+the decision is part of the cycle's contract (the hard constraint #5).
 
 Usage:
     python3 scripts/check_market_data.py [SYMBOL]
@@ -25,6 +31,7 @@ from app.alpaca_client import (  # noqa: E402
     get_trading_client,
 )
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.decision import decide_from_risk_engine  # noqa: E402
 from app.evidence import AccountSnapshot, build_evidence_package  # noqa: E402
 from app.market.calendar import (  # noqa: E402
     EASTERN,
@@ -38,6 +45,17 @@ from app.market.underlying import fetch_daily_closes, fetch_last_price  # noqa: 
 from app.market.vix import VixDataUnavailable, fetch_vix_history, summarize_regime  # noqa: E402
 from app.options.chain import fetch_chain_for_ladder  # noqa: E402
 from app.options.spreads import build_candidates  # noqa: E402
+from app.persistence import (  # noqa: E402
+    PersistenceConfigError,
+    PersistenceError,
+    agent_status_row,
+    mirror_positions,
+    persist_agent_status,
+    persist_decision,
+    persist_risk_checks,
+    supabase_config_from_settings,
+)
+from app.risk_check import AccountRiskState, evaluate_candidates  # noqa: E402
 from app.vrp import best_tradable_tenor, scan_tenors  # noqa: E402
 
 
@@ -169,6 +187,67 @@ def main() -> int:
         account=account_snapshot,
     )
 
+    # --- risk gate over the candidates the evidence package actually carries -------------
+    risk_state = AccountRiskState(
+        equity=equity,
+        open_positions=len(positions),
+        day_pnl=round(day_pnl, 2),
+        capital_at_risk=0.0,  # read-back from the persisted log is a later (order-path) milestone
+    )
+    verdicts = evaluate_candidates(candidates, risk_state, strategy)
+
+    draft = decide_from_risk_engine(
+        as_of=datetime.now(timezone.utc),
+        symbol=symbol,
+        market_open=clock.is_open,
+        equity=round(equity, 2),
+        day_pnl=round(day_pnl, 2),
+        evidence=package,
+        strategy_config=strategy,
+        verdicts=verdicts,
+    )
+
+    # --- persistence: every decision, risk-check outcome and position state (constraint #5) --
+    decision_id = None
+    persisted_checks = 0
+    upserted_positions = 0
+    try:
+        supabase = supabase_config_from_settings(settings)
+    except PersistenceConfigError as exc:
+        print(
+            f"WARNING: Supabase not configured — decision not persisted ({exc})",
+            file=sys.stderr,
+        )
+    else:
+        try:
+            decision_id = persist_decision(supabase, draft=draft)
+            persisted_checks = persist_risk_checks(
+                supabase, decision_id=decision_id, verdicts=verdicts
+            )
+            upserted_positions, _ = mirror_positions(
+                supabase, [p.model_dump(mode="json") for p in positions]
+            )
+            persist_agent_status(
+                supabase,
+                agent_status_row(
+                    state="monitoring" if clock.is_open else "idle",
+                    last_cycle_at=datetime.now(timezone.utc),
+                    last_decision_id=decision_id,
+                    detail={
+                        "candidates": len(candidates),
+                        "risk_checks": persisted_checks,
+                        "approved": sum(1 for v in verdicts if v.approved),
+                    },
+                ),
+            )
+        except PersistenceError as exc:
+            print(
+                f"ERROR: persistence failed — cycle not fully logged: {exc}",
+                file=sys.stderr,
+            )
+            print(json.dumps(package, indent=2, default=str))
+            return 1
+
     print(json.dumps(package, indent=2, default=str))
 
     best = best_tradable_tenor(tenor_vrp)
@@ -188,6 +267,24 @@ def main() -> int:
         )
     if regime_cfg["block_new_shorts_on_backwardation"] and term_structure.state == "backwardation":
         print("Term structure is BACKWARDATION — regime gate blocks new short premium.", file=sys.stderr)
+
+    print("\n--- risk gate ---", file=sys.stderr)
+    if not verdicts:
+        print("No candidate reached the risk gate (see the no-trade reason above).", file=sys.stderr)
+    for v in verdicts:
+        c = v.candidate
+        tag = "APPROVED" if v.approved else "REJECTED (" + ", ".join(r.rule for r in v.rejections) + ")"
+        print(
+            f"{c['symbol']} {c['right']} {c['expiry']} {c['strikes']} "
+            f"max_loss={c['max_loss']} -> {tag}",
+            file=sys.stderr,
+        )
+    if decision_id is not None:
+        print(
+            f"\nDecision {decision_id} persisted to Supabase "
+            f"({persisted_checks} risk check(s), {upserted_positions} position(s) mirrored).",
+            file=sys.stderr,
+        )
 
     return 0
 
