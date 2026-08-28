@@ -204,7 +204,8 @@ def main() -> int:
     paused_logged = False
     while not stop():
         try:
-            market_open = bool(client.get_clock().is_open)
+            clock = client.get_clock()
+            market_open = bool(clock.is_open)
         except Exception as exc:  # noqa: BLE001 — a clock failure must not kill the loop
             print(f"WARNING: market clock unavailable ({exc}) — retrying in 60 s", flush=True)
             chunked_sleep(60, should_stop=stop)
@@ -244,7 +245,13 @@ def main() -> int:
                 )
             except PersistenceError as exc:
                 print(f"WARNING: heartbeat persist failed ({exc})", flush=True)
-            chunked_sleep(cfg["closed_heartbeat_interval_minutes"] * 60, should_stop=stop)
+            sleep_seconds = cfg["closed_heartbeat_interval_minutes"] * 60
+            # Near the open, wake at the bell instead of drifting a full heartbeat past it.
+            next_open = getattr(clock, "next_open", None)
+            if next_open is not None:
+                until_open = (next_open - datetime.now(timezone.utc)).total_seconds() + 30
+                sleep_seconds = min(sleep_seconds, max(until_open, 60))
+            chunked_sleep(sleep_seconds, should_stop=stop)
 
     print("runner stopped gracefully", flush=True)
     return 0
