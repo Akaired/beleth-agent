@@ -167,6 +167,21 @@ def test_positions_mirror_preserves_first_seen_at(supabase_config):
         "unrealized_pl": "-0.50",
         "asset_class": "us_option",
     }
+    # The mirror table is shared with any live agent: snapshot every other row so the
+    # stale-sweep inside mirror_positions cannot delete real data mid-test, then
+    # restore it (the upsert writes the same values back, first_seen_at included).
+    others = [
+        row
+        for row in (_request(supabase_config, "GET", "positions") or [])
+        if row["symbol"] != ITEST_SYMBOL
+    ]
+    if others:
+        _request(
+            supabase_config,
+            "DELETE",
+            "positions",
+            params={"symbol": f"neq.{ITEST_SYMBOL}"},
+        )
     try:
         assert mirror_positions(supabase_config, [dump]) == (1, 0)
         first = fetch_position(supabase_config, ITEST_SYMBOL, select="symbol,first_seen_at,qty")
@@ -180,6 +195,15 @@ def test_positions_mirror_preserves_first_seen_at(supabase_config):
         assert second["first_seen_at"] == first["first_seen_at"]  # DB trigger preserves it
     finally:
         delete_position(supabase_config, ITEST_SYMBOL)
+        if others:
+            _request(
+                supabase_config,
+                "POST",
+                "positions",
+                params={"on_conflict": "symbol"},
+                json_body=others,
+                prefer="resolution=merge-duplicates",
+            )
     assert fetch_position(supabase_config, ITEST_SYMBOL) is None
 
 
