@@ -5,15 +5,19 @@ default strategy.yaml values the per-trade cap (2%) is $2,000 and the daily-draw
 (3%) is $3,000; the concurrent-position limit is 5.
 """
 
+import pytest
+
 from app.options.spreads import SpreadCandidate
 from app.risk_check import (
     AccountRiskState,
     apply_aggregate_cap,
+    apply_vix_regime,
     block_entries,
     check_r4,
     check_r6,
     check_r7,
     evaluate_candidate,
+    vix_size_multiplier,
 )
 
 STRATEGY = {
@@ -330,3 +334,84 @@ def test_aggregate_cap_leaves_already_rejected_and_unknown_max_loss_verdicts_alo
     out = apply_aggregate_cap([rejected, unknown], state(capital_at_risk=99_000.0),
                               max_aggregate_risk_pct=5)
     assert not any(r.rule == "R11" for v in out for r in v.results)
+
+
+# --- R9: VIX-regime size taper (vix_size_multiplier / apply_vix_regime) ------------------
+#
+# Calibration used in these cases mirrors the intended shape once enabled: a single line
+# from percentile 25 (full size) to percentile 3 (floor 0.5), hard block below 3. The four
+# probe percentiles are the ones from the historical analysis.
+
+_TAPER = dict(taper_upper_pct=25, taper_lower_pct=3, taper_floor_frac=0.5, block_below_pct=3)
+
+
+def test_vix_taper_is_inert_with_all_zero_defaults():
+    mult, reason = vix_size_multiplier(
+        8.0, taper_upper_pct=0, taper_lower_pct=0, taper_floor_frac=1.0, block_below_pct=0
+    )
+    assert mult == 1.0
+    assert "full size" in reason
+
+
+def test_vix_taper_full_size_at_percentile_30():
+    mult, reason = vix_size_multiplier(30.0, **_TAPER)
+    assert mult == 1.0
+    assert "at or above" in reason
+
+
+def test_vix_taper_intermediate_at_percentile_15():
+    # single slope 25 -> 3: fraction = 0.5 + 0.5 * (15 - 3) / (25 - 3) = 0.5 + 0.5 * 12/22.
+    mult, _ = vix_size_multiplier(15.0, **_TAPER)
+    assert mult == pytest.approx(0.5 + 0.5 * (12 / 22))
+    assert 0.5 < mult < 1.0
+
+
+def test_vix_taper_reduces_but_does_not_block_at_percentile_3_97():
+    # 3.97 is above the block floor (3): a smaller trade, not a no-trade.
+    mult, reason = vix_size_multiplier(3.97, **_TAPER)
+    assert 0.5 <= mult < 0.53
+    assert mult > 0.0
+    assert "scaled to" in reason
+
+
+def test_vix_taper_hard_blocks_at_percentile_2():
+    mult, reason = vix_size_multiplier(2.0, **_TAPER)
+    assert mult == 0.0
+    assert "block floor" in reason
+
+
+def test_vix_taper_holds_the_floor_between_lower_and_block_thresholds():
+    # lower 5, block 3: percentile 4 sits between them -> floor fraction, still not blocked.
+    cfg = dict(taper_upper_pct=25, taper_lower_pct=5, taper_floor_frac=0.5, block_below_pct=3)
+    mult, _ = vix_size_multiplier(4.0, **cfg)
+    assert mult == 0.5
+
+
+def test_vix_taper_unknown_percentile_never_blocks():
+    mult, reason = vix_size_multiplier(None, **_TAPER)
+    assert mult == 1.0
+    assert "unavailable" in reason
+
+
+def test_apply_vix_regime_is_a_noop_for_a_partial_taper():
+    verdicts = [_approved_verdict()]
+    out = apply_vix_regime(verdicts, 0.5, "R9 (VIX taper): scaled to 50%.")
+    assert out[0].approved is True
+    assert not any(r.rule == "R9" for r in out[0].results)
+
+
+def test_apply_vix_regime_hard_block_rejects_with_an_r9_row():
+    out = apply_vix_regime([_approved_verdict()], 0.0, "R9 (VIX taper): below the block floor.")
+    verdict = out[0]
+    assert verdict.approved is False
+    r9 = next(r for r in verdict.results if r.rule == "R9")
+    assert r9.passed is False
+    assert r9.detail["vix_size_multiplier"] == 0.0
+    assert verdict.as_dict()["rejected_by"] == ["R9"]
+
+
+def test_apply_vix_regime_hard_block_leaves_already_rejected_verdicts_untouched():
+    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0),
+                                  STRATEGY)
+    out = apply_vix_regime([rejected], 0.0, "R9 block")
+    assert [r.rule for r in out[0].results] == [r.rule for r in rejected.results]

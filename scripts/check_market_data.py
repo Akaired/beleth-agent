@@ -110,8 +110,10 @@ from app.persistence import (  # noqa: E402
 from app.risk_check import (  # noqa: E402
     AccountRiskState,
     apply_aggregate_cap,
+    apply_vix_regime,
     block_entries,
     evaluate_candidates,
+    vix_size_multiplier,
 )
 from app.vrp import best_tradable_tenor, scan_tenors  # noqa: E402
 
@@ -310,9 +312,14 @@ def _prepare_order(
     *,
     equity: float,
     strategy_config: dict[str, Any],
+    risk_pct_multiplier: float = 1.0,
 ) -> tuple[dict[str, Any] | None, str]:
     """Turn a ``trade`` decision into the single mleg order it may send — or ``None`` plus
     the fail-closed sentence that goes into the persisted summary instead of an order.
+
+    ``risk_pct_multiplier`` (default 1.0) is the R9 VIX-taper scale on the per-trade risk
+    budget: 0.5 halves the quantity that fits under the cap. A hard block (multiplier 0.0)
+    never reaches here — it has already rejected the candidate at the gate.
 
     The plan is *not* submitted here: the caller submits only after the decision row is
     persisted, so no order ever goes out unlogged (the hard constraint #5)."""
@@ -327,7 +334,7 @@ def _prepare_order(
     credit = chosen.get("credit")
     qty = compute_quantity(
         equity,
-        strategy_config["risk"]["max_risk_per_trade_pct_of_equity"],
+        strategy_config["risk"]["max_risk_per_trade_pct_of_equity"] * risk_pct_multiplier,
         max_loss,
     )
     structure = strategy_config["structure"]
@@ -342,9 +349,16 @@ def _prepare_order(
     max_frac_of_credit = structure.get("max_slippage_frac_of_credit", 0.0)
 
     if qty < 1:
+        taper_note = (
+            f", after the R9 VIX taper cut the per-trade budget to "
+            f"{risk_pct_multiplier * 100:.0f}%"
+            if risk_pct_multiplier != 1.0
+            else ""
+        )
         return None, (
             f" No order was sent: sizing cannot fit even one spread under the per-trade "
-            f"risk cap (max loss {max_loss} at {equity:.2f} equity) — fail-closed."
+            f"risk cap (max loss {max_loss} at {equity:.2f} equity{taper_note}) — "
+            "fail-closed."
         )
     if (
         credit is not None
@@ -666,6 +680,20 @@ def main() -> int:
             "max_aggregate_risk_pct_of_equity", 0
         ),
     )
+    # R9 — VIX-regime size taper. Reads the VIX's own 1y percentile: a partial taper
+    # (0 < m < 1) scales the per-trade risk budget in `_prepare_order`; a hard block
+    # (m == 0) rejects every still-approved candidate with a visible R9 row. Inert until
+    # the thresholds are set in config/strategy.yaml `entry.vix_regime`.
+    vix_regime_cfg = strategy.get("entry", {}).get("vix_regime", {})
+    vix_percentile = vix_regime.percentile_1y if vix_regime is not None else None
+    vix_size_mult, vix_size_reason = vix_size_multiplier(
+        vix_percentile,
+        taper_upper_pct=vix_regime_cfg.get("taper_upper_pct", 0),
+        taper_lower_pct=vix_regime_cfg.get("taper_lower_pct", 0),
+        taper_floor_frac=vix_regime_cfg.get("taper_floor_frac", 1.0),
+        block_below_pct=vix_regime_cfg.get("block_below_pct", 0),
+    )
+    verdicts = apply_vix_regime(verdicts, vix_size_mult, vix_size_reason)
 
     # --- decision: the LLM weighs the evidence only when it has something to weigh ------
     as_of = datetime.now(timezone.utc)
@@ -719,9 +747,17 @@ def main() -> int:
     plan: dict[str, Any] | None = None
     if draft.action == "trade" and draft.chosen_candidate is not None:
         plan, order_note = _prepare_order(
-            draft.chosen_candidate, candidates, equity=equity, strategy_config=strategy
+            draft.chosen_candidate,
+            candidates,
+            equity=equity,
+            strategy_config=strategy,
+            risk_pct_multiplier=vix_size_mult,
         )
         draft = replace(draft, summary=draft.summary + order_note)
+    # When R9 tapered the size down or hard-blocked, that is disclosed on the persisted
+    # decision summary — a smaller trade or a "no" for a stated reason, never silent.
+    if vix_size_mult != 1.0:
+        draft = replace(draft, summary=draft.summary + " " + vix_size_reason)
 
     exit_sentences = exit_summary_sentences(exit_evaluations, market_open=clock.is_open)
     if exit_sentences or exit_plan_notes:

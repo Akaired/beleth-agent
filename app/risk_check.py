@@ -394,3 +394,98 @@ def apply_aggregate_cap(
             )
         )
     return out
+
+
+# --- R9: VIX-regime size taper -------------------------------------------------------------
+#
+# A *sizing* input, not a per-candidate structural rule: it scales the per-trade risk budget
+# by a 0.0-1.0 multiplier read off the VIX's own 1-year percentile, and hard-blocks new
+# entries only in the extreme-complacency tail. Prefer the taper to a block (Strategy A5: low
+# VIX is a weak timing signal; Strategy C5: on a ~5-day window a hard block can mean zero
+# trades all week). Historical base rates that motivate keeping the block deep and the taper
+# gentle (VIX close, 1990-2026, 252d lookback): percentile < 25 on ~33% of days and usually a
+# multi-week regime (66% of such days sit in episodes >= 10 trading days), < 10 on ~18%,
+# < 3 on ~8%. Everything ships at 0 = inert.
+
+
+def vix_size_multiplier(
+    percentile: float | None,
+    *,
+    taper_upper_pct: float,
+    taper_lower_pct: float,
+    taper_floor_frac: float,
+    block_below_pct: float,
+) -> tuple[float, str]:
+    """R9. Return ``(multiplier, reason)``: a 0.0-1.0 scale on
+    ``risk.max_risk_per_trade_pct_of_equity`` for this cycle, plus a human-readable line.
+
+    One straight line, no flat segment: full size (1.0) at/above ``taper_upper_pct``,
+    linearly down to ``taper_floor_frac`` at/below ``taper_lower_pct``. Strictly below
+    ``block_below_pct`` the multiplier is ``0.0`` — a hard block, which the caller turns
+    into an R9 rejection row via ``apply_vix_regime``. Everything between the floor
+    percentile and the block percentile stays at ``taper_floor_frac`` (a smaller trade,
+    never a second no-trade path).
+
+    Inert when the taper band is unset (``taper_upper_pct <= taper_lower_pct``) and
+    ``block_below_pct <= 0``, or when the percentile is unknown (VIX unavailable) — an
+    absent VIX never blocks trading; R2 (backwardation) is the real regime gate.
+    """
+    if percentile is None:
+        return 1.0, "R9 (VIX taper): VIX 1y percentile unavailable — taper not applied."
+    if block_below_pct > 0 and percentile < block_below_pct:
+        return (
+            0.0,
+            f"R9 (VIX taper): VIX 1y percentile {percentile:.1f} is below the "
+            f"{block_below_pct:.0f} block floor — no new premium sold into this "
+            "extreme-complacency regime.",
+        )
+    if taper_upper_pct <= taper_lower_pct:
+        return 1.0, "R9 (VIX taper): no taper band configured — full size."
+    if percentile >= taper_upper_pct:
+        return (
+            1.0,
+            f"R9 (VIX taper): VIX 1y percentile {percentile:.1f} at or above the "
+            f"{taper_upper_pct:.0f} taper ceiling — full size.",
+        )
+    if percentile <= taper_lower_pct:
+        fraction = taper_floor_frac
+    else:
+        span = taper_upper_pct - taper_lower_pct
+        fraction = taper_floor_frac + (1.0 - taper_floor_frac) * (
+            (percentile - taper_lower_pct) / span
+        )
+    return (
+        fraction,
+        f"R9 (VIX taper): VIX 1y percentile {percentile:.1f} between the "
+        f"{taper_lower_pct:.0f} floor and the {taper_upper_pct:.0f} ceiling — per-trade "
+        f"size scaled to {fraction * 100:.0f}% of the cap.",
+    )
+
+
+def apply_vix_regime(
+    verdicts: list[RiskVerdict], multiplier: float, reason: str
+) -> list[RiskVerdict]:
+    """If R9 hard-blocks (``multiplier == 0.0``), reject every still-approved verdict with
+    one extra R9 row carrying ``reason`` — same visible-rejection shape as ``block_entries``
+    and ``apply_aggregate_cap``. A partial taper (``0 < multiplier < 1``) is a sizing input,
+    not a rejection: verdicts are returned unchanged and the multiplier reaches
+    ``compute_quantity`` through the order-prep path instead.
+    """
+    if multiplier > 0.0:
+        return list(verdicts)
+    out: list[RiskVerdict] = []
+    for verdict in verdicts:
+        if not verdict.approved:
+            out.append(verdict)
+            continue
+        out.append(
+            replace(
+                verdict,
+                results=[
+                    *verdict.results,
+                    RuleResult("R9", False, reason, {"vix_size_multiplier": 0.0}),
+                ],
+                approved=False,
+            )
+        )
+    return out

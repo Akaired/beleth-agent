@@ -16,9 +16,33 @@ universe:
 entry:
   # The primary entry gate is the measured volatility risk premium on the candidate tenor
   # (see tenor_scan.vrp_threshold_vol_points and Strategy R1), not a fixed IV rank. The VIX
-  # percentile (see the vix block below) is a *regime* read, not a per-contract signal
-  # (Strategy A4); this floor is off by default until we have data to tune it.
-  vix_regime_percentile_min: 0 # 0-100; 0 disables the regime floor
+  # percentile is a *regime* read, not a per-contract signal (Strategy A4).
+  vix_regime:
+    # R9 — VIX 1y-percentile size taper (app/risk_check.py: vix_size_multiplier /
+    # apply_vix_regime). Replaces the dead `vix_regime_percentile_min`. A single straight
+    # line: full size at/above taper_upper_pct, linearly down to taper_floor_frac at/below
+    # taper_lower_pct (no flat segment). Strictly below block_below_pct: no new entry at
+    # all (a hard "no", surfaced as an R9 risk-check rejection row). Between the floor
+    # percentile and the block percentile the size just stays at taper_floor_frac — a
+    # smaller trade, never a second no-trade path (that is block_below_pct's job alone).
+    # taper_floor_frac feeds risk.max_risk_per_trade_pct_of_equity in compute_quantity.
+    #
+    # ALL ZERO = DISABLED: with these defaults the multiplier is always 1.0 and nothing
+    # is blocked. Real values to be set once decided together.
+    #
+    # Historical base rates (VIX close, 1990-2026, 252d lookback) behind the shape:
+    #   percentile < 25 on ~33% of days, usually a multi-week regime (66% of such days in
+    #     episodes >= 10 trading days; longest runs 50-78 days: 2003, 2009, 2023) — too
+    #     frequent for a hard block, right level to START tapering.
+    #   percentile < 3 on ~8% of days, and mostly SHORT episodes (median ~2 trading days)
+    #     — a genuine extreme-complacency tail, the right level for the hard block and for
+    #     the taper floor.
+    # Intended shape once enabled: taper_upper_pct 25, taper_lower_pct 3,
+    #   taper_floor_frac 0.5, block_below_pct 3.
+    taper_upper_pct: 0 # at or above this 1y percentile -> full size (1.0)
+    taper_lower_pct: 0 # at or below this -> taper_floor_frac (held down to block_below_pct)
+    taper_floor_frac: 1.0 # size multiplier at/below taper_lower_pct (e.g. 0.5 = half size)
+    block_below_pct: 0 # strictly below this -> no new entry at all (R9 rejection row)
 
 tenor_scan:
   # The agent has no fixed expiry. It scans this ladder of days-to-expiry, measures the premium

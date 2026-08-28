@@ -160,6 +160,34 @@ def test_prepare_order_no_trades_when_slippage_would_eat_over_half_the_credit():
     assert "above the 50% cap" in note and "fail-closed" in note
 
 
+def test_prepare_order_applies_the_r9_vix_taper_to_the_quantity():
+    # Full budget: 2% of 100k = $2,000; $400 max loss -> 5 spreads. Taper to 50% -> 2.
+    candidate = _candidate(max_loss=400.0)
+    plan, _ = _prepare_order(
+        candidate.as_dict(),
+        [candidate],
+        equity=100_000.0,
+        strategy_config=_STRATEGY,
+        risk_pct_multiplier=0.5,
+    )
+    assert plan is not None
+    assert plan["request"].to_request_fields()["qty"] == 2  # floor(1000 / 400)
+
+
+def test_prepare_order_no_trades_when_the_r9_taper_leaves_room_for_zero_spreads():
+    # $1,900 max loss fits once at the full $2,000 budget but not at the tapered $1,000.
+    candidate = _candidate(max_loss=1_900.0)
+    plan, note = _prepare_order(
+        candidate.as_dict(),
+        [candidate],
+        equity=100_000.0,
+        strategy_config=_STRATEGY,
+        risk_pct_multiplier=0.5,
+    )
+    assert plan is None
+    assert "R9 VIX taper cut the per-trade budget to 50%" in note
+
+
 def test_prepare_order_uses_the_candidate_dict_numbers_the_gate_saw():
     # as_dict rounds credit to 4dp and max_loss to 2dp; sizing and pricing must consume
     # exactly those numbers so the order matches what the gate and the LLM approved.
