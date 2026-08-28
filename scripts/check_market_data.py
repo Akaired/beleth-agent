@@ -128,6 +128,19 @@ def _match_candidate(
     return None
 
 
+def _open_leg_sets(open_orders: list[Any] | None, intent_substring: str) -> set[frozenset[str]]:
+    sets: set[frozenset[str]] = set()
+    for order in open_orders or []:
+        legs = getattr(order, "legs", None) or []
+        symbols = {str(leg.symbol) for leg in legs if getattr(leg, "symbol", None)}
+        if not symbols:
+            continue
+        intents = {str(getattr(leg, "position_intent", "") or "") for leg in legs}
+        if any(intent_substring in intent for intent in intents):
+            sets.add(frozenset(symbols))
+    return sets
+
+
 def working_exit_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
     """Leg-symbol sets of open orders that already close a spread (``*_to_close`` intents).
 
@@ -136,16 +149,18 @@ def working_exit_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
     cycle, but within the session duplicate exits would stack against the same position.
     Entry orders resting on the same strikes carry ``*_to_open`` intents and never match.
     """
-    sets: set[frozenset[str]] = set()
-    for order in open_orders or []:
-        legs = getattr(order, "legs", None) or []
-        symbols = {str(leg.symbol) for leg in legs if getattr(leg, "symbol", None)}
-        if not symbols:
-            continue
-        intents = {str(getattr(leg, "position_intent", "") or "") for leg in legs}
-        if any("to_close" in intent for intent in intents):
-            sets.add(frozenset(symbols))
-    return sets
+    return _open_leg_sets(open_orders, "to_close")
+
+
+def resting_entry_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
+    """Leg-symbol sets of open orders that OPEN positions (``*_to_open`` intents).
+
+    A resting entry order is committed-but-invisible risk: it is not a position yet, so
+    neither the position count nor ``capital_at_risk`` sees it. The resident loop runs
+    every few minutes, so without blocking on it each cycle could stack another entry
+    order on top — multiplying the day's committed risk without the gate ever noticing.
+    """
+    return _open_leg_sets(open_orders, "to_open")
 
 
 def _prepare_closings(
@@ -413,6 +428,27 @@ def main() -> int:
         )
     triggered_exits = [e for e in exit_evaluations if e.triggered]
 
+    # Open orders must be visible before anything trades: a resting entry order is
+    # committed-but-invisible risk (not yet a position, so open_positions and
+    # capital_at_risk do not see it) and the resident loop would otherwise stack a new
+    # entry order on top of it every few minutes. A listing failure is fail-closed for
+    # BOTH paths: no closings and no new entries this cycle.
+    open_orders: list[Any] = []
+    open_orders_error = ""
+    if clock.is_open:
+        try:
+            open_orders = list(
+                trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True))
+            )
+        except Exception as exc:  # noqa: BLE001 — unknown order state must not cause more orders
+            open_orders_error = f"{type(exc).__name__}: {exc}"
+            print(
+                "WARNING: cannot list open orders "
+                f"({open_orders_error}) — no closings and no new entries this cycle "
+                "(fail-closed).",
+                file=sys.stderr,
+            )
+
     # The risk gate counts positions in spreads (the strategy's unit), not raw legs.
     open_position_count = len(open_spreads) + len(position_anomalies)
     entry_blocks = [str(a["reason"]) for a in position_anomalies]
@@ -422,6 +458,16 @@ def main() -> int:
         for spread in open_spreads
         if spread.entry_credit is None
     ]
+    if open_orders_error:
+        entry_blocks.append(
+            "open orders could not be listed, so resting entry orders cannot be ruled "
+            "out — new entries fail closed until the account state is visible again"
+        )
+    elif resting_entry_leg_sets(open_orders):
+        entry_blocks.append(
+            "an entry order is already resting on the account — waiting for its outcome "
+            "before considering any new entry (no stacking of unfilled orders)"
+        )
     capital_at_risk = round(
         sum(
             spread.qty * spread.max_loss_per_spread
@@ -503,20 +549,16 @@ def main() -> int:
         )
 
     # --- exit path: a triggered close may itself become the cycle's order -----------------
-    # Closings are prepared only while the market is open, and only after listing the open
-    # orders that may already be working the same exit; if open orders cannot be listed the
-    # close is not sent this cycle (fail-closed against duplicates) and re-arms next cycle.
+    # Closings are prepared only while the market is open, and only against the open
+    # orders listed earlier this cycle; if that listing failed the close is not sent
+    # (fail-closed against duplicates) and re-arms next cycle.
     exit_plans: list[dict[str, Any]] = []
     exit_plan_notes = ""
     if triggered_exits and clock.is_open:
-        try:
-            open_orders = trading.get_orders(
-                GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True)
-            )
-        except Exception as exc:  # noqa: BLE001 — a data failure must not cause duplicate exits
+        if open_orders_error:
             print(
-                f"WARNING: cannot list open orders ({type(exc).__name__}: {exc}) — closings "
-                "are not sent this cycle (fail-closed); they re-arm next cycle.",
+                "WARNING: open orders unavailable — closings are not sent this cycle "
+                "(fail-closed); they re-arm next cycle.",
                 file=sys.stderr,
             )
         else:

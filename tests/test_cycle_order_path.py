@@ -197,6 +197,23 @@ def test_working_exit_leg_sets_collect_closing_orders_only():
     assert working_exit_leg_sets([]) == set()
 
 
+def test_resting_entry_leg_sets_collect_opening_orders_only():
+    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+
+    orders = [_FakeOrder(*_ENTRY_LEGS), _FakeOrder(*_CLOSE_LEGS)]
+    # The two helpers are mirror filters over the same intents: an entry order blocks
+    # new entries and never matches an exit dedup, and vice versa.
+    assert resting_entry_leg_sets(orders) == {
+        frozenset({"SPY260918P00440000", "SPY260918P00435000"})
+    }
+    assert resting_entry_leg_sets([_FakeOrder(*_CLOSE_LEGS)]) == set()
+    assert resting_entry_leg_sets([]) == set()
+    assert working_exit_leg_sets(orders) == {
+        frozenset({"SPY260918P00440000", "SPY260918P00435000"})
+    }
+    assert working_exit_leg_sets([_FakeOrder(*_ENTRY_LEGS)]) == set()
+
+
 def test_prepare_closings_builds_one_plan_per_triggered_spread():
     from scripts.check_market_data import _prepare_closings
 
