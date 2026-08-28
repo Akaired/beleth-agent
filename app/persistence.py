@@ -393,9 +393,35 @@ def fetch_table_names(config: SupabaseConfig) -> list[str]:
     return sorted(definitions)
 
 
+def fetch_agent_status(
+    config: SupabaseConfig,
+    *,
+    select: str = "id,state,paused,last_decision_id,last_cycle_at,detail",
+) -> dict[str, Any] | None:
+    data = _request(config, "GET", "agent_status", params={"select": select, "id": "eq.1"})
+    return data[0] if data else None
+
+
+def fetch_position(
+    config: SupabaseConfig,
+    symbol: str,
+    *,
+    select: str = "symbol,first_seen_at,qty,avg_entry_price",
+) -> dict[str, Any] | None:
+    data = _request(
+        config, "GET", "positions", params={"select": select, "symbol": f"eq.{symbol}"}
+    )
+    return data[0] if data else None
+
+
 def delete_decision(config: SupabaseConfig, decision_id: str) -> None:
     """Cascade cleanup for the smoke test and integration tests. Production never deletes."""
     _request(config, "DELETE", "decisions", params={"id": f"eq.{decision_id}"})
+
+
+def delete_position(config: SupabaseConfig, symbol: str) -> None:
+    """Single-symbol cleanup for the smoke test and integration tests."""
+    _request(config, "DELETE", "positions", params={"symbol": f"eq.{symbol}"})
 
 
 # --- end-to-end smoke test --------------------------------------------------------------------
@@ -412,18 +438,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
 
     results: dict[str, bool] = {}
     smoke_config = replace(config, agent_version="smoke-test")
-    previous_status = (
-        _request(
-            config,
-            "GET",
-            "agent_status",
-            params={
-                "select": "id,state,paused,last_decision_id,last_cycle_at,detail",
-                "id": "eq.1",
-            },
-        )
-        or [None]
-    )[0]
+    previous_status = fetch_agent_status(config)
     decision_id = str(uuid.uuid4())
     smoke_position = {
         "symbol": "SMOKE-BELETH",
@@ -475,11 +490,13 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
             and rows[-1]["passed"] is False
         )
 
-        first_seen = _positions_first_seen(smoke_config, smoke_position["symbol"])
+        first_seen = fetch_position(smoke_config, smoke_position["symbol"])
         mirror_positions(smoke_config, [smoke_position | {"qty": "5"}])
-        second_seen = _positions_first_seen(smoke_config, smoke_position["symbol"])
+        second_seen = fetch_position(smoke_config, smoke_position["symbol"])
         results["positions upsert preserves first_seen_at"] = (
-            first_seen is not None and first_seen == second_seen
+            first_seen is not None
+            and second_seen is not None
+            and first_seen["first_seen_at"] == second_seen["first_seen_at"]
         )
 
         persist_agent_status(
@@ -491,10 +508,10 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
                 detail={"smoke": True},
             ),
         )
-        status = (
-            _request(smoke_config, "GET", "agent_status", params={"id": "eq.1"}) or [{}]
-        )[0]
-        results["agent status upserted"] = status.get("state") == "idle"
+        status = fetch_agent_status(smoke_config, select="id,state")
+        results["agent status upserted"] = (
+            status is not None and status.get("state") == "idle"
+        )
 
         delete_decision(smoke_config, decision_id)
         results["cleanup removes the smoke decision"] = (
@@ -502,18 +519,9 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
         )
     finally:
         delete_decision(smoke_config, decision_id)
-        _request(
-            config, "DELETE", "positions", params={"symbol": "eq.SMOKE-BELETH"}
-        )
+        delete_position(config, "SMOKE-BELETH")
         if previous_status is None:
             _request(config, "DELETE", "agent_status", params={"id": "eq.1"})
         else:
             persist_agent_status(config, dict(previous_status))
     return results
-
-
-def _positions_first_seen(config: SupabaseConfig, symbol: str) -> str | None:
-    data = _request(
-        config, "GET", "positions", params={"select": "symbol,first_seen_at", "symbol": f"eq.{symbol}"}
-    )
-    return data[0]["first_seen_at"] if data else None
