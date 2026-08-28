@@ -13,9 +13,10 @@ any cost — it's built to show that a disciplined, transparent, risk-bounded sy
 be profitable. Every trade decision (and every risk-check rejection) is logged and surfaced,
 not just the wins.
 
-> **Status:** milestone 4 (Supabase persistence — every cycle writes its decision, risk
-> checks, positions, and status) done — still no orders placed, no webapp yet. See
-> [TODO.md](TODO.md) for what's next and the project notes for hard development constraints.
+> **Status:** milestone 5 (LLM decision layer — the model weighs the evidence and records a
+> structured choice among risk-approved candidates) done — still no orders placed, no webapp
+> yet. See [TODO.md](TODO.md) for what's next and the project notes for hard development
+> constraints.
 >
 > Milestone 1 verified 2026-08-27: paper account active with options trading level 3 (multi-leg
 > spreads enabled); SPY option chain fetch, Greeks/IV, and the delta filter confirmed against
@@ -46,9 +47,18 @@ not just the wins.
 > full evidence package and a strategy-config snapshot), one risk_checks row per
 > (candidate, rule) — rejections are first-class rows — plus the open-positions mirror and the
 > agent-status heartbeat. Schema in [`db/migrations/`](db/migrations/); data dictionary and the
-> dashboard's queries in [`db/README.md`](db/README.md). Until the LLM decision layer lands the
-> action is always `no_trade` with `decision_source='risk_engine'`, and every persisted summary
-> says so explicitly.
+> dashboard's queries in [`db/README.md`](db/README.md).
+>
+> Milestone 5 (2026-08-28): the **LLM decision layer** ([`app/decision.py`](app/decision.py))
+> is wired into the cycle. When the market is open and at least one candidate has passed the
+> pre-trade risk gate, the configured OpenRouter free model receives the evidence package plus
+> the numbered approved candidates and records exactly one choice through a structured tool
+> call — it can only pick from that list, cannot invent structures or sizes, and its failure
+> degrades to the deterministic no-trade, never to a trade. The full
+> [`docs/strategy.md`](docs/strategy.md) reasoning is injected into its system prompt; its
+> reasoning and token usage are persisted with every decision. The R2 regime gate
+> (backwardation) is now enforced in the candidate pipeline, not just reported. No order path
+> exists yet, so a `trade` decision says so in its own summary and sends nothing.
 
 ### Data quality disclosure
 

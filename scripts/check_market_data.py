@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Run one full agent cycle and persist the decision (milestone 4).
+"""Run one full agent cycle and persist the decision (milestone 5).
 
 Builds the evidence package (milestone 2 pipeline), runs the pre-trade risk gate (R4/R6/R7)
-over the candidates it carries, then persists to Supabase: the append-only decision row
-(with the full evidence package and a strategy-config snapshot), one risk_checks row per
-(candidate, rule), the open-positions mirror, and the agent_status heartbeat. Places no
-orders and calls no LLM — the LLM decision layer is the next milestone, so the action is
-always no_trade with decision_source='risk_engine'.
+over the candidates it carries, then decides. When the market is open and at least one
+candidate survived the gate, the LLM decision layer weighs the evidence and records a
+structured choice (decision_source='llm') — it can only pick from the approved list, and its
+failure falls back to the deterministic no-trade. Otherwise the deterministic risk-engine
+verdict stands (decision_source='risk_engine'). Either way the decision is persisted to
+Supabase with the full evidence package, one risk_checks row per (candidate, rule), the
+open-positions mirror, and the agent_status heartbeat. No orders are placed — the order path
+is the next milestone, and every trade decision says so in its summary.
 
 Persistence is skipped with a stderr warning when Supabase is not configured (read-only
 usage keeps working); a persistence *failure* prints the evidence and exits 1 — persisting
@@ -31,7 +34,7 @@ from app.alpaca_client import (  # noqa: E402
     get_trading_client,
 )
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.decision import decide_from_risk_engine  # noqa: E402
+from app.decision import decide_from_llm, decide_from_risk_engine  # noqa: E402
 from app.evidence import AccountSnapshot, build_evidence_package  # noqa: E402
 from app.market.calendar import (  # noqa: E402
     EASTERN,
@@ -135,9 +138,19 @@ def main() -> int:
     )
     blocked_dtes = {b.dte for b in blocks}
 
-    # --- candidates: only for tenors that clear VRP and aren't calendar-blocked -------
+    # --- candidates: only for tenors that clear VRP and aren't gate-blocked -------------
+    # R2: an inverted term structure blocks every new short-premium position (enforced here,
+    # not just reported — the LLM layer must never even see a backwardation candidate).
+    backwardation_block = (
+        regime_cfg["block_new_shorts_on_backwardation"]
+        and term_structure.state == "backwardation"
+    )
     tradable_dtes = [
-        t.dte for t in tenor_vrp if t.passes_threshold and t.dte not in blocked_dtes
+        t.dte
+        for t in tenor_vrp
+        if t.passes_threshold
+        and t.dte not in blocked_dtes
+        and not backwardation_block
     ]
     candidates = build_candidates(
         chain,
@@ -196,16 +209,31 @@ def main() -> int:
     )
     verdicts = evaluate_candidates(candidates, risk_state, strategy)
 
-    draft = decide_from_risk_engine(
-        as_of=datetime.now(timezone.utc),
-        symbol=symbol,
-        market_open=clock.is_open,
-        equity=round(equity, 2),
-        day_pnl=round(day_pnl, 2),
-        evidence=package,
-        strategy_config=strategy,
-        verdicts=verdicts,
-    )
+    # --- decision: the LLM weighs the evidence only when it has something to weigh ------
+    as_of = datetime.now(timezone.utc)
+    if clock.is_open and any(v.approved for v in verdicts):
+        draft = decide_from_llm(
+            as_of=as_of,
+            symbol=symbol,
+            market_open=clock.is_open,
+            equity=round(equity, 2),
+            day_pnl=round(day_pnl, 2),
+            evidence=package,
+            strategy_config=strategy,
+            verdicts=verdicts,
+            settings=settings,
+        )
+    else:
+        draft = decide_from_risk_engine(
+            as_of=as_of,
+            symbol=symbol,
+            market_open=clock.is_open,
+            equity=round(equity, 2),
+            day_pnl=round(day_pnl, 2),
+            evidence=package,
+            strategy_config=strategy,
+            verdicts=verdicts,
+        )
 
     # --- persistence: every decision, risk-check outcome and position state (constraint #5) --
     decision_id = None
@@ -237,6 +265,7 @@ def main() -> int:
                         "candidates": len(candidates),
                         "risk_checks": persisted_checks,
                         "approved": sum(1 for v in verdicts if v.approved),
+                        "decision_source": draft.decision_source,
                     },
                 ),
             )
@@ -283,6 +312,18 @@ def main() -> int:
         print(
             f"\nDecision {decision_id} persisted to Supabase "
             f"({persisted_checks} risk check(s), {upserted_positions} position(s) mirrored).",
+            file=sys.stderr,
+        )
+
+    print("\n--- decision ---", file=sys.stderr)
+    print(f"source={draft.decision_source} action={draft.action}", file=sys.stderr)
+    print(draft.summary, file=sys.stderr)
+    if draft.llm_usage is not None:
+        usage = draft.llm_usage
+        print(
+            f"llm tokens: {usage.get('prompt_tokens', 0)} prompt / "
+            f"{usage.get('completion_tokens', 0)} completion / "
+            f"{usage.get('total_tokens', 0)} total ({draft.llm_model})",
             file=sys.stderr,
         )
 
