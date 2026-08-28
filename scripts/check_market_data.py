@@ -564,22 +564,44 @@ def main() -> int:
 
     # The risk gate counts positions in spreads (the strategy's unit), not raw legs.
     open_position_count = len(open_spreads) + len(position_anomalies)
-    entry_blocks = [str(a["reason"]) for a in position_anomalies]
+    # Each block is tagged with a ``kind`` so the R10 rejection row can tell a resting
+    # order apart from a position anomaly apart from an unreadable order book.
+    entry_blocks: list[dict[str, str]] = [
+        {"kind": "position_anomaly", "reason": str(a["reason"])}
+        for a in position_anomalies
+    ]
     entry_blocks += [
-        f"open spread {spread.short_symbol}/{spread.long_symbol} has no computable entry "
-        "credit, so its risk cannot be sized"
+        {
+            "kind": "position_anomaly",
+            "reason": (
+                f"open spread {spread.short_symbol}/{spread.long_symbol} has no computable "
+                "entry credit, so its risk cannot be sized"
+            ),
+        }
         for spread in open_spreads
         if spread.entry_credit is None
     ]
     if open_orders_error:
         entry_blocks.append(
-            "open orders could not be listed, so resting entry orders cannot be ruled "
-            "out — new entries fail closed until the account state is visible again"
+            {
+                "kind": "open_orders_unreadable",
+                "reason": (
+                    "open orders could not be listed, so resting entry orders cannot be "
+                    "ruled out — new entries fail closed until the account state is "
+                    "visible again"
+                ),
+            }
         )
     elif resting_entry_leg_sets(open_orders):
         entry_blocks.append(
-            "an entry order is already resting on the account — waiting for its outcome "
-            "before considering any new entry (no stacking of unfilled orders)"
+            {
+                "kind": "resting_entry_order",
+                "reason": (
+                    "an entry order is already resting on the account — waiting for its "
+                    "outcome before considering any new entry (no stacking of unfilled "
+                    "orders)"
+                ),
+            }
         )
     capital_at_risk = round(
         sum(

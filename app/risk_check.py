@@ -27,10 +27,13 @@ Rules implemented here (see ``docs/strategy.md``):
   ``risk.daily_drawdown_stop_pct`` percent of equity, every new candidate is rejected
   regardless of the other rules, and that is stated as the reason.
 
-One further gate runs *after* the per-candidate rules, in the caller, because it is a
-property of the whole account rather than of one candidate — it emits its own visible
-rejection row and ships inert until configured:
+Two further gates run *after* the per-candidate rules, in the caller, because they are
+properties of the whole account rather than of one candidate — both emit their own visible
+rejection row and both ship inert until configured:
 
+* **R10 — entry blocked by account state** (``block_entries``): a resting entry order, unpaired
+  legs, an unreadable order book. Split off R6 on 2026-08-28 — day 1 every "R6" rejection was
+  really this, making the two indistinguishable in the dashboard.
 * **R11 — aggregate risk cap** (``apply_aggregate_cap``): committed risk across open positions
   plus this candidate's max loss must stay within ``risk.max_aggregate_risk_pct_of_equity``.
 
@@ -63,7 +66,7 @@ class AccountRiskState:
 
 @dataclass(frozen=True)
 class RuleResult:
-    rule: str  # "R4" | "R6" | "R7" | "R11" (apply_aggregate_cap)
+    rule: str  # "R4" | "R6" | "R7" | "R10" (block_entries) | "R11" (apply_aggregate_cap)
     passed: bool
     reason: str  # human-readable, names the rule and quotes the numbers used
     detail: dict[str, Any] = field(default_factory=dict)
@@ -287,19 +290,32 @@ def evaluate_candidates(
 
 
 def block_entries(
-    verdicts: list[RiskVerdict], reasons: list[str]
+    verdicts: list[RiskVerdict], blocks: list[dict[str, str]]
 ) -> list[RiskVerdict]:
-    """Reject every currently-approved verdict with one extra R6 row naming the account
-    problems that block new entries — unpaired option legs, open spreads whose risk
-    cannot be computed. Exits are untouched: closing risk is never gated by this.
+    """Reject every currently-approved verdict with one extra **R10** row naming the
+    account-state problems that block new entries — a resting entry order, unpaired
+    option legs, open spreads whose risk cannot be computed, an unreadable order book.
+    Exits are untouched: closing risk is never gated by this.
 
-    The caller (``scripts/check_market_data.py``) supplies the reasons it found while
+    R10 is deliberately its own rule id, split off R6 (sizing) on 2026-08-28: day 1
+    *every* R6 rejection was actually this block ("an entry order is already resting"),
+    never a real sizing or position-count fail, so the two were indistinguishable in the
+    dashboard. Each ``block`` is ``{"kind": ..., "reason": ...}``; ``kind`` is one of
+    ``resting_entry_order`` / ``position_anomaly`` / ``open_orders_unreadable`` and is
+    kept in ``detail["kinds"]`` so a reader can tell them apart.
+
+    The caller (``scripts/check_market_data.py``) supplies the blocks it found while
     pairing open positions; the check stays pure and the rejection lands in the same
     ``risk_checks`` rows as every other rule (constraint #3 — visible, not silent).
     """
-    if not reasons:
+    if not blocks:
         return list(verdicts)
-    reason_text = "R6 (sizing): " + "; ".join(reasons) + "."
+    reasons = [b["reason"] for b in blocks]
+    kinds = sorted({b["kind"] for b in blocks})
+    reason_text = (
+        "R10 (entry blocked by account state): " + "; ".join(reasons) + "."
+    )
+    detail = {"kinds": kinds, "reasons": list(reasons)}
     out: list[RiskVerdict] = []
     for verdict in verdicts:
         if not verdict.approved:
@@ -310,7 +326,7 @@ def block_entries(
                 verdict,
                 results=[
                     *verdict.results,
-                    RuleResult("R6", False, reason_text, {"reasons": list(reasons)}),
+                    RuleResult("R10", False, reason_text, dict(detail)),
                 ],
                 approved=False,
             )

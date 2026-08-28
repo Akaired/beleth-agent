@@ -9,6 +9,7 @@ from app.options.spreads import SpreadCandidate
 from app.risk_check import (
     AccountRiskState,
     apply_aggregate_cap,
+    block_entries,
     check_r4,
     check_r6,
     check_r7,
@@ -241,11 +242,56 @@ def test_verdict_as_dict_shape():
     assert len(d["results"]) == 3
 
 
-# --- R11: account-level aggregate risk cap (apply_aggregate_cap) -------------------------
+# --- R10: entry blocked by account state (block_entries, split off R6 on 2026-08-28) -----
 
 
 def _approved_verdict(max_loss: float = 400.0):
     return evaluate_candidate(make_candidate(max_loss=max_loss), state(), STRATEGY)
+
+
+def test_block_entries_is_a_noop_without_blocks():
+    verdicts = [_approved_verdict()]
+    out = block_entries(verdicts, [])
+    assert out[0].approved is True
+    assert [r.rule for r in out[0].results] == ["R4", "R6", "R7"]
+
+
+def test_block_entries_flips_approved_verdicts_with_an_r10_row_not_r6():
+    blocks = [
+        {
+            "kind": "resting_entry_order",
+            "reason": "an entry order is already resting on the account",
+        }
+    ]
+    out = block_entries([_approved_verdict()], blocks)
+    verdict = out[0]
+    assert verdict.approved is False
+    r10 = [r for r in verdict.results if r.rule == "R10"]
+    assert len(r10) == 1
+    # The whole point of the split: this rejection is NOT labelled R6 (real sizing).
+    assert not any(r.rule == "R6" and not r.passed for r in verdict.results)
+    assert r10[0].detail["kinds"] == ["resting_entry_order"]
+    assert "already resting" in r10[0].reason
+    assert verdict.as_dict()["rejected_by"] == ["R10"]
+
+
+def test_block_entries_keeps_distinct_kinds_and_leaves_rejected_verdicts_untouched():
+    already_rejected = evaluate_candidate(
+        make_candidate(max_loss=400.0), state(day_pnl=-3_500.0), STRATEGY  # R7 trips
+    )
+    assert already_rejected.approved is False
+    blocks = [
+        {"kind": "position_anomaly", "reason": "a naked short leg is open"},
+        {"kind": "resting_entry_order", "reason": "an entry order is already resting"},
+    ]
+    out = block_entries([_approved_verdict(), already_rejected], blocks)
+    assert [r.rule for r in out[0].results if r.rule == "R10"]
+    assert out[0].results[-1].detail["kinds"] == ["position_anomaly", "resting_entry_order"]
+    # A verdict that was already rejected gets no extra R10 row bolted on.
+    assert [r.rule for r in out[1].results] == [r.rule for r in already_rejected.results]
+
+
+# --- R11: account-level aggregate risk cap (apply_aggregate_cap) -------------------------
 
 
 def test_aggregate_cap_is_inert_at_zero():
