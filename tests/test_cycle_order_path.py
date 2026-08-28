@@ -140,8 +140,9 @@ class _FakeLeg:
 
 
 class _FakeOrder:
-    def __init__(self, *legs):
+    def __init__(self, *legs, client_order_id=None):
         self.legs = list(legs)
+        self.client_order_id = client_order_id
 
 
 _ENTRY_LEGS = [
@@ -212,6 +213,100 @@ def test_resting_entry_leg_sets_collect_opening_orders_only():
         frozenset({"SPY260918P00440000", "SPY260918P00435000"})
     }
     assert working_exit_leg_sets([_FakeOrder(*_ENTRY_LEGS)]) == set()
+
+
+def test_leg_set_helpers_fall_back_to_client_order_id_without_leg_intents():
+    # Live incident 2026-08-28: the paper API listed resting orders but the cycle could
+    # not read any leg position_intent, so the intent-only guard matched nothing and
+    # entry orders stacked. Without readable intents, classification falls back to the
+    # client order id the agent stamps on its own orders; a foreign unreadable order
+    # blocks entries (fail-closed) but is never treated as a closing.
+    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+
+    leg = _FakeLeg("SPY261009P00742000", "")
+    agent_entry = _FakeOrder(leg, client_order_id="beleth-abc123")
+    agent_close = _FakeOrder(leg, client_order_id="beleth-exit-def456")
+    foreign = _FakeOrder(leg, client_order_id="manual-order-1")
+
+    assert resting_entry_leg_sets([agent_entry]) == {
+        frozenset({"SPY261009P00742000"})
+    }
+    assert resting_entry_leg_sets([agent_close]) == set()
+    assert resting_entry_leg_sets([foreign]) == {frozenset({"SPY261009P00742000"})}
+    assert working_exit_leg_sets([agent_close]) == {frozenset({"SPY261009P00742000"})}
+    assert working_exit_leg_sets([agent_entry, foreign]) == set()
+
+
+def test_resting_entry_leg_sets_block_an_order_reported_without_legs():
+    # Worst-case serialization: an agent entry order arrives with no legs at all. It
+    # must still block new entries — committed risk that cannot be inspected is risk.
+    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+
+    entry = _FakeOrder(client_order_id="beleth-abc123")
+    assert resting_entry_leg_sets([entry]) == {frozenset({"unreadable-legs"})}
+    assert working_exit_leg_sets([entry]) == set()
+
+
+def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
+    # The short-leg ITM rule compares a spread against its OWN underlying: a QQQ cycle
+    # must never measure an SPY spread against QQQ's price (it would misread ITM/OTM
+    # and could trigger a spurious close).
+    import scripts.check_market_data as cmd
+    from datetime import date
+
+    from app.exits import OpenSpread
+
+    calls: list[str] = []
+
+    def fake_fetch_last_price(client, symbol):
+        calls.append(symbol)
+        return {"SPY": 772.0, "QQQ": 720.0}[symbol]
+
+    monkeypatch.setattr(cmd, "fetch_last_price", fake_fetch_last_price)
+
+    def spread(occ):
+        return OpenSpread(
+            short_symbol=occ,
+            long_symbol=occ.replace("00440000", "00435000"),
+            right="P",
+            expiry=date(2026, 9, 18),
+            short_strike=440.0,
+            long_strike=435.0,
+            qty=1,
+            short_entry_price=1.0,
+            long_entry_price=0.1,
+        )
+
+    spreads = [spread("SPY260918P00440000"), spread("QQQ260918P00440000")]
+    prices = cmd._underlying_prices_for_spreads(object(), spreads)
+    assert prices == {"SPY": 772.0, "QQQ": 720.0}
+    assert calls == ["SPY", "QQQ"]  # one call per distinct symbol, not per spread
+
+
+def test_a_failed_underlying_quote_disables_only_the_itm_rule(monkeypatch):
+    import scripts.check_market_data as cmd
+    from datetime import date
+
+    from app.exits import OpenSpread
+
+    def failing_fetch_last_price(client, symbol):
+        raise RuntimeError("quote feed down")
+
+    monkeypatch.setattr(cmd, "fetch_last_price", failing_fetch_last_price)
+
+    spread = OpenSpread(
+        short_symbol="SPY260918P00440000",
+        long_symbol="SPY260918P00435000",
+        right="P",
+        expiry=date(2026, 9, 18),
+        short_strike=440.0,
+        long_strike=435.0,
+        qty=1,
+        short_entry_price=1.0,
+        long_entry_price=0.1,
+    )
+    prices = cmd._underlying_prices_for_spreads(object(), [spread])
+    assert prices == {"SPY": None}  # the P/L rules still fire; only ITM is off
 
 
 def test_prepare_closings_builds_one_plan_per_triggered_spread():

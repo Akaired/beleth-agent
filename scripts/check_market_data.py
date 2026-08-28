@@ -128,39 +128,116 @@ def _match_candidate(
     return None
 
 
-def _open_leg_sets(open_orders: list[Any] | None, intent_substring: str) -> set[frozenset[str]]:
-    sets: set[frozenset[str]] = set()
-    for order in open_orders or []:
-        legs = getattr(order, "legs", None) or []
-        symbols = {str(leg.symbol) for leg in legs if getattr(leg, "symbol", None)}
-        if not symbols:
-            continue
-        intents = {str(getattr(leg, "position_intent", "") or "") for leg in legs}
-        if any(intent_substring in intent for intent in intents):
-            sets.add(frozenset(symbols))
-    return sets
+def _order_leg_symbols(order: Any) -> set[str]:
+    """Leg symbols of an open order as the broker reports them (may be absent)."""
+    return {
+        str(leg.symbol)
+        for leg in getattr(order, "legs", None) or []
+        if getattr(leg, "symbol", None)
+    }
+
+
+def _order_leg_intents(order: Any) -> set[str]:
+    """Leg position intents of an open order, as plain strings (may be absent)."""
+    return {
+        str(getattr(leg, "position_intent", "") or "")
+        for leg in getattr(order, "legs", None) or []
+    }
+
+
+def _client_order_id(order: Any) -> str:
+    return str(getattr(order, "client_order_id", "") or "")
+
+
+def _classify_open_order(order: Any) -> str:
+    """``"entry"`` | ``"close"`` | ``"unknown"`` for a resting order.
+
+    Classified from leg position intents when the broker reports them. When the legs
+    carry no readable intent (nested-leg fields proved unreliable on the paper API —
+    the live incident of 2026-08-28 listed resting orders whose intents never reached
+    the cycle), an order the agent created itself is classified by the client order id
+    it stamps on submission: entries carry ``beleth-``, closings ``beleth-exit-``. A
+    foreign order with unreadable intents is ``"unknown"`` — callers treat it as
+    opening risk (fail-closed), never as a closing.
+    """
+    intents = _order_leg_intents(order)
+    if any("to_open" in intent for intent in intents):
+        return "entry"
+    if any("to_close" in intent for intent in intents):
+        return "close"
+    client_order_id = _client_order_id(order)
+    if client_order_id.startswith("beleth-exit-"):
+        return "close"
+    if client_order_id.startswith("beleth-"):
+        return "entry"
+    return "unknown"
 
 
 def working_exit_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
-    """Leg-symbol sets of open orders that already close a spread (``*_to_close`` intents).
+    """Leg-symbol sets of open orders that already close a spread.
 
     A triggered exit whose spread already has a resting closing order must not submit a
     second one — day-only TIF means an unfilled close dies at the bell and re-arms next
     cycle, but within the session duplicate exits would stack against the same position.
-    Entry orders resting on the same strikes carry ``*_to_open`` intents and never match.
+    Entry orders on the same strikes never match, whatever their intents look like.
     """
-    return _open_leg_sets(open_orders, "to_close")
+    sets: set[frozenset[str]] = set()
+    for order in open_orders or []:
+        if _classify_open_order(order) != "close":
+            continue
+        symbols = _order_leg_symbols(order)
+        if symbols:
+            sets.add(frozenset(symbols))
+    return sets
 
 
 def resting_entry_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
-    """Leg-symbol sets of open orders that OPEN positions (``*_to_open`` intents).
+    """Leg-symbol sets of open orders that OPEN positions — or cannot be ruled out.
 
     A resting entry order is committed-but-invisible risk: it is not a position yet, so
     neither the position count nor ``capital_at_risk`` sees it. The resident loop runs
     every few minutes, so without blocking on it each cycle could stack another entry
     order on top — multiplying the day's committed risk without the gate ever noticing.
+    An order whose legs carry no readable intents is classified by its client order id
+    (see :func:`_classify_open_order`); a foreign or otherwise unreadable order also
+    blocks — an entry we cannot rule out is an entry.
     """
-    return _open_leg_sets(open_orders, "to_open")
+    sets: set[frozenset[str]] = set()
+    for order in open_orders or []:
+        if _classify_open_order(order) == "close":
+            continue
+        symbols = _order_leg_symbols(order)
+        sets.add(frozenset(symbols) if symbols else frozenset({"unreadable-legs"}))
+    return sets
+
+
+def _underlying_prices_for_spreads(
+    stock_client: Any, spreads: list[Any]
+) -> dict[str, float | None]:
+    """Last price of each spread's OWN underlying, one fetch per distinct symbol.
+
+    The short-leg ITM rule compares a spread's short strike against its own symbol's
+    price — never the cycle's symbol: a QQQ cycle measuring an SPY spread against
+    QQQ's price would misread ITM/OTM and could trigger a spurious close. A failed
+    quote only disables the ITM rule for that symbol (fail-safe, not fail-spurious);
+    the P/L rules keep working off the leg quotes.
+    """
+    prices: dict[str, float | None] = {}
+    for spread in spreads:
+        root = spread.root
+        if root in prices:
+            continue
+        try:
+            prices[root] = fetch_last_price(stock_client, root)
+        except Exception as exc:  # noqa: BLE001 — see docstring: ITM rule off, nothing worse
+            prices[root] = None
+            print(
+                f"WARNING: last price for {root} unavailable "
+                f"({type(exc).__name__}: {exc}) — its short-leg ITM exit rule "
+                "cannot fire this cycle.",
+                file=sys.stderr,
+            )
+    return prices
 
 
 def _prepare_closings(
@@ -410,6 +487,7 @@ def main() -> int:
 
     exit_cfg = strategy["exit"]
     exit_evaluations: list[ExitEvaluation] = []
+    underlying_prices = _underlying_prices_for_spreads(stock_client, open_spreads)
     for spread in open_spreads:
         short_bid, short_ask = leg_quotes.get(spread.short_symbol, (None, None))
         long_bid, long_ask = leg_quotes.get(spread.long_symbol, (None, None))
@@ -420,7 +498,7 @@ def main() -> int:
                 short_ask=short_ask,
                 long_bid=long_bid,
                 long_ask=long_ask,
-                underlying_last=last_price,
+                underlying_last=underlying_prices[spread.root],
                 profit_target_pct=exit_cfg["profit_target_pct_of_max_credit"],
                 loss_multiple=exit_cfg["loss_close_credit_multiple"],
                 exit_on_short_itm=exit_cfg["loss_close_on_short_leg_itm"],
@@ -448,6 +526,9 @@ def main() -> int:
                 "(fail-closed).",
                 file=sys.stderr,
             )
+        # Always visible in the logs: the live incident of 2026-08-28 (resting orders the
+        # cycle could not see) was invisible precisely because this count was never printed.
+        print(f"open orders listed: {len(open_orders)}", flush=True)
 
     # The risk gate counts positions in spreads (the strategy's unit), not raw legs.
     open_position_count = len(open_spreads) + len(position_anomalies)
