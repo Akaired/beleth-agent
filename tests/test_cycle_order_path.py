@@ -128,3 +128,126 @@ def test_prepare_order_uses_the_candidate_dict_numbers_the_gate_saw():
     assert plan is not None
     assert plan["request"].to_request_fields()["qty"] == 4  # floor(2000 / 400.49)
     assert plan["credit"] == 0.98  # floor(1.0049 - 0.02) to the cent
+
+
+# --- exit glue: dedup + closing plans --------------------------------------------------------------
+
+
+class _FakeLeg:
+    def __init__(self, symbol, intent):
+        self.symbol = symbol
+        self.position_intent = intent
+
+
+class _FakeOrder:
+    def __init__(self, *legs):
+        self.legs = list(legs)
+
+
+_ENTRY_LEGS = [
+    _FakeLeg("SPY260918P00440000", "sell_to_open"),
+    _FakeLeg("SPY260918P00435000", "buy_to_open"),
+]
+
+_CLOSE_LEGS = [
+    _FakeLeg("SPY260918P00440000", "buy_to_close"),
+    _FakeLeg("SPY260918P00435000", "sell_to_close"),
+]
+
+
+def _triggered_exit():
+    from datetime import date
+
+    from app.exits import OpenSpread, evaluate_exit
+
+    spread = OpenSpread(
+        short_symbol="SPY260918P00440000",
+        long_symbol="SPY260918P00435000",
+        right="P",
+        expiry=date(2026, 9, 18),
+        short_strike=440.0,
+        long_strike=435.0,
+        qty=2,
+        short_entry_price=1.20,
+        long_entry_price=0.30,
+    )
+    # Mark 0.45 == the 50% profit target on entry credit 0.90 -> close.
+    return evaluate_exit(
+        spread,
+        short_bid=0.80, short_ask=0.90,
+        long_bid=0.35, long_ask=0.45,
+        underlying_last=450.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+
+
+_EXIT_STRATEGY = {"exit": {"close_slippage_usd": 0.05}}
+
+
+def test_working_exit_leg_sets_collect_closing_orders_only():
+    from scripts.check_market_data import working_exit_leg_sets
+
+    orders = [_FakeOrder(*_ENTRY_LEGS), _FakeOrder(*_CLOSE_LEGS)]
+    assert working_exit_leg_sets(orders) == {
+        frozenset({"SPY260918P00440000", "SPY260918P00435000"})
+    }
+    assert working_exit_leg_sets([_FakeOrder(*_ENTRY_LEGS)]) == set()
+    assert working_exit_leg_sets([]) == set()
+
+
+def test_prepare_closings_builds_one_plan_per_triggered_spread():
+    from scripts.check_market_data import _prepare_closings
+
+    plans, notes = _prepare_closings(
+        [_triggered_exit()], working_leg_sets=set(), strategy_config=_EXIT_STRATEGY
+    )
+    assert len(plans) == 1
+    plan = plans[0]
+    fields = plan["request"].to_request_fields()
+    assert fields["qty"] == 2  # the spread's own remaining quantity, not the risk cap
+    assert fields["limit_price"] == 0.50  # mark 0.45 + 0.05 concession
+    assert [leg["position_intent"] for leg in fields["legs"]] == [
+        "buy_to_close", "sell_to_close"
+    ]
+    assert plan["exit_reason"] == "profit_target"
+    assert plan["client_order_id"].startswith("beleth-exit-")
+    assert "closing order" in notes and "is being sent" in notes
+
+
+def test_prepare_closings_skips_a_spread_already_working():
+    from scripts.check_market_data import _prepare_closings
+
+    evaluation = _triggered_exit()
+    spread = evaluation.spread
+    working = {frozenset({spread.short_symbol, spread.long_symbol})}
+    plans, notes = _prepare_closings(
+        [evaluation], working_leg_sets=working, strategy_config=_EXIT_STRATEGY
+    )
+    assert plans == []
+    assert "already working" in notes and "not duplicated" in notes
+
+
+def test_prepare_closings_fails_closed_without_a_measurable_mark():
+    from scripts.check_market_data import _prepare_closings
+
+    from app.exits import evaluate_exit
+
+    # The ITM rule fires with no usable leg quotes: the close is triggered but cannot
+    # be priced, so no order is built and the fail-closed note lands in the summary.
+    evaluation = evaluate_exit(
+        _triggered_exit().spread,
+        short_bid=None, short_ask=None,
+        long_bid=None, long_ask=None,
+        underlying_last=439.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+    assert evaluation.triggered is True
+    plans, notes = _prepare_closings(
+        [evaluation], working_leg_sets=set(), strategy_config=_EXIT_STRATEGY
+    )
+    assert plans == []
+    assert "no closing order" in notes and "fail-closed" in notes

@@ -102,7 +102,14 @@ These are what the agent runs on. Parameters live in `config/strategy.yaml`, nev
 - **R4.** Defined risk only. Maximum loss is computed, logged, and shown *before* the order is
   submitted.
 - **R5.** Exit: 50% of the credit in profit; 2× the credit in loss, or the short leg going
-  in-the-money.
+  in-the-money. Exits are mechanical risk management, never LLM-gated: every cycle the open
+  legs are paired back into spreads (same root/expiry/right; a short pairs with the
+  nearest-strike protective long) and each spread is measured. Entry economics come from the
+  legs' own filled prices, so exit management never depends on the trades log staying
+  complete. A triggered close is one `mleg` order closing both legs inside it, priced to
+  fill (mark + a wider-than-entry slippage concession — a protective close that rests
+  unfilled is worse than paying for liquidity). Naked legs, unpaired protective legs, or a
+  spread whose entry credit cannot be computed block every new entry until resolved.
 - **R6.** Sizing: risk 1–2% per trade, at most 3–5 open positions.
 - **R7.** Daily stop: intraday drawdown beyond 3% → stop opening new positions for the day.
 - **R8.** If no tenor clears the threshold, **do not trade** and state the reason in the
@@ -152,6 +159,11 @@ reconstructible after the fact.
     "delta_short": 0.0, "credit": 0.0, "max_loss": 0.0, "breakeven": 0.0,
     "bid_ask_spread": 0.0
   } ],
+  "open_positions_detail": [ {
+    "symbol": "SPY", "right": "P", "expiry": "", "dte": 0, "strikes": [0, 0],
+    "strike_width": 0.0, "qty": 0, "entry_credit": 0.0, "max_loss": 0.0,
+    "short_symbol": "", "long_symbol": ""
+  } ],
   "account": {
     "cash": 0.0, "buying_power": 0.0, "open_positions": 0, "day_pnl": 0.0,
     "risk_budget_remaining_today": 0.0
@@ -162,4 +174,6 @@ reconstructible after the fact.
 Assembled by `app/evidence.py`; run `python scripts/check_market_data.py SPY` to print a real
 one. `vrp.vix_minus_rv20` is the 30-day premium in volatility points (VIX level minus 20-day
 realized vol); `vrp.per_tenor[].vrp_vs_rv20` is that tenor's own ATM IV minus 20-day realized
-vol, also in volatility points, and is the quantity R1 gates on.
+vol, also in volatility points, and is the quantity R1 gates on. `open_positions_detail` lists
+the spreads reconstructed from the account's open legs — each entry is one R5-managed
+position, empty when the account is flat.

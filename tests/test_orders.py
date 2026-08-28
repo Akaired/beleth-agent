@@ -8,12 +8,18 @@ position intents) are pinned against the values verified in the vendored docs.
 
 import pytest
 
+from datetime import date
+
+from app.exits import OpenSpread
 from app.options.spreads import SpreadCandidate
 from app.orders import (
     OrderSubmissionError,
+    build_closing_mleg_order,
     build_mleg_order,
+    closing_limit_price,
     compute_quantity,
     credit_limit_price,
+    describe_closing_legs,
     describe_legs,
     submit_mleg_order,
 )
@@ -155,6 +161,102 @@ def test_describe_legs_is_self_contained():
     assert [leg["role"] for leg in legs] == ["short", "long"]
     assert [leg["strike"] for leg in legs] == [440.0, 435.0]
     assert [leg["side"] for leg in legs] == ["sell", "buy"]
+    assert legs[0]["symbol"] == "SPY260918P00440000"
+    assert legs[1]["symbol"] == "SPY260918P00435000"
+
+
+# --- closing (exit) pricing ---------------------------------------------------------------------
+
+
+def make_open_spread() -> OpenSpread:
+    """The account-side twin of ``make_candidate``: the same bull put, entry credit 0.90."""
+    return OpenSpread(
+        short_symbol="SPY260918P00440000",
+        long_symbol="SPY260918P00435000",
+        right="P",
+        expiry=date(2026, 9, 18),
+        short_strike=440.0,
+        long_strike=435.0,
+        qty=2,
+        short_entry_price=1.20,
+        long_entry_price=0.30,
+    )
+
+
+def test_closing_limit_pays_the_mark_plus_slippage():
+    # Measured cost to close 0.90 + 0.05 concession -> 0.95 debit, floored to the cent.
+    assert closing_limit_price(0.90, 0.05) == 0.95
+
+
+def test_closing_limit_floors_to_the_cent():
+    # 0.901 + 0.05 = 0.951 -> 0.95, never rounded up.
+    assert closing_limit_price(0.901, 0.05) == 0.95
+
+
+def test_closing_limit_demands_credit_minus_slippage_when_the_market_pays():
+    # Mark -0.10 (market would pay us 0.10 to close): demand -0.05 credit.
+    assert closing_limit_price(-0.10, 0.05) == -0.05
+
+
+def test_closing_limit_falls_back_to_a_penny_debit_when_credit_cannot_absorb_slippage():
+    # The market pays 0.03 to close; the 0.05 concession would swallow it. A guaranteed
+    # exit is worth a cent.
+    assert closing_limit_price(-0.03, 0.05) == 0.01
+
+
+def test_closing_limit_fails_closed_on_an_unmeasured_mark():
+    assert closing_limit_price(None, 0.05) is None
+
+
+def test_closing_limit_with_zero_mark_is_a_penny_debit_not_zero():
+    # A 0.00 limit on Alpaca is not a fillable debit; the fallback guarantees the exit.
+    assert closing_limit_price(0.0, 0.05) == 0.05
+
+
+# --- closing order construction -------------------------------------------------------------------
+
+
+def test_closing_order_buys_back_the_short_and_sells_the_long():
+    fields = build_closing_mleg_order(
+        make_open_spread(), qty=2, limit_price=0.95, client_order_id="beleth-x"
+    ).to_request_fields()
+    assert fields["qty"] == 2
+    assert fields["order_class"] == "mleg"
+    assert fields["type"] == "limit"
+    assert fields["time_in_force"] == "day"
+    assert fields["limit_price"] == 0.95  # positive = net debit: we pay to get out
+    assert fields["client_order_id"] == "beleth-x"
+
+    short, long = fields["legs"]
+    assert short == {
+        "symbol": "SPY260918P00440000",
+        "ratio_qty": 1,
+        "side": "buy",
+        "position_intent": "buy_to_close",
+    }
+    assert long == {
+        "symbol": "SPY260918P00435000",
+        "ratio_qty": 1,
+        "side": "sell",
+        "position_intent": "sell_to_close",
+    }
+
+
+def test_closing_order_can_demand_a_credit_with_a_negative_limit():
+    fields = build_closing_mleg_order(
+        make_open_spread(), qty=1, limit_price=-0.05, client_order_id="beleth-y"
+    ).to_request_fields()
+    assert fields["limit_price"] == -0.05
+    short, _long = fields["legs"]
+    assert short["position_intent"] == "buy_to_close"
+
+
+def test_describe_closing_legs_mirrors_the_opening_intents():
+    legs = describe_closing_legs(make_open_spread())
+    assert [leg["role"] for leg in legs] == ["short", "long"]
+    assert [leg["side"] for leg in legs] == ["buy", "sell"]
+    assert [leg["position_intent"] for leg in legs] == ["buy_to_close", "sell_to_close"]
+    assert [leg["strike"] for leg in legs] == [440.0, 435.0]
     assert legs[0]["symbol"] == "SPY260918P00440000"
     assert legs[1]["symbol"] == "SPY260918P00435000"
 

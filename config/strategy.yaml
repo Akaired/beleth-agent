@@ -84,6 +84,11 @@ exit:
   profit_target_pct_of_max_credit: 50 # close at 50% of max credit captured, don't wait for expiry
   loss_close_credit_multiple: 2 # close at ~2x the credit received...
   loss_close_on_short_leg_itm: true # ...or immediately if the short leg goes in-the-money
+  # Closing orders are priced to FILL, not to haggle — an exit is risk reduction (R5), so the
+  # limit pays the measured close cost plus this concession (a mid quote is an indication).
+  # Wider than the entry concession on purpose: a protective close that rests unfilled is
+  # worse than paying for liquidity. Strategy level B: industry convention, not backtested.
+  close_slippage_usd: 0.05
 
 risk:
   max_risk_per_trade_pct_of_equity: 2 # 1-2% band; this is the upper bound used as the hard cap

@@ -1,34 +1,40 @@
 """Integration tests against the real Supabase project (service-role key from .env).
 
 Self-cleaning: every row these tests create is deleted in a ``finally`` block, and the
-agent_status row is snapshotted and restored. They never touch the ``trades`` table
-(nothing writes to it yet). The whole module skips cleanly when Supabase is unconfigured
-or the migration has not been applied.
+agent_status row is snapshotted and restored (the ``trades`` and ``risk_checks`` rows
+cascade from their decision row, so deleting the decision cleans them). The whole module
+skips cleanly when Supabase is unconfigured or the migration has not been applied.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
 from app.config import get_settings
 from app.decision import DecisionDraft
+from app.exits import OpenSpread, evaluate_exit
 from app.persistence import (
     EXPECTED_TABLES,
     PersistenceConfigError,
     agent_status_row,
     delete_decision,
     delete_position,
+    exit_check_rows,
     fetch_agent_status,
     fetch_decision,
     fetch_latest_decision,
     fetch_position,
     fetch_risk_checks,
     fetch_table_names,
+    fetch_trades_for_decision,
     mirror_positions,
     persist_agent_status,
     persist_decision,
+    persist_exit_checks,
     persist_risk_checks,
+    persist_trade,
     supabase_config_from_settings,
+    trade_row,
 )
 from app.persistence import _request
 from app.risk_check import RuleResult, RiskVerdict
@@ -175,3 +181,74 @@ def test_positions_mirror_preserves_first_seen_at(supabase_config):
     finally:
         delete_position(supabase_config, ITEST_SYMBOL)
     assert fetch_position(supabase_config, ITEST_SYMBOL) is None
+
+
+def test_exit_trade_rows_and_r5_checks_round_trip(supabase_config):
+    """Migration 0002 round trip: an exit trades row carries kind='exit' and the fired R5
+    rule; each open spread's R5 verdict lands as a risk_checks row. Both cascade away
+    with the decision."""
+    draft = _make_draft(action="trade", summary="[itest] exit round trip — safe to delete.")
+    decision_id = persist_decision(supabase_config, draft=draft)
+    try:
+        persist_trade(
+            supabase_config,
+            trade_row(
+                decision_id=decision_id,
+                underlying="SPY",
+                qty=2,
+                credit=None,
+                max_loss=None,
+                legs=[{"role": "short", "symbol": "SPY260918P00440000", "strike": 440.0}],
+                order=_ORDER_DUMP_IEST,
+                kind="exit",
+                exit_reason="profit_target",
+            ),
+        )
+        trades = fetch_trades_for_decision(supabase_config, decision_id)
+        assert len(trades) == 1
+        assert trades[0]["kind"] == "exit"
+        assert trades[0]["exit_reason"] == "profit_target"
+
+        spread = OpenSpread(
+            short_symbol="SPY260918P00440000",
+            long_symbol="SPY260918P00435000",
+            right="P",
+            expiry=date(2026, 9, 18),
+            short_strike=440.0,
+            long_strike=435.0,
+            qty=1,
+            short_entry_price=1.20,
+            long_entry_price=0.30,
+        )
+        evaluation = evaluate_exit(
+            spread,
+            short_bid=0.80, short_ask=0.91,
+            long_bid=0.35, long_ask=0.45,
+            underlying_last=450.0,
+            profit_target_pct=50,
+            loss_multiple=2,
+            exit_on_short_itm=True,
+        )
+        assert persist_exit_checks(
+            supabase_config, decision_id=decision_id, evaluations=[evaluation]
+        ) == 1
+        checks = fetch_risk_checks(supabase_config, decision_id)
+        assert [c["rule"] for c in checks] == ["R5"]
+        assert checks[0]["passed"] is True and checks[0]["approved"] is False
+        assert checks[0]["candidate"]["short_symbol"] == "SPY260918P00440000"
+    finally:
+        delete_decision(supabase_config, decision_id)
+    assert fetch_trades_for_decision(supabase_config, decision_id) == []
+
+
+_ORDER_DUMP_IEST = {
+    "id": "0b5c6a4e-0000-0000-0000-000000000009",
+    "client_order_id": "beleth-itest-exit",
+    "status": "accepted",
+    "qty": "2",
+    "filled_qty": "0",
+    "filled_avg_price": None,
+    "submitted_at": "2026-08-28T14:05:00Z",
+    "filled_at": None,
+    "legs": [{"symbol": "SPY260918P00440000", "side": "buy"}],
+}

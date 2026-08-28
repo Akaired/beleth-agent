@@ -136,6 +136,9 @@ class DecisionDraft:
     # Set on a 'trade' decision: the chosen candidate's dict, handed to the order path so
     # sizing and submission act on exactly the structure the decision picked. Always None
     # on a no_trade — the caller must treat a trade without one as a fail-closed fault.
+    # One deliberate exception: an exit-only cycle (a triggered R5 close became the order)
+    # is action='trade' with chosen_candidate None — the closing order carries its own
+    # spread, not a candidate from this cycle's scan.
     chosen_candidate: dict[str, Any] | None = None
 
 

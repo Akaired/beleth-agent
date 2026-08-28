@@ -14,8 +14,15 @@ reads the same database. There is no other store — no local SQLite, no JSON fi
 
 Migrations are plain SQL files in `db/migrations/`, numbered and append-only — never edit an
 applied migration, add a new one. There is no DB password in this project on purpose: the
-service-role key only speaks the REST API, which cannot run DDL, so migrations are applied by
-hand from the dashboard.
+service-role key only speaks the REST API, which cannot run DDL. Apply with the
+Supabase **Management API** from the repo (needs `SUPABASE_ACCESS_TOKEN`, a personal access
+token, in `.env` — it is a dashboard credential, never committed):
+
+```bash
+uv run python scripts/apply_migration.py db/migrations/0002_exit_trades.sql
+```
+
+Or by hand from the dashboard:
 
 1. Open the Supabase dashboard → **SQL Editor**.
 2. Paste the full contents of the migration file (e.g. `0001_initial_schema.sql`).
@@ -29,8 +36,8 @@ hand from the dashboard.
 | Table | Written by | Shape |
 |---|---|---|
 | `decisions` | agent, one row per cycle, append-only | the decision (action, plain-language `summary`), denormalized `equity`/`day_pnl`/`market_open` for the P&L curve, the **full evidence package** and a snapshot of `config/strategy.yaml` as JSONB, nullable `llm_*` columns for the LLM milestone |
-| `risk_checks` | agent, one row per (decision, candidate, rule) | `rule` (`R4`/`R6`/`R7`), `passed`, human-readable `reason`, structured `detail`, the full `candidate` — rejections are first-class rows, queryable independently and shown with the same prominence as fills |
-| `trades` | agent, when a cycle submits an order | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload |
+| `risk_checks` | agent, one row per (decision, candidate, rule) — plus one R5 row per open spread | `rule` (`R4`/`R6`/`R7`/`R5`), `passed`, human-readable `reason`, structured `detail`, the full `candidate` — rejections are first-class rows, queryable independently and shown with the same prominence as fills. On an R5 row, `passed` means the spread is within the exit rules and `approved` means a close is demanded |
+| `trades` | agent, when a cycle submits an order (entry or R5 close) | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload. `kind` is `entry` (default) or `exit`; on an exit row `exit_reason` carries the fired R5 rule and `credit`/`max_loss` are null (a close has no entry economics of its own) |
 | `positions` | agent, mirrored every cycle (upsert + per-symbol delete of closed ones) | current open positions; `first_seen_at` is derived by trigger, never client-sent |
 | `agent_status` | agent, single row `id=1` upserted every cycle | `state` (vocabulary in `app/persistence.py`), `paused` (master-admin switch — the agent never writes it), `last_decision_id` |
 

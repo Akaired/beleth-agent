@@ -52,6 +52,7 @@ def build_evidence_package(
     now_et: datetime,
     candidates: list[SpreadCandidate],
     account: AccountSnapshot,
+    open_positions_detail: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     rv20 = realized_vols.get(20)
     rv20_value = rv20.value if rv20 is not None else None
@@ -126,6 +127,7 @@ def build_evidence_package(
             ],
         },
         "candidates": [c.as_dict() for c in candidates],
+        "open_positions_detail": open_positions_detail or [],
         "account": {
             "cash": account.cash,
             "buying_power": account.buying_power,

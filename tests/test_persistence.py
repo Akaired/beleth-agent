@@ -2,18 +2,20 @@
 
 import uuid
 from dataclasses import FrozenInstanceError
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 
 from app.config import Settings
 from app.decision import DecisionDraft
+from app.exits import OpenSpread, evaluate_exit
 from app.persistence import (
     PersistenceConfigError,
     PersistenceError,
     SupabaseConfig,
     agent_status_row,
     decision_row,
+    exit_check_rows,
     position_rows,
     risk_check_rows,
     supabase_config_from_settings,
@@ -319,6 +321,102 @@ def test_trade_row_converts_datetime_values_in_the_order_dump():
         decision_id="dec-1", underlying="SPY", qty=1, credit=0.98, max_loss=400.0, order=order
     )
     assert row["submitted_at"] == "2026-08-28T14:05:00+00:00"
+
+
+def test_trade_row_kind_defaults_to_entry():
+    row = trade_row(decision_id="dec-1", underlying="SPY", qty=1, credit=0.98, max_loss=400.0)
+    assert row["kind"] == "entry"
+    assert "exit_reason" not in row  # nullable column, key simply absent
+
+
+def test_trade_row_carries_kind_and_exit_reason_on_exits():
+    row = trade_row(
+        decision_id="dec-1",
+        underlying="SPY",
+        qty=2,
+        credit=None,
+        max_loss=None,
+        legs=_LEGS,
+        order=_ORDER_DUMP,
+        kind="exit",
+        exit_reason="short_leg_itm",
+    )
+    assert row["kind"] == "exit"
+    assert row["exit_reason"] == "short_leg_itm"
+    # A closing order has no entry credit / max loss of its own — keys absent, DB null.
+    assert "credit" not in row
+    assert "max_loss" not in row
+
+
+# --- exit check rows ---------------------------------------------------------------------------
+
+
+def _open_spread():
+    return OpenSpread(
+        short_symbol="SPY260918P00440000",
+        long_symbol="SPY260918P00435000",
+        right="P",
+        expiry=date(2026, 9, 18),
+        short_strike=440.0,
+        long_strike=435.0,
+        qty=1,
+        short_entry_price=1.20,
+        long_entry_price=0.30,
+    )
+
+
+def _held_evaluation():
+    return evaluate_exit(
+        _open_spread(),
+        short_bid=0.80, short_ask=0.91,
+        long_bid=0.35, long_ask=0.45,
+        underlying_last=450.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+
+
+def test_exit_check_rows_holding_position_passes():
+    rows = exit_check_rows("dec-1", [_held_evaluation()])
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["rule"] == "R5"
+    assert row["passed"] is True
+    assert row["approved"] is False
+    assert row["candidate"]["short_symbol"] == "SPY260918P00440000"
+    assert row["max_loss"] == pytest.approx(410.0)
+    assert row["breakeven"] is None
+
+
+def test_exit_check_rows_triggered_position_approves_the_close():
+    fired = evaluate_exit(
+        _open_spread(),
+        short_bid=2.00, short_ask=2.10,
+        long_bid=0.20, long_ask=0.30,
+        underlying_last=439.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+    fired = evaluate_exit(
+        _open_spread(),
+        short_bid=2.00, short_ask=2.10,
+        long_bid=0.20, long_ask=0.30,
+        underlying_last=439.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+    rows = exit_check_rows("dec-1", [fired])
+    assert rows[0]["passed"] is False
+    assert rows[0]["approved"] is True
+    assert "closing" in rows[0]["reason"]
+
+
+def test_exit_check_rows_index_each_spread():
+    rows = exit_check_rows("dec-1", [_held_evaluation(), _held_evaluation()])
+    assert [r["candidate_index"] for r in rows] == [0, 1]
 
 
 # --- config dataclass ------------------------------------------------------------------------

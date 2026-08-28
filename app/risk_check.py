@@ -33,8 +33,7 @@ order path and real positions exist. See TODO.md.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass, field, replace
 
 from app.options.spreads import SpreadCandidate
 
@@ -278,3 +277,35 @@ def evaluate_candidates(
     strategy_config: dict[str, Any],
 ) -> list[RiskVerdict]:
     return [evaluate_candidate(c, state, strategy_config) for c in candidates]
+
+
+def block_entries(
+    verdicts: list[RiskVerdict], reasons: list[str]
+) -> list[RiskVerdict]:
+    """Reject every currently-approved verdict with one extra R6 row naming the account
+    problems that block new entries — unpaired option legs, open spreads whose risk
+    cannot be computed. Exits are untouched: closing risk is never gated by this.
+
+    The caller (``scripts/check_market_data.py``) supplies the reasons it found while
+    pairing open positions; the check stays pure and the rejection lands in the same
+    ``risk_checks`` rows as every other rule (constraint #3 — visible, not silent).
+    """
+    if not reasons:
+        return list(verdicts)
+    reason_text = "R6 (sizing): " + "; ".join(reasons) + "."
+    out: list[RiskVerdict] = []
+    for verdict in verdicts:
+        if not verdict.approved:
+            out.append(verdict)
+            continue
+        out.append(
+            replace(
+                verdict,
+                results=[
+                    *verdict.results,
+                    RuleResult("R6", False, reason_text, {"reasons": list(reasons)}),
+                ],
+                approved=False,
+            )
+        )
+    return out

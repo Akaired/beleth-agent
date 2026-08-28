@@ -35,6 +35,7 @@ from app.config import Settings
 
 if TYPE_CHECKING:
     from app.decision import DecisionDraft
+    from app.exits import ExitEvaluation
     from app.risk_check import RiskVerdict
 
 REST_PATH = "/rest/v1"
@@ -231,6 +232,38 @@ def risk_check_rows(
     return rows
 
 
+def exit_check_rows(
+    decision_id: str, evaluations: Sequence[ExitEvaluation]
+) -> list[dict[str, Any]]:
+    """One row per open spread checked against the exit rules (rule ``'R5'``).
+
+    Field semantics on these rows: ``passed`` means the position is within the exit rules
+    (no close demanded); ``approved`` means the R5 verdict approves closing it — the two
+    diverge only when the market is closed and a triggered close must wait for the next
+    open, which the row's ``reason`` states. ``candidate`` carries the spread's own dict
+    (legs, quantity, filled entry credit) so each row is self-contained.
+    """
+    rows = []
+    for index, evaluation in enumerate(evaluations):
+        spread = evaluation.spread
+        rows.append(
+            {
+                "id": str(uuid.uuid4()),
+                "decision_id": decision_id,
+                "candidate_index": index,
+                "rule": "R5",
+                "passed": not evaluation.triggered,
+                "reason": evaluation.reason,
+                "detail": _ensure_json_safe(evaluation.detail),
+                "candidate": _ensure_json_safe(spread.as_dict()),
+                "approved": evaluation.triggered,
+                "max_loss": spread.max_loss_per_spread,
+                "breakeven": None,
+            }
+        )
+    return rows
+
+
 def position_rows(model_dumps: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """Shape ``Position.model_dump(mode="json")`` dicts. Alpaca reports the numerics as
     strings; convert. ``first_seen_at`` is deliberately not client-sent (DB-owned)."""
@@ -273,6 +306,8 @@ def trade_row(
     legs: Sequence[Mapping[str, Any]] | None = None,
     order: Mapping[str, Any] | None = None,
     failure: str | None = None,
+    kind: str = "entry",
+    exit_reason: str | None = None,
 ) -> dict[str, Any]:
     """Shape the ``trades`` row for one decision's order.
 
@@ -282,6 +317,9 @@ def trade_row(
     row, constraint #3). ``credit`` stores the net credit the limit demanded (positive
     number); Alpaca's raw ``filled_avg_price`` (signed, per the mleg debit/credit
     convention) stays in the ``filled_avg_price`` column and the ``raw`` dump.
+
+    ``kind`` marks an entry (default) or an exit (R5 close, migration 0002); ``exit_reason``
+    carries the fired R5 rule id on exit rows, ``None`` on entries.
     """
     row: dict[str, Any] = {
         "decision_id": decision_id,
@@ -289,8 +327,11 @@ def trade_row(
         "qty": qty,
         "credit": credit,
         "max_loss": max_loss,
+        "kind": kind,
         "legs": _ensure_json_safe(list(legs) if legs else None),
     }
+    if exit_reason is not None:
+        row["exit_reason"] = exit_reason
     if order is not None:
         row.update(
             {
@@ -354,6 +395,17 @@ def persist_risk_checks(
 ) -> int:
     """Insert one row per (candidate, rule). Empty verdicts write nothing and cost no request."""
     rows = risk_check_rows(decision_id, verdicts)
+    if not rows:
+        return 0
+    _request(config, "POST", "risk_checks", json_body=rows)
+    return len(rows)
+
+
+def persist_exit_checks(
+    config: SupabaseConfig, *, decision_id: str, evaluations: Sequence[ExitEvaluation]
+) -> int:
+    """Insert one R5 row per open spread checked this cycle. Empty input writes nothing."""
+    rows = exit_check_rows(decision_id, evaluations)
     if not rows:
         return 0
     _request(config, "POST", "risk_checks", json_body=rows)
@@ -436,7 +488,7 @@ def fetch_risk_checks(
     config: SupabaseConfig,
     decision_id: str,
     *,
-    select: str = "rule,passed,reason,approved,candidate_index,max_loss,breakeven",
+    select: str = "rule,passed,reason,approved,candidate_index,max_loss,breakeven,candidate",
 ) -> list[dict[str, Any]]:
     data = _request(
         config,
@@ -456,7 +508,7 @@ def fetch_trades_for_decision(
     decision_id: str,
     *,
     select: str = "underlying,alpaca_order_id,client_order_id,status,qty,filled_qty,"
-    "filled_avg_price,credit,max_loss,legs,submitted_at",
+    "filled_avg_price,credit,max_loss,legs,submitted_at,kind,exit_reason",
 ) -> list[dict[str, Any]]:
     data = _request(
         config, "GET", "trades", params={"select": select, "decision_id": f"eq.{decision_id}"}

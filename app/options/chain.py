@@ -6,7 +6,7 @@ from datetime import date, timedelta
 
 from alpaca.data.historical.option import OptionHistoricalDataClient
 from alpaca.data.models.snapshots import OptionsSnapshot
-from alpaca.data.requests import OptionChainRequest
+from alpaca.data.requests import OptionChainRequest, OptionLatestQuoteRequest
 
 
 def fetch_chain(
@@ -46,3 +46,24 @@ def fetch_chain_for_ladder(
     lo = max(0, min(dte_ladder) - tail_days)
     hi = max(dte_ladder) + tail_days
     return fetch_chain(client, underlying_symbol, expiry_days_min=lo, expiry_days_max=hi)
+
+
+def fetch_latest_quotes(
+    client: OptionHistoricalDataClient, symbols: list[str]
+) -> dict[str, tuple[float | None, float | None]]:
+    """Latest quote (bid, ask) per option symbol, for pricing exits on open positions.
+
+    Takes explicit OCC symbols — the contracts an open spread actually holds, which may
+    sit outside the scan ladder's expiry window and therefore outside any chain fetch.
+    Missing or unusable quotes come back as ``(None, None)``; callers treat a missing
+    mark as "cannot measure, do not act" (see `app.exits.evaluate_exit`).
+    """
+    if not symbols:
+        return {}
+    quotes = client.get_option_latest_quote(OptionLatestQuoteRequest(symbol_or_symbols=symbols))
+    out: dict[str, tuple[float | None, float | None]] = {}
+    for symbol, quote in quotes.items():
+        bid = getattr(quote, "bid_price", None)
+        ask = getattr(quote, "ask_price", None)
+        out[symbol] = (float(bid) if bid is not None else None, float(ask) if ask is not None else None)
+    return out

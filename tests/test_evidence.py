@@ -48,7 +48,11 @@ def _base_kwargs():
 
 def test_package_has_the_agreed_top_level_shape():
     pkg = build_evidence_package(**_base_kwargs())
-    assert set(pkg) == {"as_of", "market_open", "underlying", "vix", "vrp", "calendar", "candidates", "account"}
+    assert set(pkg) == {
+        "as_of", "market_open", "underlying", "vix", "vrp", "calendar",
+        "candidates", "open_positions_detail", "account",
+    }
+    assert pkg["open_positions_detail"] == []
     assert pkg["underlying"]["realized_vol"] == {"10d": 0.11, "20d": 0.134, "30d": 0.14}
     assert pkg["vix"]["term_structure"] == CONTANGO
     # vix_minus_rv20 = 15.45 - 13.4 = 2.05
