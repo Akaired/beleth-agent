@@ -36,7 +36,7 @@ const GROUPS: Group[] = [
     label: "Records",
     items: [
       { href: "/dashboard/decisions", label: "Decision history", min: "demo_admin", Icon: IconDecisions },
-      { href: "/dashboard/strategy", label: "Strategy config", min: "demo_admin", Icon: IconStrategy },
+      { href: "/dashboard/strategy", label: "Strategy strategy", min: "demo_admin", Icon: IconStrategy },
     ],
   },
   {

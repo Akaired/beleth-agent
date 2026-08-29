@@ -263,11 +263,13 @@ export async function fetchLatestStrategyConfig(): Promise<{
   config: Record<string, unknown> | null;
   asOf: string | null;
   agentVersion: string | null;
+  /** VIX 1y percentile from the same decision's evidence package, for the R9 taper marker. */
+  vixPercentile: number | null;
 }> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("decisions")
-    .select("created_at,agent_version,strategy_config")
+    .select("created_at,agent_version,strategy_config,evidence")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -277,12 +279,18 @@ export async function fetchLatestStrategyConfig(): Promise<{
         created_at: string;
         agent_version: string;
         strategy_config: Record<string, unknown> | null;
+        evidence: Record<string, unknown> | null;
       }
     | null;
+
+  const vix = (row?.evidence?.vix ?? null) as Record<string, unknown> | null;
+  const pct = vix ? Number(vix.percentile_1y) : NaN;
+
   return {
     config: row?.strategy_config ?? null,
     asOf: row?.created_at ?? null,
     agentVersion: row?.agent_version ?? null,
+    vixPercentile: Number.isFinite(pct) ? pct : null,
   };
 }
 
