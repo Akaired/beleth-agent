@@ -21,7 +21,7 @@ export function CtaSection() {
           className="inline-flex items-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap self-start md:self-auto"
         >
           <IconGithub size={15} weight="fill" />
-          Read the source on GitHub
+          View the source on GitHub
         </a>
       </div>
     </section>

@@ -41,10 +41,8 @@ export function SiteFooter() {
 
         <div className="flex flex-col items-center gap-3">
           <p className="text-center text-[11px] leading-relaxed text-faint">
-            © 2026 Beleth — paper trading only, no live code path. Built in Italy
-            for the Alpaca AI Trading Agents Hackathon (lablab.ai). Every position
-            carries a defined, known maximum loss; losing trades are normal and
-            expected.
+            © 2026 Beleth Options Trading Agent. Built in Italy
+            for the Alpaca AI Trading Agents Hackathon (lablab.ai). Trading involves risk.
           </p>
           <a
             href="https://davidemaiorana.dev/"

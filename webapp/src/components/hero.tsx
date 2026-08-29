@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { BelethSprite } from "@/components/beleth-sprite";
 import { IconArrowDown, IconChart } from "@/components/icons";
+import type { BelethPnl, BelethScene } from "@/lib/beleth";
 import type { DecisionRow, ThoughtBubble } from "@/lib/queries";
 
 const BUBBLE_TONE: Record<ThoughtBubble["tone"], string> = {
@@ -43,9 +44,15 @@ function utcStamp(iso: string | null): string {
 export function Hero({
   latestDecision,
   bubbles,
+  scene,
+  sceneCaption,
+  pnl = null,
 }: {
   latestDecision: DecisionRow | null;
   bubbles: ThoughtBubble[];
+  scene: BelethScene;
+  sceneCaption: string;
+  pnl?: BelethPnl;
 }) {
   return (
     <section className="grid md:grid-cols-2 items-center gap-6 md:gap-[clamp(24px,4vw,56px)] px-4 md:px-[clamp(16px,3vw,40px)] py-[clamp(40px,6vw,80px)]">
@@ -103,11 +110,14 @@ export function Hero({
           </div>
         )}
       </div>
-      <div className="flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center gap-3">
         <div className="relative w-full max-w-[300px]">
-          <BelethSprite />
+          <BelethSprite scene={scene} pnl={pnl} />
           <ThoughtBubbles bubbles={bubbles} />
         </div>
+        <p className="font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+          {sceneCaption}
+        </p>
       </div>
     </section>
   );

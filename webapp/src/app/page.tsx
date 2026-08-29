@@ -17,6 +17,11 @@ import {
   fetchTradeMarkers,
   DEFAULT_EQUITY_RANGE,
 } from "@/lib/alpaca";
+import {
+  BELETH_SCENE_META,
+  belethPnl,
+  belethScene,
+} from "@/lib/beleth";
 import type { EquityHistory, MarketClock, TradeMarker } from "@/lib/equity";
 import {
   daysLive,
@@ -69,6 +74,13 @@ export default async function Home() {
     console.error("equity / trade-marker fetch failed", err);
   }
 
+  const belethSceneId = belethScene({
+    status: data.agentStatus,
+    decision: data.latestDecision,
+    clock,
+  });
+  const belethTint = belethPnl(data.latestDecision);
+
   const stats: TearsheetStat[] = [
     {
       label: "Days live",
@@ -108,7 +120,13 @@ export default async function Home() {
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl">
-        <Hero latestDecision={data.latestDecision} bubbles={thoughtBubbles(data.latestDecision)} />
+        <Hero
+          latestDecision={data.latestDecision}
+          bubbles={thoughtBubbles(data.latestDecision)}
+          scene={belethSceneId}
+          sceneCaption={BELETH_SCENE_META[belethSceneId].caption}
+          pnl={belethTint}
+        />
         <Tearsheet
           stats={stats}
           equity={equity}
