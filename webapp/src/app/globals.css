@@ -113,9 +113,13 @@ body {
   animation: bblink 5.4s steps(1, end) infinite;
 }
 #flame {
-  animation: bflame 0.7s steps(2, end) infinite;
+  /* two layers: a ~1s shape dance (transform) and a fast crackle (opacity),
+     so it reads as a real flame burning, not a pulsing blob. It floats a few
+     px clear of the head — the pivot is its own base. */
+  animation: bflame 1.05s ease-in-out infinite,
+    bflame-glow 0.34s ease-in-out infinite;
   transform-box: view-box;
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
 }
 
 @keyframes bfloat {
@@ -137,17 +141,36 @@ body {
   }
 }
 @keyframes bflame {
-  0% {
-    transform: scaleY(1) scaleX(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scaleY(1.2) scaleX(0.9);
-    opacity: 0.85;
-  }
+  0%,
   100% {
-    transform: scaleY(0.92) scaleX(1.08);
+    transform: scaleY(1) scaleX(1) rotate(0deg) skewX(0deg);
+  }
+  14% {
+    transform: scaleY(1.14) scaleX(0.92) rotate(-4deg) skewX(-3deg);
+  }
+  29% {
+    transform: scaleY(0.94) scaleX(1.07) rotate(3deg) skewX(2deg);
+  }
+  44% {
+    transform: scaleY(1.2) scaleX(0.88) rotate(-2deg) skewX(-4deg);
+  }
+  61% {
+    transform: scaleY(1.03) scaleX(1.03) rotate(4deg) skewX(3deg);
+  }
+  79% {
+    transform: scaleY(1.11) scaleX(0.95) rotate(-1deg) skewX(-1deg);
+  }
+}
+@keyframes bflame-glow {
+  0%,
+  100% {
     opacity: 1;
+  }
+  40% {
+    opacity: 0.82;
+  }
+  70% {
+    opacity: 0.93;
   }
 }
 @keyframes bblink {
@@ -247,13 +270,28 @@ body {
   transform-origin: 30px 34px;
 }
 
-/* day-P&L tint — independent of the scene; only the flame carries it. Scene
-   rules that also set a flame filter come later and win for those scenes. */
+/* day-P&L drives the flame — #flame-rig sets how high it burns (grows from its
+   base), #flame keeps flickering inside it, the filter tints the glow. Scene
+   rules that own the flame (drawdown, night, …) still set its motion; the rig
+   scale composes under them. */
+#flame-rig {
+  transform-box: view-box;
+  transform-origin: 30px 14px;
+  transition: transform 0.6s ease;
+}
+.beleth-sprite[data-pnl="up"] #flame-rig {
+  transform: scaleY(1.26) scaleX(1.06);
+}
 .beleth-sprite[data-pnl="up"] #flame {
   filter: brightness(1.18) saturate(1.25) hue-rotate(-6deg);
+  animation-duration: 0.72s, 0.22s;
+}
+.beleth-sprite[data-pnl="down"] #flame-rig {
+  transform: scaleY(0.7) scaleX(0.94);
 }
 .beleth-sprite[data-pnl="down"] #flame {
   filter: brightness(0.82) saturate(0.85);
+  animation-duration: 1.7s, 0.6s;
 }
 
 /* mouth — happy when the P&L is green, sad when it's red, neutral otherwise.
@@ -358,7 +396,7 @@ body {
   animation: b-bell-body 6s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="opening-bell"] #flame {
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
   animation: b-flame-hop 6s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="opening-bell"] #sigil {
@@ -767,7 +805,7 @@ body {
   animation: b-approve 4.5s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="stamp"] #flame {
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
   animation: b-flame-flare 4.5s ease-out infinite;
 }
 .beleth-sprite[data-scene="stamp"] #sigil {
@@ -902,7 +940,7 @@ body {
   animation: b-eyes-firm 4s steps(1, end) infinite;
 }
 .beleth-sprite[data-scene="shield"] #flame {
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
   animation: b-flame-hard 4s ease-in-out infinite;
   filter: hue-rotate(150deg) saturate(1.6) brightness(1.1);
 }
@@ -1167,7 +1205,7 @@ body {
   animation: b-eyes-narrow 3.4s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="vigilant"] #flame {
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
   animation: b-flame-bend 2s ease-in-out infinite;
   filter: hue-rotate(-12deg) saturate(1.35) brightness(0.85);
 }
@@ -1269,7 +1307,7 @@ body {
     b-breathe 5s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="night"] #flame {
-  transform-origin: 30px 17px;
+  transform-origin: 30px 14px;
   animation: b-flame-low 3.4s ease-in-out infinite;
 }
 .beleth-sprite[data-scene="night"] #beleth {
@@ -1304,17 +1342,6 @@ body {
   87%,
   100% {
     opacity: 1;
-  }
-}
-@keyframes b-ember {
-  0%,
-  100% {
-    transform: scaleY(0.38) scaleX(0.86);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scaleY(0.46) scaleX(0.88);
-    opacity: 0.85;
   }
 }
 @keyframes b-flame-low {
@@ -1369,9 +1396,10 @@ body {
   transform-origin: 30px 40px;
   animation: b-conk 11s ease-in-out infinite;
 }
+/* asleep for the weekend — the flame is out, a wisp of smoke where it was. */
 .beleth-sprite[data-scene="weekend"] #flame {
-  transform-origin: 30px 17px;
-  animation: b-ember 4.4s ease-in-out infinite;
+  opacity: 0;
+  animation: none;
 }
 .beleth-sprite[data-scene="weekend"] #beleth {
   animation: b-conk 11s ease-in-out infinite;
@@ -1382,6 +1410,18 @@ body {
 .beleth-sprite[data-scene="weekend"] #sigil {
   animation: none;
   opacity: 0.16;
+}
+.beleth-sprite[data-scene="weekend"] #pr-smoke {
+  opacity: 1;
+}
+.beleth-sprite[data-scene="weekend"] #bsm1 {
+  animation: b-smoke 4.5s ease-out infinite;
+}
+.beleth-sprite[data-scene="weekend"] #bsm2 {
+  animation: b-smoke 4.5s ease-out infinite 1.5s;
+}
+.beleth-sprite[data-scene="weekend"] #bsm3 {
+  animation: b-smoke 4.5s ease-out infinite 3s;
 }
 .beleth-sprite[data-scene="weekend"] #pr-zzz {
   opacity: 1;

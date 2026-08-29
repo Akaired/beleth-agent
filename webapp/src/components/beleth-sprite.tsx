@@ -19,45 +19,34 @@ import type { BelethPnl, BelethScene } from "@/lib/beleth";
  *    right after #head, so they track the face through every scene transform;
  *  - the remaining prop layer (bell, lens, stamp, …) spliced in before </svg>.
  */
-const FLAME = `<g id="flame">
-<rect x="30" y="7" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="8" width="1" height="1" fill="#e0532a"></rect>
-<rect x="30" y="8" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="31" y="8" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="9" width="1" height="1" fill="#e0532a"></rect>
-<rect x="30" y="9" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="31" y="9" width="1" height="1" fill="#e0532a"></rect>
-<rect x="28" y="10" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="10" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="30" y="10" width="1" height="1" fill="#ffe9bd"></rect>
-<rect x="31" y="10" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="32" y="10" width="1" height="1" fill="#e0532a"></rect>
-<rect x="28" y="11" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="11" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="30" y="11" width="1" height="1" fill="#ffe9bd"></rect>
-<rect x="31" y="11" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="32" y="11" width="1" height="1" fill="#e0532a"></rect>
-<rect x="28" y="12" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="12" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="30" y="12" width="1" height="1" fill="#ffe9bd"></rect>
-<rect x="31" y="12" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="32" y="12" width="1" height="1" fill="#e0532a"></rect>
-<rect x="28" y="13" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="13" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="30" y="13" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="31" y="13" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="32" y="13" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="14" width="1" height="1" fill="#e0532a"></rect>
-<rect x="30" y="14" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="31" y="14" width="1" height="1" fill="#e0532a"></rect>
-<rect x="29" y="15" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="30" y="15" width="1" height="1" fill="#ffe9bd"></rect>
-<rect x="31" y="15" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="29" y="16" width="1" height="1" fill="#e0532a"></rect>
-<rect x="30" y="16" width="1" height="1" fill="#f5b06f"></rect>
-<rect x="31" y="16" width="1" height="1" fill="#e0532a"></rect>
-<rect x="30" y="17" width="1" height="1" fill="#c23d1c"></rect>
-</g>`;
+// A real layered pixel flame that floats 2px clear of the head crown (head top
+// is y17; the flame's lowest pixel is y14). Three concentric tones — red-orange
+// spiky body, orange middle, yellow core with a white-hot centre — the shape
+// the reference art uses. Wrapped in #flame-rig: #flame does the flicker,
+// #flame-rig scales it by the day's P&L (tall & hard when green, low when red,
+// out when Beleth sleeps). See globals.css.
+const FLAME = `<g id="flame-rig"><g id="flame">
+<rect x="30" y="2" width="1" height="2" fill="#e0532a"></rect>
+<rect x="29" y="4" width="3" height="2" fill="#e0532a"></rect>
+<rect x="28" y="6" width="5" height="1" fill="#e0532a"></rect>
+<rect x="27" y="7" width="7" height="1" fill="#e0532a"></rect>
+<rect x="26" y="8" width="9" height="4" fill="#e0532a"></rect>
+<rect x="27" y="12" width="7" height="1" fill="#e0532a"></rect>
+<rect x="28" y="13" width="5" height="1" fill="#e0532a"></rect>
+<rect x="29" y="14" width="3" height="1" fill="#e0532a"></rect>
+<rect x="30" y="5" width="1" height="1" fill="#f5a53c"></rect>
+<rect x="29" y="6" width="3" height="1" fill="#f5a53c"></rect>
+<rect x="28" y="7" width="5" height="1" fill="#f5a53c"></rect>
+<rect x="27" y="8" width="7" height="4" fill="#f5a53c"></rect>
+<rect x="28" y="12" width="5" height="1" fill="#f5a53c"></rect>
+<rect x="29" y="13" width="3" height="1" fill="#f5a53c"></rect>
+<rect x="30" y="7" width="1" height="1" fill="#ffd95e"></rect>
+<rect x="29" y="8" width="3" height="1" fill="#ffd95e"></rect>
+<rect x="28" y="9" width="5" height="2" fill="#ffd95e"></rect>
+<rect x="29" y="11" width="3" height="1" fill="#ffd95e"></rect>
+<rect x="30" y="12" width="1" height="1" fill="#ffd95e"></rect>
+<rect x="30" y="8" width="1" height="3" fill="#fff1c4"></rect>
+</g></g>`;
 
 // Membrane wedges that fill the armpit gap between torso and wing. Injected as
 // the last children of #wing so they flap with it and read as wing, not flesh.

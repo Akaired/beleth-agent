@@ -110,12 +110,12 @@ export function Hero({
           </div>
         )}
       </div>
-      <div className="flex flex-col items-center justify-center gap-3">
+      <div className="flex flex-col items-center justify-center">
         <div className="relative w-full max-w-[300px]">
           <BelethSprite scene={scene} pnl={pnl} />
           <ThoughtBubbles bubbles={bubbles} />
         </div>
-        <p className="font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
+        <p className="mt-10 font-mono text-[10px] tracking-[0.14em] text-dim uppercase">
           {sceneCaption}
         </p>
       </div>
