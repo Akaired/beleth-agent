@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { BelethSprite } from "@/components/beleth-sprite";
+import { IconArrowDown, IconChart } from "@/components/icons";
 import type { DecisionRow, ThoughtBubble } from "@/lib/queries";
 
 const BUBBLE_TONE: Record<ThoughtBubble["tone"], string> = {
@@ -63,15 +64,17 @@ export function Hero({
         <div className="flex items-center gap-6 mt-8">
           <a
             href="#live"
-            className="inline-block bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
           >
-            See today&apos;s decision
+            <IconChart size={14} weight="bold" />
+            See current equity curve
           </a>
           <a
             href="#method"
-            className="text-[13px] text-sec hover:text-acc transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1 text-[13px] text-sec hover:text-acc transition-colors whitespace-nowrap"
           >
-            How it decides →
+            How it decides
+            <IconArrowDown size={13} />
           </a>
         </div>
         {latestDecision && (

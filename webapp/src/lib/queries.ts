@@ -63,6 +63,7 @@ export type HomepageData = {
   cyclesRun: number;
   tradesSubmitted: number;
   refused: number;
+  openPositions: number;
   firstDecisionAt: string | null;
   agentStatus: AgentStatusRow | null;
 };
@@ -72,7 +73,7 @@ export type HomepageData = {
  * The homepage sets `revalidate = 60`, so these run at most once a minute.
  */
 export async function fetchHomepageData(): Promise<HomepageData> {
-  const [latest, counts, first, agentStatus] = await Promise.all([
+  const [latest, counts, first, agentStatus, openPositions] = await Promise.all([
     restGet<DecisionRow>("decisions", {
       select:
         "id,created_at,as_of,symbol,action,summary,market_open,equity,day_pnl,decision_source,llm_model,evidence",
@@ -99,6 +100,9 @@ export async function fetchHomepageData(): Promise<HomepageData> {
       id: "eq.1",
       limit: "1",
     }).catch(() => [] as AgentStatusRow[]),
+    // Open spreads = short-side legs in `positions`, the same definition the
+    // dashboard's open-count badge uses. Anon-readable via 0003.
+    restCount("positions", { side: "eq.short" }).catch(() => 0),
   ]);
 
   return {
@@ -106,6 +110,7 @@ export async function fetchHomepageData(): Promise<HomepageData> {
     cyclesRun: counts[0],
     tradesSubmitted: counts[1],
     refused: counts[2],
+    openPositions,
     firstDecisionAt: first[0]?.created_at ?? null,
     agentStatus: agentStatus[0] ?? null,
   };

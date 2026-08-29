@@ -32,6 +32,7 @@ export {
   CaretRight as IconCaretRight,
   CaretLeft as IconCaretLeft,
   ArrowRight as IconArrowRight,
+  ArrowDown as IconArrowDown,
   ArrowUpRight as IconArrowUpRight,
   Scales as IconScales,
   Target as IconTarget,

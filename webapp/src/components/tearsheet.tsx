@@ -1,12 +1,16 @@
+import type { ComponentType } from "react";
 import { CountUp } from "@/components/count-up";
 import { EquityCurve } from "@/components/equity-curve";
 import { IconChart } from "@/components/icons";
 import type { EquityHistory, TradeMarker } from "@/lib/equity";
 
+type IconComponent = ComponentType<{ size?: number; className?: string }>;
+
 export type TearsheetStat = {
   label: string;
   value: number;
   tone: "txt" | "acc";
+  Icon: IconComponent;
 };
 
 const TONE: Record<TearsheetStat["tone"], string> = {
@@ -32,15 +36,21 @@ export function Tearsheet({
       id="live"
       className="border-y border-line px-4 pt-8 pb-12 md:px-[clamp(16px,3vw,40px)]"
     >
-      <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
         {stats.map((s) => (
-          <div key={s.label}>
-            <div
-              className={`font-mono text-[26px] leading-none tracking-[-0.02em] md:text-[34px] ${TONE[s.tone]}`}
-            >
-              <CountUp value={s.value} />
+          <div
+            key={s.label}
+            className="flex items-center gap-4 rounded-lg border border-line bg-panel px-5 py-6"
+          >
+            <s.Icon size={30} className="shrink-0 text-dim" />
+            <div className="min-w-0 flex-1 text-center">
+              <div
+                className={`font-mono text-[30px] leading-none tracking-[-0.02em] md:text-[38px] ${TONE[s.tone]}`}
+              >
+                <CountUp value={s.value} />
+              </div>
+              <div className="mt-2 text-xs text-sec">{s.label}</div>
             </div>
-            <div className="mt-2.5 text-xs text-sec">{s.label}</div>
           </div>
         ))}
       </div>

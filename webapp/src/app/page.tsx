@@ -1,5 +1,12 @@
 import { CtaSection } from "@/components/cta-section";
 import { Hero } from "@/components/hero";
+import {
+  IconCalendar,
+  IconCycles,
+  IconPositions,
+  IconRefused,
+  IconTrades,
+} from "@/components/icons";
 import { Method } from "@/components/method";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -28,6 +35,7 @@ function emptyData(): HomepageData {
     cyclesRun: 0,
     tradesSubmitted: 0,
     refused: 0,
+    openPositions: 0,
     firstDecisionAt: null,
     agentStatus: null,
   };
@@ -62,10 +70,31 @@ export default async function Home() {
   }
 
   const stats: TearsheetStat[] = [
-    { label: "Days live", value: daysLive(data.firstDecisionAt), tone: "txt" },
-    { label: "Cycles run", value: data.cyclesRun, tone: "txt" },
-    { label: "Trades submitted", value: data.tradesSubmitted, tone: "txt" },
-    { label: "Refused by risk checks", value: data.refused, tone: "acc" },
+    {
+      label: "Days live",
+      value: daysLive(data.firstDecisionAt),
+      tone: "txt",
+      Icon: IconCalendar,
+    },
+    { label: "Cycles run", value: data.cyclesRun, tone: "txt", Icon: IconCycles },
+    {
+      label: "Trades submitted",
+      value: data.tradesSubmitted,
+      tone: "txt",
+      Icon: IconTrades,
+    },
+    {
+      label: "Open positions",
+      value: data.openPositions,
+      tone: "txt",
+      Icon: IconPositions,
+    },
+    {
+      label: "Refused by risk checks",
+      value: data.refused,
+      tone: "acc",
+      Icon: IconRefused,
+    },
   ];
 
   return (
