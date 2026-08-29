@@ -42,4 +42,6 @@ export {
   LockSimple as IconLock,
   Code as IconCode,
   GithubLogo as IconGithub,
+  List as IconMenu,
+  X as IconClose,
 } from "@phosphor-icons/react/dist/ssr";
