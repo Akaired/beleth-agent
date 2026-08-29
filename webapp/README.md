@@ -61,6 +61,20 @@ enough for a 5-minute cycle cadence, and judges always get a fast page. If
 Supabase is unreachable or env is missing, the page renders with placeholder
 counters and a visible `LIVE DATA UNAVAILABLE` note instead of failing.
 
+### Alpaca-backed pieces (`src/lib/alpaca.ts`, server-only)
+
+The equity curve, the MARKET OPEN/CLOSED chip, the live Equity / Day P&L
+figures, and the filled-trade markers all read Alpaca **paper** endpoints
+server-side (`/v2/account/portfolio/history`, `/v2/clock`, `/v2/account`,
+`/v2/orders` + `/v2/positions`), cached 60 s. The client range switcher calls
+`GET /api/equity?range=1D|1W|1M|ALL`, which runs the same server module.
+Because `portfolio/history` only has completed market-hours bars, the chart
+pins its final point to the live `/v2/account` equity so its "latest" always
+matches the overview. Each of these is a soft dependency: if the Alpaca call
+fails the chart / chip / markers just drop, the rest of the page is unaffected.
+Alpaca paper keys are full trading keys (no read-only variant) — they are
+server-only (**never** `NEXT_PUBLIC_*`) and belong only in encrypted env.
+
 ## Local development
 
 ```sh
@@ -76,6 +90,11 @@ key). Both are public by design: visibility is enforced by the RLS policies in
 `db/migrations/0003_anon_read_policies.sql`, not by key secrecy. Never put the
 service-role key in this app.
 
+`ALPACA_API_KEY` / `ALPACA_SECRET_KEY` (same values as the agent's) power the
+equity chart, market-status chip and trade markers. They are read server-side
+only — do **not** prefix them with `NEXT_PUBLIC_`. `ALPACA_API_BASE_URL` is an
+optional override (defaults to the paper endpoint).
+
 ## Deploy (Vercel)
 
 1. Push this repo to GitHub.
@@ -84,8 +103,12 @@ service-role key in this app.
 4. Environment variables (Production + Preview):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   (same two values back both the anon homepage and the authenticated
-   dashboard — auth needs no extra env)
+     (same two values back both the anon homepage and the authenticated
+     dashboard — auth needs no extra env)
+   - `ALPACA_API_KEY`
+   - `ALPACA_SECRET_KEY`
+     (server-side only — the equity chart, market-status chip and trade
+     markers; **not** `NEXT_PUBLIC_`)
 5. Deploy. Every push to `main` deploys automatically.
 6. Custom domain later: Project → Settings → Domains → `beleth.davidemaiorana.dev`
    (CNAME per Vercel's instructions).

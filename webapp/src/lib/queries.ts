@@ -57,6 +57,7 @@ export type AgentStatusRow = {
   detail: Record<string, unknown>;
 };
 
+
 export type HomepageData = {
   latestDecision: DecisionRow | null;
   cyclesRun: number;

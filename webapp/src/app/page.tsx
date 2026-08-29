@@ -5,6 +5,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Tearsheet, type TearsheetStat } from "@/components/tearsheet";
 import {
+  fetchEquityHistory,
+  fetchMarketClock,
+  fetchTradeMarkers,
+  DEFAULT_EQUITY_RANGE,
+} from "@/lib/alpaca";
+import type { EquityHistory, MarketClock, TradeMarker } from "@/lib/equity";
+import {
   daysLive,
   fetchHomepageData,
   thoughtBubbles,
@@ -38,6 +45,22 @@ export default async function Home() {
     live = false;
   }
 
+  // The equity curve and trade markers come from Alpaca, a separate dependency —
+  // its own failure just hides the chart, it never flips the page into
+  // "data unavailable".
+  let equity: EquityHistory | null = null;
+  let tradeMarkers: TradeMarker[] = [];
+  let clock: MarketClock | null = null;
+  try {
+    [equity, tradeMarkers, clock] = await Promise.all([
+      fetchEquityHistory(DEFAULT_EQUITY_RANGE),
+      fetchTradeMarkers().catch(() => [] as TradeMarker[]),
+      fetchMarketClock().catch(() => null),
+    ]);
+  } catch (err) {
+    console.error("equity / trade-marker fetch failed", err);
+  }
+
   const stats: TearsheetStat[] = [
     { label: "Days live", value: daysLive(data.firstDecisionAt), tone: "txt" },
     { label: "Cycles run", value: data.cyclesRun, tone: "txt" },
@@ -47,7 +70,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col flex-1 min-h-screen">
-      <SiteHeader agentStatus={data.agentStatus} />
+      <SiteHeader agentStatus={data.agentStatus} marketOpen={clock?.isOpen ?? null} />
       {!live && (
         <div className="border-b border-line font-mono text-[10.5px] text-dim">
           <div className="mx-auto w-full max-w-6xl px-4 md:px-[clamp(16px,3vw,40px)] py-2">
@@ -57,7 +80,12 @@ export default async function Home() {
       )}
       <main className="mx-auto w-full max-w-6xl">
         <Hero latestDecision={data.latestDecision} bubbles={thoughtBubbles(data.latestDecision)} />
-        <Tearsheet stats={stats} />
+        <Tearsheet
+          stats={stats}
+          equity={equity}
+          tradeMarkers={tradeMarkers}
+          marketOpen={clock?.isOpen ?? null}
+        />
         <Method />
         <CtaSection />
       </main>

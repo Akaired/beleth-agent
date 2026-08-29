@@ -10,13 +10,25 @@
  */
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import {
+  fetchAccountSnapshot,
+  fetchEquityHistory,
+  fetchMarketClock,
+  fetchTradeMarkers,
+  DEFAULT_EQUITY_RANGE,
+} from "@/lib/alpaca";
 import type {
-  AgentStatusRow,
-  DecisionRow,
-  EvidencePackage,
+  AccountSnapshot,
+  EquityHistory,
+  TradeMarker,
+} from "@/lib/equity";
+import {
+  type AgentStatusRow,
+  type DecisionRow,
+  type EvidencePackage,
 } from "@/lib/queries";
 
-export type { AgentStatusRow, DecisionRow, EvidencePackage };
+export type { AgentStatusRow, DecisionRow, EvidencePackage, TradeMarker };
 
 /** A decision plus the backoffice-only columns (demo_admin and up). */
 export type DecisionDetailRow = DecisionRow & {
@@ -56,13 +68,14 @@ export type TradeRow = {
   legs: unknown;
 };
 
-export type EquityPoint = { created_at: string; equity: number; day_pnl: number };
-
 export type DashboardOverview = {
   latestDecision: DecisionRow | null;
   agentStatus: AgentStatusRow | null;
   recentDecisions: DecisionRow[];
-  equitySeries: EquityPoint[];
+  equity: EquityHistory | null;
+  account: AccountSnapshot | null;
+  tradeMarkers: TradeMarker[];
+  marketOpen: boolean | null;
   cyclesRun: number;
   tradesSubmitted: number;
   refused: number;
@@ -83,13 +96,16 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
   const [
     latest,
     recent,
-    series,
+    tradeMarkers,
     first,
     status,
     cycles,
     trades,
     refusedRows,
     positions,
+    equity,
+    clock,
+    account,
   ] = await Promise.all([
     supabase
       .from("decisions")
@@ -102,11 +118,10 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .select(DECISION_COLS)
       .order("created_at", { ascending: false })
       .limit(12),
-    supabase
-      .from("decisions")
-      .select("created_at,equity,day_pnl")
-      .order("created_at", { ascending: true })
-      .limit(500),
+    fetchTradeMarkers().catch((err) => {
+      console.error("dashboard trade markers fetch failed", err);
+      return [] as TradeMarker[];
+    }),
     supabase
       .from("decisions")
       .select("created_at")
@@ -132,6 +147,19 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .eq("approved", false)
       .neq("rule", "R5"),
     supabase.from("positions").select("symbol", { count: "exact", head: true }),
+    // Alpaca is a separate dependency — a failure just drops the chart.
+    fetchEquityHistory(DEFAULT_EQUITY_RANGE).catch((err) => {
+      console.error("dashboard equity history fetch failed", err);
+      return null;
+    }),
+    fetchMarketClock().catch((err) => {
+      console.error("dashboard market clock fetch failed", err);
+      return null;
+    }),
+    fetchAccountSnapshot().catch((err) => {
+      console.error("dashboard account snapshot fetch failed", err);
+      return null;
+    }),
   ]);
 
   const refused = new Set(
@@ -144,15 +172,10 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
     latestDecision: (latest.data as DecisionRow | null) ?? null,
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
     recentDecisions: (recent.data as DecisionRow[] | null) ?? [],
-    equitySeries: ((series.data as Array<{
-      created_at: string;
-      equity: string;
-      day_pnl: string;
-    }> | null) ?? []).map((r) => ({
-      created_at: r.created_at,
-      equity: Number(r.equity),
-      day_pnl: Number(r.day_pnl),
-    })),
+    equity,
+    account,
+    tradeMarkers,
+    marketOpen: clock?.isOpen ?? null,
     cyclesRun: cycles.count ?? 0,
     tradesSubmitted: trades.count ?? 0,
     refused,

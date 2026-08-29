@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchDashboardOverview } from "@/lib/dashboard-queries";
 import { daysLive } from "@/lib/queries";
-import { EquityChart } from "@/components/dashboard/equity-chart";
+import { EquityCurve } from "@/components/equity-curve";
+import { MarketChip } from "@/components/market-chip";
 import {
   ActionBadge,
   Panel,
@@ -68,8 +69,12 @@ export default async function DashboardOverview() {
   const ctx = await requireSession();
   const d = await fetchDashboardOverview();
   const latest = d.latestDecision;
-  const dayPnl = latest ? Number(latest.day_pnl) : 0;
-  const equity = latest ? Number(latest.equity) : 0;
+  // Prefer the live Alpaca account balances; fall back to the last decision row
+  // the agent persisted if the account call failed.
+  const equity =
+    d.account?.equity ?? (latest ? Number(latest.equity) : 0);
+  const dayPnl =
+    d.account?.dayPnl ?? (latest ? Number(latest.day_pnl) : 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -78,9 +83,12 @@ export default async function DashboardOverview() {
           <IconOverview size={17} weight="bold" className="text-acc" />
           Overview
         </h1>
-        <span className="font-mono text-[10.5px] text-dim">
-          cycle {timeAgo(d.agentStatus?.last_cycle_at ?? null)}
-        </span>
+        <div className="flex items-center gap-3">
+          <MarketChip open={d.marketOpen} />
+          <span className="font-mono text-[10.5px] text-dim">
+            cycle {timeAgo(d.agentStatus?.last_cycle_at ?? null)}
+          </span>
+        </div>
       </div>
 
       {d.agentStatus?.paused && (
@@ -139,7 +147,18 @@ export default async function DashboardOverview() {
       </div>
 
       <Panel title="Equity curve">
-        <EquityChart points={d.equitySeries} />
+        {d.equity && d.equity.points.length >= 2 ? (
+          <EquityCurve
+            initial={d.equity}
+            variant="panel"
+            markers={d.tradeMarkers}
+            marketOpen={d.marketOpen}
+          />
+        ) : (
+          <div className="flex h-[260px] items-center justify-center text-[12px] text-dim">
+            No equity history from Alpaca yet.
+          </div>
+        )}
       </Panel>
 
       <Panel

@@ -2,8 +2,15 @@ import Link from "next/link";
 import { agentStateLine } from "@/lib/queries";
 import type { AgentStatusRow } from "@/lib/queries";
 import { IconLive } from "@/components/icons";
+import { MarketChip } from "@/components/market-chip";
 
-export function SiteHeader({ agentStatus }: { agentStatus: AgentStatusRow | null }) {
+export function SiteHeader({
+  agentStatus,
+  marketOpen,
+}: {
+  agentStatus: AgentStatusRow | null;
+  marketOpen?: boolean | null;
+}) {
   const state = agentStateLine(agentStatus);
   return (
     <header className="border-b border-line">
@@ -55,6 +62,7 @@ export function SiteHeader({ agentStatus }: { agentStatus: AgentStatusRow | null
               {state.label}
             </span>
           )}
+          <MarketChip open={marketOpen} bordered />
         </nav>
       </div>
     </header>
