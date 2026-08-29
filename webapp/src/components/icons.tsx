@@ -9,7 +9,7 @@ export {
   Gauge as IconOverview,
   ListChecks as IconDecisions,
   SlidersHorizontal as IconStrategy,
-  Power as IconControls,
+  HandPalm as IconControls,
   SignOut as IconSignOut,
   Lightning as IconLive,
   Broadcast as IconBroadcast,

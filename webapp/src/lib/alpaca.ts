@@ -14,6 +14,7 @@
  */
 import "server-only";
 import { DataUnavailableError } from "@/lib/supabase";
+import type { PositionState, SpreadPosition } from "@/lib/positions";
 import {
   DEFAULT_EQUITY_RANGE,
   spreadLabel,
@@ -238,9 +239,23 @@ type AlpacaOrder = {
   filled_avg_price?: string | number | null;
   filled_at?: string | null;
   legs?: AlpacaLeg[] | null;
+  client_order_id?: string | null;
+  qty?: string | number | null;
+  submitted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  canceled_at?: string | null;
+  expired_at?: string | null;
 };
 
-type AlpacaPosition = { symbol?: string; qty?: string | number | null };
+type AlpacaPosition = {
+  symbol?: string;
+  qty?: string | number | null;
+  asset_class?: string | null;
+  avg_entry_price?: string | number | null;
+  market_value?: string | number | null;
+  unrealized_pl?: string | number | null;
+};
 
 function num(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
@@ -257,6 +272,12 @@ function strikeOf(symbol: string): number | null {
 function rightOf(symbol: string): "C" | "P" | null {
   const m = /(\d{6})([CP])\d{8}$/.exec(symbol);
   return m ? (m[2] as "C" | "P") : null;
+}
+
+/** OCC expiry `YYMMDD` out of an option symbol, e.g. SPY261009C… -> "261009". */
+function expiryOf(symbol: string): string | null {
+  const m = /(\d{6})[CP]\d{8}$/.exec(symbol);
+  return m ? m[1] : null;
 }
 
 function rootOf(symbol: string): string {
@@ -344,4 +365,210 @@ export async function fetchTradeMarkers(): Promise<TradeMarker[]> {
 
   markers.sort((a, b) => a.time - b.time);
   return markers;
+}
+
+// --- Spread positions (backoffice) ----------------------------------------
+
+function sumBy<T>(items: T[], pick: (t: T) => number | null): number | null {
+  let acc: number | null = null;
+  for (const it of items) {
+    const v = pick(it);
+    if (v != null) acc = (acc ?? 0) + v;
+  }
+  return acc;
+}
+
+/**
+ * Every spread the agent has opened or tried to open on the paper account,
+ * reconstructed from Alpaca and classified: `open` (both legs still on the
+ * book, with live unrealized P&L), `closed` (a filled entry matched to a
+ * filled exit — realized P&L), `canceled` (an entry order that terminated
+ * unfilled), `failed` (an entry order rejected by Alpaca).
+ *
+ * Pre-submission failures (rejected by our own risk gate, never sent) are NOT
+ * here — they have no Alpaca order; `dashboard-queries` adds them from the
+ * `trades` table. Throws `DataUnavailableError` when Alpaca is unreachable so
+ * the page can fail soft.
+ */
+export async function fetchSpreadPositions(): Promise<SpreadPosition[]> {
+  const [orders, positions] = await Promise.all([
+    alpacaGet<AlpacaOrder[]>(
+      "/v2/orders?status=closed&nested=true&limit=500&direction=asc",
+    ),
+    alpacaGet<AlpacaPosition[]>("/v2/positions"),
+  ]);
+
+  // Live per-leg P&L, keyed by option symbol, for merging onto open rows.
+  const legLive = new Map<
+    string,
+    { mv: number | null; upl: number | null }
+  >();
+  for (const p of positions) {
+    if (!p.symbol || (num(p.qty) ?? 0) === 0) continue;
+    legLive.set(p.symbol, {
+      mv: num(p.market_value),
+      upl: num(p.unrealized_pl),
+    });
+  }
+  const openLegSymbols = new Set(legLive.keys());
+
+  const mleg = orders.filter((o) => o.order_class === "mleg");
+
+  // Filled closing orders, indexed for round-trip matching against entries.
+  const filledExits = mleg
+    .filter((o) => {
+      const intents = (o.legs ?? []).map((l) => l.position_intent ?? "");
+      return (
+        intents.some((i) => i.endsWith("_to_close")) &&
+        (num(o.filled_qty) ?? 0) > 0 &&
+        !!o.filled_at
+      );
+    })
+    .map((o) => ({
+      order: o,
+      symbols: new Set(
+        (o.legs ?? [])
+          .map((l) => l.symbol)
+          .filter((s): s is string => !!s),
+      ),
+      at: new Date(o.filled_at as string).getTime(),
+    }));
+
+  const out: SpreadPosition[] = [];
+  const seenOpen = new Set<string>();
+
+  for (const o of mleg) {
+    const legs = o.legs ?? [];
+    if (legs.length < 2) continue;
+
+    const intents = legs.map((l) => l.position_intent ?? "");
+    if (!intents.some((i) => i.endsWith("_to_open"))) continue; // exits ride their entry
+
+    const symbols = legs
+      .map((l) => l.symbol)
+      .filter((s): s is string => !!s);
+    const shortLeg =
+      legs.find((l) => l.position_intent === "sell_to_open") ??
+      legs.find((l) => l.side === "sell");
+    const longLeg = legs.find((l) => l !== shortLeg) ?? null;
+    const shortStrike = shortLeg?.symbol ? strikeOf(shortLeg.symbol) : null;
+    const longStrike = longLeg?.symbol ? strikeOf(longLeg.symbol) : null;
+    const right = symbols[0] ? rightOf(symbols[0]) : null;
+    const underlying = symbols[0] ? rootOf(symbols[0]) : "?";
+    const qty = num(o.filled_qty) ?? num(o.qty);
+    const filled = (num(o.filled_qty) ?? 0) > 0 && !!o.filled_at;
+
+    const width =
+      shortStrike != null && longStrike != null
+        ? Math.abs(shortStrike - longStrike)
+        : null;
+
+    const expiry =
+      (shortLeg?.symbol && expiryOf(shortLeg.symbol)) ||
+      (symbols[0] && expiryOf(symbols[0])) ||
+      null;
+
+    const common = {
+      underlying,
+      right,
+      qty,
+      spread: spreadLabel(right, shortStrike, longStrike),
+      shortStrike,
+      longStrike,
+      expiry,
+      clientOrderId: o.client_order_id ?? null,
+      exitClientOrderId: null as string | null,
+      exitReason: null as string | null,
+      decisionId: null as string | null,
+    };
+
+    if (!filled) {
+      const status = o.status ?? "unknown";
+      const state: PositionState = status === "rejected" ? "failed" : "canceled";
+      out.push({
+        ...common,
+        id: o.id ?? `order:${common.clientOrderId ?? symbols.join(",")}`,
+        state,
+        entryCredit: null,
+        exitDebit: null,
+        realizedPnl: null,
+        unrealizedPnl: null,
+        marketValue: null,
+        maxLoss: null,
+        openedAt: o.submitted_at ?? o.created_at ?? null,
+        closedAt: o.canceled_at ?? o.expired_at ?? o.updated_at ?? null,
+        failureReason: state === "failed" ? "rejected by Alpaca" : null,
+        alpacaStatus: status,
+      });
+      continue;
+    }
+
+    // filled entry: `filled_avg_price` is signed — negative = net credit.
+    const entryNet = num(o.filled_avg_price);
+    const entryCredit = entryNet != null ? -entryNet : null;
+    const maxLoss =
+      width != null && entryCredit != null && qty != null
+        ? Math.max(0, (width - entryCredit) * 100 * qty)
+        : null;
+
+    const stillOpen =
+      symbols.length > 0 && symbols.every((s) => openLegSymbols.has(s));
+
+    if (stillOpen) {
+      const key = symbols.slice().sort().join(",");
+      if (seenOpen.has(key)) continue;
+      seenOpen.add(key);
+      const live = symbols.map((s) => legLive.get(s)).filter((x) => !!x) as {
+        mv: number | null;
+        upl: number | null;
+      }[];
+      out.push({
+        ...common,
+        id: o.id ?? `open:${key}`,
+        state: "open",
+        entryCredit,
+        exitDebit: null,
+        realizedPnl: null,
+        unrealizedPnl: sumBy(live, (l) => l.upl),
+        marketValue: sumBy(live, (l) => l.mv),
+        maxLoss,
+        openedAt: o.filled_at ?? null,
+        closedAt: null,
+        failureReason: null,
+        alpacaStatus: "open",
+      });
+      continue;
+    }
+
+    // round-trip: earliest filled exit that shares a leg and is not older.
+    const entryAt = o.filled_at ? new Date(o.filled_at).getTime() : 0;
+    const match = filledExits
+      .filter((e) => e.at >= entryAt && symbols.some((s) => e.symbols.has(s)))
+      .sort((a, b) => a.at - b.at)[0];
+
+    const exitNet = match ? num(match.order.filled_avg_price) : null;
+    const realizedPnl =
+      entryCredit != null && exitNet != null && qty != null
+        ? (entryCredit - exitNet) * 100 * qty
+        : null;
+
+    out.push({
+      ...common,
+      id: o.id ?? `closed:${symbols.join(",")}`,
+      state: "closed",
+      entryCredit,
+      exitDebit: exitNet,
+      realizedPnl,
+      unrealizedPnl: null,
+      marketValue: null,
+      maxLoss,
+      openedAt: o.filled_at ?? null,
+      closedAt: match?.order.filled_at ?? null,
+      failureReason: null,
+      alpacaStatus: o.status ?? "filled",
+      exitClientOrderId: match?.order.client_order_id ?? null,
+    });
+  }
+
+  return out;
 }

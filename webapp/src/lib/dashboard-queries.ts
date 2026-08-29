@@ -14,14 +14,17 @@ import {
   fetchAccountSnapshot,
   fetchEquityHistory,
   fetchMarketClock,
+  fetchSpreadPositions,
   fetchTradeMarkers,
   DEFAULT_EQUITY_RANGE,
 } from "@/lib/alpaca";
-import type {
-  AccountSnapshot,
-  EquityHistory,
-  TradeMarker,
+import {
+  spreadLabel,
+  type AccountSnapshot,
+  type EquityHistory,
+  type TradeMarker,
 } from "@/lib/equity";
+import type { SpreadPosition } from "@/lib/positions";
 import {
   type AgentStatusRow,
   type DecisionRow,
@@ -29,6 +32,7 @@ import {
 } from "@/lib/queries";
 
 export type { AgentStatusRow, DecisionRow, EvidencePackage, TradeMarker };
+export type { SpreadPosition } from "@/lib/positions";
 
 /** A decision plus the backoffice-only columns (demo_admin and up). */
 export type DecisionDetailRow = DecisionRow & {
@@ -319,4 +323,154 @@ export async function fetchControlPanel(): Promise<ControlPanel> {
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
     events: (events.data as AgentControlEvent[] | null) ?? [],
   };
+}
+
+type LegDesc = {
+  role?: string;
+  right?: string;
+  strike?: number | string | null;
+};
+
+type TradeJoinRow = {
+  id: string;
+  created_at: string;
+  underlying: string;
+  kind: "entry" | "exit";
+  exit_reason: string | null;
+  client_order_id: string | null;
+  decision_id: string | null;
+  status: string | null;
+  qty: string | null;
+  credit: string | null;
+  max_loss: string | null;
+  legs: LegDesc[] | null;
+};
+
+export type PositionsView = {
+  open: SpreadPosition[];
+  history: SpreadPosition[];
+  /** False when the Alpaca read failed — the page then shows only what the
+   *  `trades` table knows (pre-submission failures) plus a soft warning. */
+  alpacaOk: boolean;
+};
+
+/**
+ * The backoffice "Positions" view: open spreads (live P&L from Alpaca) plus
+ * the history of closed / canceled / failed ones. Alpaca is the lifecycle
+ * source (our tables do not keep it); the `trades` table only adds the
+ * decision link and the pre-submission failures Alpaca never saw.
+ */
+export async function fetchPositionsView(): Promise<PositionsView> {
+  const supabase = await createClient();
+
+  const [alpaca, tradesRes] = await Promise.all([
+    fetchSpreadPositions().then(
+      (rows) => ({ rows, ok: true }),
+      (err) => {
+        console.error("positions: alpaca fetch failed", err);
+        return { rows: [] as SpreadPosition[], ok: false };
+      },
+    ),
+    supabase
+      .from("trades")
+      .select(
+        "id,created_at,underlying,kind,exit_reason,client_order_id,decision_id,status,qty,credit,max_loss,legs",
+      )
+      .order("created_at", { ascending: false }),
+  ]);
+
+  const trades = (tradesRes.data as TradeJoinRow[] | null) ?? [];
+
+  const decisionByCoid = new Map<string, string>(); // entry client_order_id -> decision_id
+  const exitReasonByCoid = new Map<string, string>(); // exit client_order_id -> R5 rule
+  for (const t of trades) {
+    if (!t.client_order_id) continue;
+    if (t.decision_id) decisionByCoid.set(t.client_order_id, t.decision_id);
+    if (t.kind === "exit" && t.exit_reason)
+      exitReasonByCoid.set(t.client_order_id, t.exit_reason);
+  }
+
+  const enrich = (p: SpreadPosition): SpreadPosition => ({
+    ...p,
+    decisionId:
+      p.decisionId ??
+      (p.clientOrderId ? decisionByCoid.get(p.clientOrderId) ?? null : null),
+    exitReason:
+      p.exitReason ??
+      (p.exitClientOrderId
+        ? exitReasonByCoid.get(p.exitClientOrderId) ?? null
+        : null),
+  });
+
+  const open = alpaca.rows.filter((p) => p.state === "open").map(enrich);
+  const history = alpaca.rows.filter((p) => p.state !== "open").map(enrich);
+
+  // Orders rejected by our own risk gate never reach Alpaca — pull them from
+  // the trades table (they carry no alpaca_order_id).
+  for (const t of trades) {
+    if (t.status !== "submission_failed") continue;
+    const legs = t.legs ?? [];
+    const shortLeg = legs.find((l) => l.role === "short") ?? null;
+    const longLeg = legs.find((l) => l.role === "long") ?? null;
+    const right =
+      (shortLeg?.right as "C" | "P" | undefined) ??
+      (longLeg?.right as "C" | "P" | undefined) ??
+      null;
+    const shortStrike =
+      shortLeg?.strike != null ? Number(shortLeg.strike) : null;
+    const longStrike = longLeg?.strike != null ? Number(longLeg.strike) : null;
+    history.push({
+      id: `trades:${t.id}`,
+      state: "failed",
+      underlying: t.underlying,
+      right,
+      qty: t.qty != null ? Number(t.qty) : null,
+      spread: spreadLabel(right, shortStrike, longStrike),
+      shortStrike,
+      longStrike,
+      expiry: null,
+      entryCredit: t.credit != null ? Number(t.credit) : null,
+      exitDebit: null,
+      realizedPnl: null,
+      unrealizedPnl: null,
+      marketValue: null,
+      maxLoss: t.max_loss != null ? Number(t.max_loss) : null,
+      openedAt: t.created_at,
+      closedAt: t.created_at,
+      exitReason: null,
+      failureReason: "rejected by risk check before submission",
+      alpacaStatus: null,
+      clientOrderId: t.client_order_id,
+      exitClientOrderId: null,
+      decisionId: t.decision_id,
+    });
+  }
+
+  history.sort((a, b) =>
+    (b.closedAt ?? b.openedAt ?? "").localeCompare(
+      a.closedAt ?? a.openedAt ?? "",
+    ),
+  );
+
+  return { open, history, alpacaOk: alpaca.ok };
+}
+
+/**
+ * Number of currently open spreads, for the sidebar badge. Each credit spread
+ * has exactly one short leg, so counting `positions` rows with `side='short'`
+ * gives the spread count without pairing. Cheap enough for the dashboard
+ * layout; returns 0 if the read fails so the badge just disappears.
+ */
+export async function fetchOpenSpreadCount(): Promise<number> {
+  try {
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from("positions")
+      .select("symbol", { count: "exact", head: true })
+      .eq("side", "short");
+    return count ?? 0;
+  } catch (err) {
+    console.error("positions: open-count fetch failed", err);
+    return 0;
+  }
 }

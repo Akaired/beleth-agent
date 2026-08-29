@@ -1,6 +1,18 @@
-import type { ReactNode } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { Role } from "@/lib/roles";
-import { IconCheckCircle, IconProhibit, IconXCircle } from "@/components/icons";
+import {
+  IconCheckCircle,
+  IconProhibit,
+  IconPulse,
+  IconWarning,
+  IconXCircle,
+} from "@/components/icons";
+
+type IconProps = {
+  size?: number;
+  weight?: "regular" | "bold" | "fill";
+  className?: string;
+};
 
 export function Panel({
   title,
@@ -63,6 +75,51 @@ export function ActionBadge({ action }: { action: "trade" | "no_trade" }) {
     >
       <Icon size={11} weight="bold" />
       {isTrade ? "TRADE" : "NO TRADE"}
+    </span>
+  );
+}
+
+const POSITION_STATE_STYLE: Record<
+  string,
+  { badge: string; Icon: ComponentType<IconProps> }
+> = {
+  open: { badge: "bg-acc/12 text-acc", Icon: IconPulse },
+  closed: { badge: "bg-up/12 text-up", Icon: IconCheckCircle },
+  canceled: { badge: "bg-chipbg text-sec", Icon: IconProhibit },
+  failed: { badge: "bg-down/12 text-down", Icon: IconWarning },
+};
+
+export function PositionStateBadge({
+  state,
+}: {
+  state: "open" | "closed" | "canceled" | "failed";
+}) {
+  const s = POSITION_STATE_STYLE[state] ?? POSITION_STATE_STYLE.canceled;
+  return (
+    <span
+      className={`inline-flex w-[104px] items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] uppercase rounded px-2 py-0.5 ${s.badge}`}
+    >
+      <s.Icon size={11} weight="bold" className="shrink-0" />
+      {state}
+    </span>
+  );
+}
+
+/**
+ * BUY / SELL pill for a spread leg. The agent always SELLS the short leg to
+ * open (that is where the credit comes from) and BUYS the long leg as defined
+ * protection; on a close the mirror. Green = buy, red = sell — the trading
+ * convention, so the direction reads at a glance.
+ */
+export function SideTag({ side }: { side: "buy" | "sell" }) {
+  const buy = side === "buy";
+  return (
+    <span
+      className={`inline-flex w-[38px] justify-center font-mono text-[9.5px] font-medium tracking-[0.1em] uppercase rounded-sm px-1 py-0.5 ${
+        buy ? "bg-up/12 text-up" : "bg-down/12 text-down"
+      }`}
+    >
+      {side}
     </span>
   );
 }

@@ -9,6 +9,7 @@ import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { RoleChip } from "@/components/dashboard/ui";
 import {
   IconOverview,
+  IconPositions,
   IconDecisions,
   IconStrategy,
   IconControls,
@@ -28,6 +29,7 @@ const GROUPS: Group[] = [
     label: "Live",
     items: [
       { href: "/dashboard", label: "Overview", min: "public_user", Icon: IconOverview },
+      { href: "/dashboard/positions", label: "Positions", min: "demo_admin", Icon: IconPositions },
     ],
   },
   {
@@ -51,7 +53,15 @@ function isActive(pathname: string, href: string): boolean {
     : pathname.startsWith(href);
 }
 
-function NavGroups({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
+function NavGroups({
+  role,
+  badges,
+  onNavigate,
+}: {
+  role: Role;
+  badges?: Record<string, number>;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const groups = GROUPS.map((g) => ({
     ...g,
@@ -67,6 +77,7 @@ function NavGroups({ role, onNavigate }: { role: Role; onNavigate?: () => void }
           </div>
           {g.items.map((it) => {
             const active = isActive(pathname, it.href);
+            const badge = badges?.[it.href] ?? 0;
             return (
               <Link
                 key={it.href}
@@ -85,6 +96,14 @@ function NavGroups({ role, onNavigate }: { role: Role; onNavigate?: () => void }
                   className={active ? "text-acc" : "text-dim"}
                 />
                 <span>{it.label}</span>
+                {badge > 0 && (
+                  <span
+                    className="ml-auto min-w-[18px] rounded-full bg-acc/15 px-1.5 py-px text-center font-mono text-[10px] font-medium text-acc"
+                    title={`${badge} open position${badge === 1 ? "" : "s"}`}
+                  >
+                    {badge}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -125,10 +144,12 @@ function Brand({ onClick }: { onClick?: () => void }) {
 export function DashboardChrome({
   role,
   email,
+  badges,
   children,
 }: {
   role: Role;
   email: string | null;
+  badges?: Record<string, number>;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -171,7 +192,7 @@ export function DashboardChrome({
       <div className="flex-1 min-h-0 md:grid md:grid-cols-[196px_minmax(0,1fr)] md:overflow-hidden">
         {/* Desktop rail */}
         <aside className="hidden md:flex md:flex-col md:border-r md:border-line md:overflow-y-auto">
-          <NavGroups role={role} />
+          <NavGroups role={role} badges={badges} />
           <SidebarFooter />
         </aside>
 
@@ -209,7 +230,11 @@ export function DashboardChrome({
               </button>
             </div>
             <div className="flex flex-1 flex-col overflow-y-auto">
-              <NavGroups role={role} onNavigate={() => setOpen(false)} />
+              <NavGroups
+                role={role}
+                badges={badges}
+                onNavigate={() => setOpen(false)}
+              />
               <SidebarFooter />
             </div>
           </div>
