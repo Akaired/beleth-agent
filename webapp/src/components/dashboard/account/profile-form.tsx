@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { updateProfileAction } from "@/app/dashboard/account/actions";
 import {
-  updateProfileAction,
   EMPTY_STATE,
   type FormState,
-} from "@/app/dashboard/account/actions";
+} from "@/app/dashboard/account/form-state";
 import { IconAccount } from "@/components/icons";
 
 const field =

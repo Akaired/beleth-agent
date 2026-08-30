@@ -4,9 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-
-export type FormState = { error: string | null; notice: string | null };
-export const EMPTY_STATE: FormState = { error: null, notice: null };
+import type { AvatarResult, FormState } from "@/app/dashboard/account/form-state";
 
 const AVATAR_BUCKET = "avatars";
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -56,10 +54,6 @@ export async function updateProfileAction(
 }
 
 // ── avatar ─────────────────────────────────────────────────────────────────
-export type AvatarResult =
-  | { ok: true; url: string | null }
-  | { ok: false; error: string };
-
 export async function uploadAvatarAction(
   formData: FormData,
 ): Promise<AvatarResult> {
