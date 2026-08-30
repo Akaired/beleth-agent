@@ -4,13 +4,16 @@ import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import {
   createBroadcast,
+  createTemplate,
   deleteBroadcast,
   sendBroadcast,
   updateTemplate,
+  fetchTemplates,
   ResendApiError,
   ResendNotConfigured,
   type CreateBroadcastInput,
 } from "@/lib/admin/email";
+import { STARTER_TEMPLATES, getStarterTemplate } from "@/lib/admin/email-templates";
 
 type Result = { ok: true } | { ok: false; error: string };
 type CreateResult = { ok: true; id: string } | { ok: false; error: string };
@@ -29,6 +32,66 @@ function toMessage(err: unknown): string {
   }
   if (err instanceof ResendApiError) return err.message;
   return err instanceof Error ? err.message : "Unexpected error.";
+}
+
+/**
+ * Provision one starter template (create + publish) into Resend. Idempotent-ish:
+ * refuses if a template with that alias already exists so a double click can't
+ * make duplicates.
+ */
+export async function createStarterTemplateAction(alias: string): Promise<Result> {
+  const denied = await assertMasterAdmin();
+  if (denied) return denied;
+
+  const preset = getStarterTemplate(alias);
+  if (!preset) return { ok: false, error: `Unknown template "${alias}".` };
+
+  try {
+    const existing = await fetchTemplates();
+    if (existing.some((t) => t.alias === preset.alias)) {
+      return { ok: false, error: `"${preset.name}" already exists in Resend.` };
+    }
+    await createTemplate({
+      name: preset.name,
+      alias: preset.alias,
+      subject: preset.subject,
+      html: preset.html,
+      variables: preset.variables,
+    });
+    revalidatePath("/dashboard/admin/email/templates");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: toMessage(err) };
+  }
+}
+
+/** Provision every starter template that isn't in Resend yet. */
+export async function createAllStarterTemplatesAction(): Promise<
+  { ok: true; created: number; skipped: number } | { ok: false; error: string }
+> {
+  const denied = await assertMasterAdmin();
+  if (denied) return denied;
+
+  try {
+    const existing = await fetchTemplates();
+    const have = new Set(existing.map((t) => t.alias).filter(Boolean));
+    let created = 0;
+    for (const preset of STARTER_TEMPLATES) {
+      if (have.has(preset.alias)) continue;
+      await createTemplate({
+        name: preset.name,
+        alias: preset.alias,
+        subject: preset.subject,
+        html: preset.html,
+        variables: preset.variables,
+      });
+      created += 1;
+    }
+    revalidatePath("/dashboard/admin/email/templates");
+    return { ok: true, created, skipped: STARTER_TEMPLATES.length - created };
+  } catch (err) {
+    return { ok: false, error: toMessage(err) };
+  }
 }
 
 export async function updateTemplateAction(

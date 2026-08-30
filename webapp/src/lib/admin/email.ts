@@ -344,6 +344,34 @@ export async function fetchBelethTemplates(): Promise<TemplateSummary[]> {
     .map(({ t }) => t);
 }
 
+export type CreateTemplateInput = {
+  name: string;
+  alias?: string;
+  subject?: string;
+  html: string;
+  from?: string;
+  variables?: Array<{ key: string; type: "string" | "number"; fallback_value?: string | number }>;
+};
+
+/** Create a template, then publish it so it can be used straight away. */
+export async function createTemplate(input: CreateTemplateInput): Promise<string> {
+  const res = await resendRequest<{ id: string }>("/templates", {
+    method: "POST",
+    body: {
+      name: input.name,
+      alias: input.alias || undefined,
+      subject: input.subject || undefined,
+      html: input.html,
+      from: input.from || undefined,
+      variables: input.variables?.length ? input.variables : undefined,
+    },
+  });
+  await resendRequest(`/templates/${encodeURIComponent(res.id)}/publish`, {
+    method: "POST",
+  });
+  return res.id;
+}
+
 // --- Broadcasts (marketing campaigns) -----------------------------------------
 
 export type BroadcastStatus =
