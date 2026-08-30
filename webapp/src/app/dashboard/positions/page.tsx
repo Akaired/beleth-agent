@@ -10,8 +10,11 @@ import {
   SideTag,
   formatUsd,
 } from "@/components/dashboard/ui";
+import { TickerBadge } from "@/components/ticker-badge";
 import {
+  IconArrowDown,
   IconArrowRight,
+  IconArrowUp,
   IconCaretLeft,
   IconCaretRight,
   IconPositions,
@@ -95,8 +98,11 @@ function SpreadLegs({
 
   if (compact) {
     return (
-      <span className="font-mono text-[10px] text-dim">
-        <span className="text-down">sell</span> {p.shortStrike ?? "?"} ·{" "}
+      <span className="inline-flex items-center gap-1 font-mono text-[10px] text-dim">
+        <IconArrowDown size={9} weight="bold" className="text-down" />
+        <span className="text-down">sell</span> {p.shortStrike ?? "?"}
+        <span className="mx-0.5 text-faint">·</span>
+        <IconArrowUp size={9} weight="bold" className="text-up" />
         <span className="text-up">buy</span> {p.longStrike ?? "?"} {r}
       </span>
     );
@@ -169,17 +175,18 @@ function OpenCard({ p }: { p: SpreadPosition }) {
   return (
     <div className="rounded-md border border-line bg-inset/40 px-3 py-3.5">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            <span className="text-[14px] text-txt">{structureName(p)}</span>
-            <span className="rounded bg-acc/12 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-acc">
-              sold for credit
+        <div className="flex items-start gap-3">
+          <TickerBadge symbol={p.underlying} size={34} className="mt-0.5" />
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[14px] text-txt">{structureName(p)}</span>
+              <SideTag side="sell" size="md" />
+            </div>
+            <span className="font-mono text-[10.5px] text-dim">
+              {p.underlying} · {p.qty ?? "?"} contract{p.qty === 1 ? "" : "s"}
+              {exp ? ` · exp ${exp}` : ""}
             </span>
           </div>
-          <span className="font-mono text-[10.5px] text-dim">
-            {p.underlying} · {p.qty ?? "?"} contract{p.qty === 1 ? "" : "s"}
-            {exp ? ` · exp ${exp}` : ""}
-          </span>
         </div>
         <div className="text-right">
           <span
@@ -347,11 +354,18 @@ export default async function PositionsPage({
                       {when(p.closedAt ?? p.openedAt)}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[11.5px] text-txt">
-                          {structureName(p)}
-                        </span>
-                        <SpreadLegs p={p} compact />
+                      <div className="flex items-start gap-2">
+                        <TickerBadge
+                          symbol={p.underlying}
+                          size={16}
+                          className="mt-0.5"
+                        />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[11.5px] text-txt">
+                            {structureName(p)}
+                          </span>
+                          <SpreadLegs p={p} compact />
+                        </div>
                       </div>
                     </td>
                     <td className="px-3 py-2.5">

@@ -10,6 +10,7 @@ import {
   PassFail,
   formatUsd,
 } from "@/components/dashboard/ui";
+import { TickerBadge } from "@/components/ticker-badge";
 
 export const metadata: Metadata = { title: "Decision — Beleth backoffice" };
 
@@ -174,10 +175,13 @@ export default async function DecisionDetailPage({
                 key={t.id}
                 className="border border-rowline rounded p-3 text-[11.5px]"
               >
-                <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10.5px] text-dim">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10.5px] text-dim">
                   <span className="text-sec uppercase">{t.kind}</span>
                   {t.exit_reason && <span>reason: {t.exit_reason}</span>}
-                  <span>{t.underlying}</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <TickerBadge symbol={t.underlying} size={14} />
+                    {t.underlying}
+                  </span>
                   <span>status: {t.status ?? "—"}</span>
                   <span>qty {t.qty ?? "—"}</span>
                   {t.credit && <span>credit {t.credit}</span>}

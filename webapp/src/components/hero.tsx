@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { BelethSprite } from "@/components/beleth-sprite";
 import { IconArrowDown, IconChart } from "@/components/icons";
+import { TickerBadge } from "@/components/ticker-badge";
 import type { BelethPnl, BelethScene } from "@/lib/beleth";
 import type { DecisionRow, ThoughtBubble } from "@/lib/queries";
 
@@ -100,7 +101,8 @@ export function Hero({
               <span className="font-medium text-[#0b0e11]">
                 {latestDecision.action.replace("_", " ").toUpperCase()}
               </span>
-              <span>
+              <span className="inline-flex items-center gap-1.5">
+                <TickerBadge symbol={latestDecision.symbol} size={14} />
                 {latestDecision.symbol} · {utcStamp(latestDecision.created_at)}
               </span>
             </div>

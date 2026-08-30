@@ -52,6 +52,7 @@ export {
   Gear as IconSettings,
   ArrowRight as IconArrowRight,
   ArrowLeft as IconArrowLeft,
+  ArrowUp as IconArrowUp,
   ArrowDown as IconArrowDown,
   ArrowUpRight as IconArrowUpRight,
   Scales as IconScales,

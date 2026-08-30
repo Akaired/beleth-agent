@@ -1,6 +1,8 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Role } from "@/lib/roles";
 import {
+  IconArrowDown,
+  IconArrowUp,
   IconCheckCircle,
   IconProhibit,
   IconPulse,
@@ -106,19 +108,29 @@ export function PositionStateBadge({
 }
 
 /**
- * BUY / SELL pill for a spread leg. The agent always SELLS the short leg to
+ * BUY / SELL pill with a direction arrow. The agent SELLS the short leg to
  * open (that is where the credit comes from) and BUYS the long leg as defined
- * protection; on a close the mirror. Green = buy, red = sell — the trading
- * convention, so the direction reads at a glance.
+ * protection; on a close the mirror. A whole credit spread reads as SELL,
+ * since it is opened for a net credit. Green + up arrow = buy, red + down
+ * arrow = sell — the trading convention, so the direction reads at a glance.
  */
-export function SideTag({ side }: { side: "buy" | "sell" }) {
+export function SideTag({
+  side,
+  size = "sm",
+}: {
+  side: "buy" | "sell";
+  size?: "sm" | "md";
+}) {
   const buy = side === "buy";
+  const Icon = buy ? IconArrowUp : IconArrowDown;
+  const md = size === "md";
   return (
     <span
-      className={`inline-flex w-[38px] justify-center font-mono text-[9.5px] font-medium tracking-[0.1em] uppercase rounded-sm px-1 py-0.5 ${
-        buy ? "bg-up/12 text-up" : "bg-down/12 text-down"
-      }`}
+      className={`inline-flex items-center justify-center gap-1 font-mono font-medium tracking-[0.1em] uppercase rounded-sm ${
+        md ? "text-[10.5px] px-1.5 py-0.5" : "text-[9.5px] px-1 py-0.5"
+      } ${buy ? "bg-up/12 text-up" : "bg-down/12 text-down"}`}
     >
+      <Icon size={md ? 12 : 10} weight="bold" className="shrink-0" />
       {side}
     </span>
   );

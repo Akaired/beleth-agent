@@ -6,6 +6,7 @@ import { fetchDashboardOverview } from "@/lib/dashboard-queries";
 import { daysLive } from "@/lib/queries";
 import { EquityCurve } from "@/components/equity-curve";
 import { MarketChip } from "@/components/market-chip";
+import { TickerBadge } from "@/components/ticker-badge";
 import {
   ActionBadge,
   Panel,
@@ -169,8 +170,11 @@ export default async function DashboardOverview() {
       >
         {latest ? (
           <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10.5px] text-dim">
-              <span>{latest.symbol}</span>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10.5px] text-dim">
+              <span className="inline-flex items-center gap-1.5">
+                <TickerBadge symbol={latest.symbol} size={14} />
+                {latest.symbol}
+              </span>
               <span>{new Date(latest.created_at).toLocaleString()}</span>
               <span>source: {latest.decision_source}</span>
               {latest.llm_model && <span>{latest.llm_model}</span>}

@@ -37,6 +37,7 @@ import {
   type TradeMarker,
 } from "@/lib/equity";
 import { MarketChip } from "@/components/market-chip";
+import { TickerBadge } from "@/components/ticker-badge";
 
 type Variant = "hero" | "panel";
 type LwcModule = typeof import("lightweight-charts");
@@ -168,7 +169,8 @@ function TradeTooltip({
         >
           {badge.label}
         </span>
-        <span className="font-mono text-[11px] text-txt">
+        <span className="inline-flex items-center gap-1 font-mono text-[11px] text-txt">
+          <TickerBadge symbol={marker.underlying} size={13} />
           {marker.underlying}
         </span>
       </div>
