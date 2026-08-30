@@ -4,7 +4,7 @@ import {
   ResendUnavailable,
   formatDateTime,
 } from "@/components/dashboard/admin/email-ui";
-import { getResendKey, tolerant, fetchSegments } from "@/lib/admin/email";
+import { getResendKey, tolerant, fetchBelethSegments } from "@/lib/admin/email";
 import { IconArrowUpRight } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email audiences — Beleth" };
@@ -12,15 +12,9 @@ export const metadata: Metadata = { title: "Admin · Email audiences — Beleth"
 export default async function EmailAudiencesPage() {
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 
-  const res = await tolerant(fetchSegments);
+  const res = await tolerant(fetchBelethSegments);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
-
-  // Segments carry no sender domain — the only signal is the name. Show the
-  // ones that name Beleth; if none do, fall back to all so the view is never
-  // mysteriously empty.
-  const belethNamed = res.data.filter((s) => /beleth/i.test(s.name));
-  const scoped = belethNamed.length > 0;
-  const segments = scoped ? belethNamed : res.data;
+  const { segments, scanned } = res.data;
 
   return (
     <Panel
@@ -38,8 +32,9 @@ export default async function EmailAudiencesPage() {
     >
       {segments.length === 0 ? (
         <p className="text-[13px] text-sec leading-relaxed">
-          No segments yet. A campaign sends to a segment, so create at least one
-          in Resend before building a campaign.
+          No Beleth segment. {scanned} segment{scanned === 1 ? "" : "s"} in the
+          account, none named for Beleth — give a segment &ldquo;beleth&rdquo; in
+          its name (in Resend) and it shows here.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-line">
@@ -57,11 +52,9 @@ export default async function EmailAudiencesPage() {
         </ul>
       )}
       <p className="mt-3 text-[11px] text-sec leading-relaxed">
-        {scoped
-          ? "Showing segments whose name mentions Beleth. "
-          : "No Beleth-named segment — showing all. "}
-        Contact lists live in Resend — this view is read-only, and the API
-        reports no per-segment contact total.
+        Showing the {segments.length} segment{segments.length === 1 ? "" : "s"}{" "}
+        (of {scanned}) whose name mentions Beleth — the only signal that a
+        segment is ours. Contact lists live in Resend; this view is read-only.
       </p>
     </Panel>
   );

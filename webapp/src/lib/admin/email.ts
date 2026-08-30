@@ -110,6 +110,13 @@ export function isBelethMail(from: string | null | undefined): boolean {
   return d === BELETH_MAIL_DOMAIN || d.endsWith(`.${BELETH_MAIL_DOMAIN}`);
 }
 
+// Segments carry no sender domain in Resend, so the only signal that one
+// belongs to Beleth is its name. Heuristic, but it keeps another project's
+// contact lists out of the campaign flow.
+export function isBelethSegmentName(name: string | null | undefined): boolean {
+  return !!name && /beleth/i.test(name);
+}
+
 /** Resolve a batch of promises in fixed-size waves (Resend rate limits). */
 async function inWaves<T, R>(
   items: T[],
@@ -326,10 +333,17 @@ export async function updateTemplate(
   });
 }
 
-// The list endpoint carries no `from`, so each template is fetched once to
-// check its sender domain. A template with no explicit `from` (it inherits
-// at send time) is kept — only a foreign domain is filtered out.
-export async function fetchBelethTemplates(): Promise<TemplateSummary[]> {
+/**
+ * Templates whose sender is explicitly on the Beleth domain. The list endpoint
+ * carries no `from`, so each template is fetched once. Strict: a template with
+ * no `from` set is NOT shown (in a shared account that is ambiguous) — it is
+ * counted in `hiddenNoSender` so the UI can explain the gap.
+ */
+export async function fetchBelethTemplates(): Promise<{
+  templates: TemplateSummary[];
+  hiddenNoSender: number;
+  hiddenForeign: number;
+}> {
   const all = await fetchTemplates();
   const checked = await inWaves(all, 4, async (t) => {
     try {
@@ -339,9 +353,15 @@ export async function fetchBelethTemplates(): Promise<TemplateSummary[]> {
       return { t, from: null as string | null };
     }
   });
-  return checked
-    .filter(({ from }) => !from || isBelethMail(from))
-    .map(({ t }) => t);
+  const templates: TemplateSummary[] = [];
+  let hiddenNoSender = 0;
+  let hiddenForeign = 0;
+  for (const { t, from } of checked) {
+    if (isBelethMail(from)) templates.push(t);
+    else if (!from) hiddenNoSender += 1;
+    else hiddenForeign += 1;
+  }
+  return { templates, hiddenNoSender, hiddenForeign };
 }
 
 export type CreateTemplateInput = {
@@ -460,8 +480,7 @@ export async function fetchBroadcast(id: string): Promise<Broadcast> {
 }
 
 // Same story as templates: the list has no `from`, so each broadcast is
-// fetched once and kept only if it sends from the Beleth domain (a missing
-// `from` is kept).
+// fetched once and kept only if it sends explicitly from the Beleth domain.
 export async function fetchBelethBroadcasts(): Promise<BroadcastSummary[]> {
   const all = await fetchBroadcasts();
   const checked = await inWaves(all, 4, async (b) => {
@@ -472,9 +491,7 @@ export async function fetchBelethBroadcasts(): Promise<BroadcastSummary[]> {
       return { b, from: null as string | null };
     }
   });
-  return checked
-    .filter(({ from }) => !from || isBelethMail(from))
-    .map(({ b }) => b);
+  return checked.filter(({ from }) => isBelethMail(from)).map(({ b }) => b);
 }
 
 export type CreateBroadcastInput = {
@@ -555,4 +572,19 @@ export async function fetchSegments(): Promise<Segment[]> {
     name: s.name,
     createdAt: s.created_at ?? null,
   }));
+}
+
+/**
+ * Segments whose name mentions Beleth (the only available signal). `scanned`
+ * is the account total, so the UI can say "3 of 11 segments".
+ */
+export async function fetchBelethSegments(): Promise<{
+  segments: Segment[];
+  scanned: number;
+}> {
+  const all = await fetchSegments();
+  return {
+    segments: all.filter((s) => isBelethSegmentName(s.name)),
+    scanned: all.length,
+  };
 }

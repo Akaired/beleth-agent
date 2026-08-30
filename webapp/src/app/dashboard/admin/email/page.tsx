@@ -80,7 +80,7 @@ export default async function AdminEmailOverviewPage() {
   const opened = (tally.opened ?? 0) + (tally.clicked ?? 0);
   const bounced = (tally.bounced ?? 0) + (tally.complained ?? 0);
 
-  const templateCount = templatesR.ok ? templatesR.data.length : 0;
+  const templateCount = templatesR.ok ? templatesR.data.templates.length : 0;
   const broadcasts = broadcastsR.ok ? broadcastsR.data : [];
   const sentCampaigns = broadcasts.filter((b) => b.status === "sent").length;
 

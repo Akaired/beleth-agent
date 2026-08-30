@@ -9,6 +9,12 @@ import {
   sendBroadcast,
   updateTemplate,
   fetchTemplates,
+  fetchTemplate,
+  fetchBroadcast,
+  fetchSegments,
+  isBelethMail,
+  isBelethSegmentName,
+  BELETH_MAIL_DOMAIN,
   ResendApiError,
   ResendNotConfigured,
   type CreateBroadcastInput,
@@ -34,6 +40,8 @@ function toMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Unexpected error.";
 }
 
+const STARTER_FROM = `Beleth <no-reply@${BELETH_MAIL_DOMAIN}>`;
+
 /**
  * Provision one starter template (create + publish) into Resend. Idempotent-ish:
  * refuses if a template with that alias already exists so a double click can't
@@ -56,6 +64,7 @@ export async function createStarterTemplateAction(alias: string): Promise<Result
       alias: preset.alias,
       subject: preset.subject,
       html: preset.html,
+      from: STARTER_FROM,
       variables: preset.variables,
     });
     revalidatePath("/dashboard/admin/email/templates");
@@ -83,6 +92,7 @@ export async function createAllStarterTemplatesAction(): Promise<
         alias: preset.alias,
         subject: preset.subject,
         html: preset.html,
+        from: STARTER_FROM,
         variables: preset.variables,
       });
       created += 1;
@@ -101,6 +111,11 @@ export async function updateTemplateAction(
   const denied = await assertMasterAdmin();
   if (denied) return denied;
   try {
+    // Never edit another project's template on the shared account.
+    const current = await fetchTemplate(id);
+    if (current.from && !isBelethMail(current.from)) {
+      return { ok: false, error: "That template is not on the Beleth domain." };
+    }
     await updateTemplate(id, patch);
     revalidatePath("/dashboard/admin/email/templates");
     revalidatePath(`/dashboard/admin/email/templates/${id}`);
@@ -118,7 +133,20 @@ export async function createBroadcastAction(
   if (!input.segmentId || !input.from || !input.subject) {
     return { ok: false, error: "Segment, from and subject are required." };
   }
+  if (!isBelethMail(input.from)) {
+    return {
+      ok: false,
+      error: `From must be on ${BELETH_MAIL_DOMAIN}.`,
+    };
+  }
   try {
+    // The chosen segment must be a Beleth segment (name heuristic) — don't let
+    // a Beleth campaign target another project's contact list.
+    const segments = await fetchSegments();
+    const seg = segments.find((s) => s.id === input.segmentId);
+    if (!seg || !isBelethSegmentName(seg.name)) {
+      return { ok: false, error: "Pick a Beleth segment." };
+    }
     const id = await createBroadcast(input);
     revalidatePath("/dashboard/admin/email/campaigns");
     return { ok: true, id };
@@ -134,6 +162,10 @@ export async function sendBroadcastAction(
   const denied = await assertMasterAdmin();
   if (denied) return denied;
   try {
+    const b = await fetchBroadcast(id);
+    if (!isBelethMail(b.from)) {
+      return { ok: false, error: "That campaign is not on the Beleth domain." };
+    }
     await sendBroadcast(id, scheduledAt?.trim() || undefined);
     revalidatePath("/dashboard/admin/email/campaigns");
     revalidatePath(`/dashboard/admin/email/campaigns/${id}`);
@@ -147,6 +179,10 @@ export async function deleteBroadcastAction(id: string): Promise<Result> {
   const denied = await assertMasterAdmin();
   if (denied) return denied;
   try {
+    const b = await fetchBroadcast(id);
+    if (!isBelethMail(b.from)) {
+      return { ok: false, error: "That campaign is not on the Beleth domain." };
+    }
     await deleteBroadcast(id);
     revalidatePath("/dashboard/admin/email/campaigns");
     return { ok: true };

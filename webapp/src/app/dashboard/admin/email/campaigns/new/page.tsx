@@ -6,7 +6,7 @@ import { CampaignForm } from "@/components/dashboard/admin/campaign-form";
 import {
   getResendKey,
   tolerant,
-  fetchSegments,
+  fetchBelethSegments,
   BELETH_MAIL_DOMAIN,
 } from "@/lib/admin/email";
 import { campaignStarterHtml } from "@/lib/admin/email-templates";
@@ -17,8 +17,9 @@ export const metadata: Metadata = { title: "Admin · New campaign — Beleth" };
 export default async function NewCampaignPage() {
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 
-  const res = await tolerant(fetchSegments);
+  const res = await tolerant(fetchBelethSegments);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
+  const { segments, scanned } = res.data;
 
   return (
     <div className="flex flex-col gap-5">
@@ -30,11 +31,30 @@ export default async function NewCampaignPage() {
       </Link>
       <h2 className="text-[17px] font-light text-txt">New campaign</h2>
       <Panel title="Draft">
-        <CampaignForm
-          segments={res.data.map((s) => ({ id: s.id, name: s.name }))}
-          defaultFrom={`Beleth <no-reply@${BELETH_MAIL_DOMAIN}>`}
-          defaultHtml={campaignStarterHtml()}
-        />
+        {segments.length === 0 ? (
+          <p className="text-[13px] text-sec leading-relaxed">
+            No Beleth segment to send to. Of {scanned} segment
+            {scanned === 1 ? "" : "s"} in the Resend account, none has
+            &ldquo;beleth&rdquo; in its name — that is the only signal that a
+            segment is ours, so campaigns are limited to those. Name or create a
+            Beleth segment in{" "}
+            <a
+              href="https://resend.com/audiences"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-acc hover:underline"
+            >
+              Resend
+            </a>
+            , then reload.
+          </p>
+        ) : (
+          <CampaignForm
+            segments={segments.map((s) => ({ id: s.id, name: s.name }))}
+            defaultFrom={`Beleth <no-reply@${BELETH_MAIL_DOMAIN}>`}
+            defaultHtml={campaignStarterHtml()}
+          />
+        )}
       </Panel>
     </div>
   );

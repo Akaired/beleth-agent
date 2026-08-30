@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
+  OutOfScope,
   EventPill,
   Stat,
   formatDateTime,
@@ -14,6 +15,7 @@ import {
   fetchBroadcast,
   fetchBroadcastEngagement,
   fetchSegments,
+  isBelethMail,
   type Engagement,
 } from "@/lib/admin/email";
 import { IconArrowLeft } from "@/components/icons";
@@ -29,6 +31,11 @@ export default async function CampaignPage({
   const res = await tolerant(() => fetchBroadcast(id));
   if (!res.ok) return <ResendUnavailable message={res.message} />;
   const b = res.data;
+
+  // A broadcast that doesn't send from the Beleth domain is another project's.
+  if (!isBelethMail(b.from)) {
+    return <OutOfScope kind="campaign" backHref="/dashboard/admin/email/campaigns" />;
+  }
 
   // Resolve the segment name (best-effort) and, for a sent campaign, engagement.
   const [segmentsR, engagementR] = await Promise.all([

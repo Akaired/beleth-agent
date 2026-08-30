@@ -23,7 +23,7 @@ export default async function EmailTemplatesPage() {
 
   const res = await tolerant(fetchBelethTemplates);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
-  const templates = res.data;
+  const { templates, hiddenNoSender, hiddenForeign } = res.data;
   const existingAliases = templates
     .map((t) => t.alias)
     .filter((a): a is string => Boolean(a));
@@ -75,6 +75,13 @@ export default async function EmailTemplatesPage() {
               </li>
             ))}
           </ul>
+        )}
+        {(hiddenNoSender > 0 || hiddenForeign > 0) && (
+          <p className="mt-3 font-mono text-[10.5px] text-faint">
+            {hiddenForeign > 0 && `${hiddenForeign} hidden (other project) · `}
+            {hiddenNoSender > 0 &&
+              `${hiddenNoSender} hidden (no sender set — add a from on ${BELETH_MAIL_DOMAIN} to show)`}
+          </p>
         )}
       </Panel>
 

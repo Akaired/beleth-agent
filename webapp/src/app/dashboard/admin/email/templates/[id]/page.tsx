@@ -3,11 +3,17 @@ import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
+  OutOfScope,
   EventPill,
   formatDateTime,
 } from "@/components/dashboard/admin/email-ui";
 import { TemplateEditor } from "@/components/dashboard/admin/template-editor";
-import { getResendKey, tolerant, fetchTemplate } from "@/lib/admin/email";
+import {
+  getResendKey,
+  tolerant,
+  fetchTemplate,
+  isBelethMail,
+} from "@/lib/admin/email";
 import { IconArrowLeft } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email template — Beleth" };
@@ -24,6 +30,11 @@ export default async function EmailTemplatePage({
     return <ResendUnavailable message={res.message} />;
   }
   const t = res.data;
+
+  // A template with an explicit non-Beleth sender belongs to another project.
+  if (t.from && !isBelethMail(t.from)) {
+    return <OutOfScope kind="template" backHref="/dashboard/admin/email/templates" />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

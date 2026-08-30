@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
-import { IconEnvelope } from "@/components/icons";
+import { IconEnvelope, IconProhibit } from "@/components/icons";
 
 /** Shown wherever the Resend key is missing or the API call failed. */
 export function ResendUnavailable({ message }: { message: string }) {
@@ -23,6 +24,28 @@ export function ResendUnavailable({ message }: { message: string }) {
           </p>
         )}
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * Shown when a template / campaign is opened by id but its sender is not on
+ * the Beleth domain — the shared Resend account holds other projects' items.
+ */
+export function OutOfScope({ kind, backHref }: { kind: string; backHref: string }) {
+  return (
+    <Panel title="Not a Beleth item">
+      <p className="flex items-start gap-2 text-[13px] text-sec leading-relaxed">
+        <IconProhibit size={16} className="mt-0.5 shrink-0 text-dim" />
+        This {kind} sends from another domain, so it belongs to a different
+        project on the shared Resend account. It is not shown here.
+      </p>
+      <Link
+        href={backHref}
+        className="mt-3 inline-block font-mono text-[11px] uppercase tracking-[0.07em] text-acc hover:underline"
+      >
+        Back
+      </Link>
     </Panel>
   );
 }
