@@ -125,7 +125,7 @@ export default async function DashboardOverview() {
         />
         <Stat label="Cycles run" Icon={IconCycles} value={d.cyclesRun} />
         <Stat
-          label="Trades submitted"
+          label="Trades filled"
           Icon={IconTrades}
           value={d.tradesSubmitted}
         />

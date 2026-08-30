@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { agentStateLine } from "@/lib/queries";
 import type { AgentStatusRow } from "@/lib/queries";
-import { IconLive, IconSignIn } from "@/components/icons";
+import { IconLive } from "@/components/icons";
 import { MarketChip } from "@/components/market-chip";
+import { HeaderAuth } from "@/components/header-auth";
 
 export function SiteHeader({
   agentStatus,
@@ -51,13 +51,7 @@ export function SiteHeader({
             </span>
           )}
           <MarketChip open={marketOpen} bordered />
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-1.5 rounded-[2px] bg-txt px-3 py-[7px] text-[12px] font-medium text-bg transition-colors hover:bg-acc"
-          >
-            <IconSignIn size={13} weight="fill" />
-            Log in / Register
-          </Link>
+          <HeaderAuth />
         </nav>
       </div>
     </header>

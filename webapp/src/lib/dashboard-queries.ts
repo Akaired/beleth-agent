@@ -102,6 +102,7 @@ const DETAIL_COLS =
 export async function fetchDashboardOverview(): Promise<DashboardOverview> {
   const supabase = await createClient();
 
+  let markersLive = false;
   const [
     latest,
     recent,
@@ -127,10 +128,15 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .select(DECISION_COLS)
       .order("created_at", { ascending: false })
       .limit(12),
-    fetchTradeMarkers().catch((err) => {
-      console.error("dashboard trade markers fetch failed", err);
-      return [] as TradeMarker[];
-    }),
+    fetchTradeMarkers()
+      .then((m) => {
+        markersLive = true;
+        return m;
+      })
+      .catch((err) => {
+        console.error("dashboard trade markers fetch failed", err);
+        return [] as TradeMarker[];
+      }),
     supabase
       .from("decisions")
       .select("created_at")
@@ -177,6 +183,16 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
     ),
   ).size;
 
+  // Trades that actually executed on the paper account: an entry marker
+  // exists only for a filled order, so canceled / expired / rejected orders
+  // are excluded, and "exit" markers are a round trip's closing leg, not a
+  // new trade. Falls back to the Supabase submitted count only when Alpaca
+  // is unreachable.
+  const tradesFilled = markersLive
+    ? tradeMarkers.filter((m) => m.state === "open" || m.state === "closed")
+        .length
+    : (trades.count ?? 0);
+
   return {
     latestDecision: (latest.data as DecisionRow | null) ?? null,
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
@@ -186,7 +202,7 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
     tradeMarkers,
     marketOpen: clock?.isOpen ?? null,
     cyclesRun: cycles.count ?? 0,
-    tradesSubmitted: trades.count ?? 0,
+    tradesSubmitted: tradesFilled,
     refused,
     firstDecisionAt:
       (first.data as { created_at: string } | null)?.created_at ?? null,

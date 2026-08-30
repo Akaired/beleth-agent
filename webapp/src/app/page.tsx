@@ -64,15 +64,30 @@ export default async function Home() {
   let equity: EquityHistory | null = null;
   let tradeMarkers: TradeMarker[] = [];
   let clock: MarketClock | null = null;
+  let markersLive = false;
   try {
     [equity, tradeMarkers, clock] = await Promise.all([
       fetchEquityHistory(DEFAULT_EQUITY_RANGE),
-      fetchTradeMarkers().catch(() => [] as TradeMarker[]),
+      fetchTradeMarkers()
+        .then((m) => {
+          markersLive = true;
+          return m;
+        })
+        .catch(() => [] as TradeMarker[]),
       fetchMarketClock().catch(() => null),
     ]);
   } catch (err) {
     console.error("equity / trade-marker fetch failed", err);
   }
+
+  // "Trades filled" = entries that actually executed on the paper account
+  // (an entry marker exists only for a filled order). Canceled, expired and
+  // broker-rejected orders never become markers; the "exit" markers are the
+  // closing leg of a round trip, not a separate trade. Falls back to the
+  // Supabase submitted-order count only when Alpaca is unreachable.
+  const tradesFilled = markersLive
+    ? tradeMarkers.filter((m) => m.state === "open" || m.state === "closed").length
+    : data.tradesSubmitted;
 
   const belethSceneId = belethScene({
     status: data.agentStatus,
@@ -90,8 +105,8 @@ export default async function Home() {
     },
     { label: "Cycles run", value: data.cyclesRun, tone: "txt", Icon: IconCycles },
     {
-      label: "Trades submitted",
-      value: data.tradesSubmitted,
+      label: "Trades filled",
+      value: tradesFilled,
       tone: "txt",
       Icon: IconTrades,
     },

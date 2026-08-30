@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import {
   IconBroadcast,
   IconEye,
@@ -37,6 +40,37 @@ const STEPS = [
 ];
 
 export function Method() {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [swept, setSwept] = useState(false);
+
+  // When the grid comes near the viewport, run the green top-border through
+  // the four steps in sequence (each card's transition-delay is staggered),
+  // then release it so the highlight recedes in the same order — a one-shot
+  // sweep, not a state that sticks. Skipped under reduced-motion.
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setSwept(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0, rootMargin: "0px 0px -15% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!swept) return;
+    const t = setTimeout(() => setSwept(false), 1500);
+    return () => clearTimeout(t);
+  }, [swept]);
+
   return (
     <section
       id="method"
@@ -47,11 +81,17 @@ export function Method() {
         The same four steps, over and over, while the market is open. Any one of them can
         stop the trade.
       </p>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-7 mt-8">
-        {STEPS.map((s) => (
+      <div
+        ref={gridRef}
+        className="grid sm:grid-cols-2 lg:grid-cols-4 gap-7 mt-8"
+      >
+        {STEPS.map((s, i) => (
           <div
             key={s.n}
-            className="border-t-2 border-neutralbar hover:border-up transition-colors pt-3"
+            style={{ "--d": `${i * 130}ms` } as React.CSSProperties}
+            className={`border-t-2 pt-3 transition-colors duration-300 [transition-delay:var(--d)] hover:border-up hover:[transition-delay:0ms] ${
+              swept ? "border-up" : "border-neutralbar"
+            }`}
           >
             <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] text-dim">
               <s.Icon size={13} className="text-sec" />

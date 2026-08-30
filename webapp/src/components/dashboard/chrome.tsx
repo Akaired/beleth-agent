@@ -8,7 +8,7 @@ import { roleAtLeast, type Role } from "@/lib/roles";
 import type { ChatSessionSummary } from "@/lib/chat/types";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { ChatNav } from "@/components/dashboard/chat-nav";
-import { RoleChip } from "@/components/dashboard/ui";
+import { AccountDropdown } from "@/components/account-dropdown";
 import {
   IconOverview,
   IconPositions,
@@ -19,10 +19,25 @@ import {
   IconTradeCalendar,
   IconMenu,
   IconClose,
+  IconAccount,
+  IconSparkle,
+  IconAdmin,
+  IconCode,
+  IconDocs,
+  IconForum,
+  IconReports,
+  IconSettings,
 } from "@/components/icons";
 
 type IconProps = { size?: number; weight?: "regular" | "bold" | "fill"; className?: string };
-type Item = { href: string; label: string; min: Role; Icon: ComponentType<IconProps> };
+type Item = {
+  href: string;
+  label: string;
+  min: Role;
+  Icon: ComponentType<IconProps>;
+  // Placeholder entry: shown but not navigable yet.
+  disabled?: boolean;
+};
 type Group = { label: string; items: Item[] };
 
 // Sidebar groups, 1:1 with the approved mockup
@@ -38,17 +53,28 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    label: "User",
+    items: [
+      { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount, disabled: true },
+      { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconSparkle, disabled: true },
+      { href: "/dashboard/forum", label: "Forum", min: "public_user", Icon: IconForum, disabled: true },
+    ],
+  },
+  {
     label: "Records",
     items: [
       { href: "/dashboard/trade-calendar", label: "Trade calendar", min: "demo_admin", Icon: IconTradeCalendar },
       { href: "/dashboard/decisions", label: "Decision history", min: "demo_admin", Icon: IconDecisions },
       { href: "/dashboard/strategy", label: "Strategy strategy", min: "demo_admin", Icon: IconStrategy },
+      { href: "/dashboard/reports", label: "Reports", min: "demo_admin", Icon: IconReports, disabled: true },
     ],
   },
   {
     label: "Operator",
     items: [
+      { href: "/dashboard/admin", label: "Admin", min: "master_admin", Icon: IconAdmin, disabled: true },
       { href: "/dashboard/controls", label: "Controls", min: "master_admin", Icon: IconControls },
+      { href: "/dashboard/api", label: "API", min: "master_admin", Icon: IconCode, disabled: true },
     ],
   },
 ];
@@ -85,6 +111,22 @@ function NavGroups({
             {g.label}
           </div>
           {g.items.map((it) => {
+            if (it.disabled) {
+              return (
+                <div
+                  key={it.href}
+                  aria-disabled="true"
+                  title="Coming soon"
+                  className="flex items-center gap-2.5 border-l-2 border-transparent py-[7px] pl-2.5 pr-3 text-[12.5px] text-faint cursor-default select-none"
+                >
+                  <it.Icon size={15} weight="regular" className="text-faint" />
+                  <span>{it.label}</span>
+                  <span className="ml-auto font-mono text-[8.5px] uppercase tracking-[0.12em] text-faint/70">
+                    soon
+                  </span>
+                </div>
+              );
+            }
             const active = isActive(pathname, it.href);
             const badge = badges?.[it.href] ?? 0;
             return (
@@ -117,8 +159,8 @@ function NavGroups({
             );
           })}
         </div>
-        {/* The Chat section sits right after Live (present for every role). */}
-        {g.label === "Live" && (
+        {/* The Chat section sits right after User (present for every role). */}
+        {g.label === "User" && (
           <ChatNav recentChats={recentChats} onNavigate={onNavigate} />
         )}
         </div>
@@ -129,7 +171,29 @@ function NavGroups({
 
 function SidebarFooter() {
   return (
-    <div className="mt-auto border-t border-line px-3 py-3">
+    <div className="mt-auto flex flex-col gap-2.5 border-t border-line px-3 py-3">
+      <div
+        aria-disabled="true"
+        title="Coming soon"
+        className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint cursor-default select-none"
+      >
+        <IconDocs size={13} />
+        Docs
+        <span className="ml-auto text-[8.5px] tracking-[0.12em] text-faint/70">
+          soon
+        </span>
+      </div>
+      <div
+        aria-disabled="true"
+        title="Coming soon"
+        className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint cursor-default select-none"
+      >
+        <IconSettings size={13} />
+        Settings
+        <span className="ml-auto text-[8.5px] tracking-[0.12em] text-faint/70">
+          soon
+        </span>
+      </div>
       <SignOutButton />
     </div>
   );
@@ -199,10 +263,12 @@ export function DashboardChrome({
           </button>
           <Brand />
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden sm:inline text-[11px] text-dim">{email}</span>
-          <RoleChip role={role} />
-        </div>
+        <AccountDropdown
+          role={role}
+          email={email}
+          homeHref="/"
+          homeLabel="Homepage"
+        />
       </header>
 
       <div className="flex-1 min-h-0 md:grid md:grid-cols-[196px_minmax(0,1fr)] md:overflow-hidden">
