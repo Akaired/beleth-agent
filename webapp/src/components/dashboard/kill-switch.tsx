@@ -48,8 +48,8 @@ export function KillSwitch({ paused }: { paused: boolean }) {
 
       <p className="text-[12px] text-sec leading-relaxed max-w-prose">
         {next
-          ? "Pausing sets agent_status.paused. The resident runner checks it at the top of every cycle and stops producing decisions fail-closed — it keeps writing a heartbeat, and any resting orders are left untouched. Nothing is cancelled."
-          : "Resuming clears agent_status.paused. The next cycle after the flag is read resumes normal evaluation."}
+          ? "Stops new decisions from the next cycle. Heartbeat and resting orders are untouched — nothing is cancelled."
+          : "The next cycle resumes normal evaluation."}
       </p>
 
       {!armed ? (

@@ -1,3 +1,4 @@
+import type { ComponentType } from "react";
 import {
   formatGb,
   formatMb,
@@ -9,99 +10,120 @@ import {
   type HostMetrics,
 } from "@/lib/host";
 import { Panel, timeAgo } from "@/components/dashboard/ui";
-import { IconControls } from "@/components/icons";
+import {
+  IconCpu,
+  IconData,
+  IconPulse,
+  IconServer,
+  IconTemp,
+} from "@/components/icons";
 
-const TONE_BAR: Record<"ok" | "warn" | "crit", string> = {
+type Tone = "ok" | "warn" | "crit";
+type IconType = ComponentType<{
+  size?: number;
+  weight?: "regular" | "bold" | "fill";
+  className?: string;
+}>;
+
+const BAR: Record<Tone, string> = {
   ok: "bg-up",
   warn: "bg-acc",
   crit: "bg-down",
 };
-const TONE_TXT: Record<"ok" | "warn" | "crit", string> = {
+const VALUE: Record<Tone, string> = {
   ok: "text-txt",
   warn: "text-acc",
   crit: "text-down",
 };
 
-function Meter({
+function Tile({
   label,
-  pct,
+  Icon,
   value,
+  sub,
+  pct,
+  tone,
 }: {
   label: string;
-  pct: number | null | undefined;
+  Icon: IconType;
   value: string;
+  sub?: string;
+  /** 0–100; renders a meter bar. Omit for a plain tile. */
+  pct?: number | null;
+  /** Override the pct-derived tone. */
+  tone?: Tone;
 }) {
-  const tone = usageTone(pct);
-  const width = pct == null ? 0 : Math.max(2, Math.min(100, pct));
+  const t: Tone = tone ?? usageTone(pct);
+  const hasBar = pct != null && Number.isFinite(pct);
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[10px] tracking-[0.08em] text-sec uppercase">
-          {label}
+    <div className="flex flex-col gap-2 rounded-md border border-line bg-inset p-3">
+      <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.09em] text-sec">
+        <Icon size={12} className="text-dim" />
+        {label}
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className={`font-mono text-[20px] leading-none ${VALUE[t]}`}>
+          {value}
         </span>
-        <span className={`font-mono text-[11px] ${TONE_TXT[tone]}`}>{value}</span>
+        {sub && <span className="font-mono text-[11px] text-dim">{sub}</span>}
       </div>
-      <div className="h-1.5 rounded-full bg-track overflow-hidden">
-        <div
-          className={`h-full rounded-full ${TONE_BAR[tone]}`}
-          style={{ width: `${width}%` }}
-        />
-      </div>
+      {hasBar && (
+        <div className="mt-0.5 h-[3px] rounded-full bg-track overflow-hidden">
+          <div
+            className={`h-full rounded-full ${BAR[t]}`}
+            style={{ width: `${Math.max(2, Math.min(100, pct))}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-/** Minimal inline-SVG sparkline over the history window. */
 function Spark({
   label,
   points,
+  digits,
   unit,
-  tone = "text-sec",
 }: {
   label: string;
   points: number[];
+  digits: number;
   unit: string;
-  tone?: string;
 }) {
   const clean = points.filter((n) => Number.isFinite(n));
   if (clean.length < 2) return null;
-  const W = 120;
-  const H = 28;
+  const W = 96;
+  const H = 22;
   const min = Math.min(...clean);
   const max = Math.max(...clean);
   const span = max - min || 1;
   const d = clean
     .map((n, i) => {
       const x = (i / (clean.length - 1)) * W;
-      const y = H - ((n - min) / span) * (H - 4) - 2;
+      const y = H - ((n - min) / span) * (H - 3) - 1.5;
       return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
-  const last = clean[clean.length - 1];
   return (
-    <div className="flex items-center gap-2.5">
-      <span className="font-mono text-[10px] tracking-[0.08em] text-sec uppercase w-[68px] shrink-0">
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.08em] text-dim w-[52px] shrink-0">
         {label}
       </span>
       <svg
         width={W}
         height={H}
         viewBox={`0 0 ${W} ${H}`}
-        className="shrink-0 text-acc"
+        className="shrink-0 text-acc/80"
         aria-hidden="true"
       >
         <path d={d} fill="none" stroke="currentColor" strokeWidth="1.25" />
       </svg>
-      <span className={`font-mono text-[11px] ${tone}`}>
-        {last.toFixed(unit === "°C" ? 0 : unit === "" ? 2 : 0)}
-        {unit && ` ${unit}`}
+      <span className="font-mono text-[10px] text-sec">
+        {clean[clean.length - 1].toFixed(digits)}
+        {unit}
       </span>
     </div>
   );
-}
-
-function Fact({ children }: { children: React.ReactNode }) {
-  return <span className="font-mono text-[11px] text-sec">{children}</span>;
 }
 
 export function HostPanel({
@@ -115,12 +137,18 @@ export function HostPanel({
 }) {
   const host: HostMetrics | null = parseHostMetrics(detail);
 
+  const title = (
+    <span className="flex items-center gap-1.5">
+      <IconServer size={13} weight="bold" className="text-acc" />
+      {host?.label ?? "the trading host"}
+    </span>
+  );
+
   if (!host) {
     return (
-      <Panel title="Host">
+      <Panel title={title}>
         <p className="font-mono text-[11px] text-dim">
-          No host telemetry yet — the runner attaches it to the next
-          heartbeat/cycle.
+          No host telemetry yet — attached to the next heartbeat.
         </p>
       </Panel>
     );
@@ -128,7 +156,6 @@ export function HostPanel({
 
   const capturedIso = host.captured_at ?? lastCycleAt;
   const stale = isStale(capturedIso);
-
   const plat = host.platform ?? {};
   const cm = host.container_mem;
   const mem = host.mem;
@@ -136,137 +163,123 @@ export function HostPanel({
   const proc = host.process ?? {};
   const load1 = host.load?.[0] ?? null;
   const loadPct =
-    load1 != null && host.cpu_count
-      ? (load1 / host.cpu_count) * 100
-      : null;
+    load1 != null && host.cpu_count ? (load1 / host.cpu_count) * 100 : null;
 
   const series = history.map((p) => p.metrics ?? ({} as HostMetrics));
-  const memPctSeries = series
-    .map((m) => m.container_mem?.used_pct)
-    .filter((n): n is number => typeof n === "number");
-  const loadSeries = series
-    .map((m) => m.load?.[0])
-    .filter((n): n is number => typeof n === "number");
-  const tempSeries = series
-    .map((m) => m.thermal_c)
-    .filter((n): n is number => typeof n === "number");
+  const pick = (fn: (m: HostMetrics) => number | null | undefined) =>
+    series.map(fn).filter((n): n is number => typeof n === "number");
+  const memSpark = pick((m) => m.container_mem?.used_pct);
+  const loadSpark = pick((m) => m.load?.[0]);
+  const tempSpark = pick((m) => m.thermal_c);
+  const hasSpark =
+    memSpark.length > 1 || loadSpark.length > 1 || tempSpark.length > 1;
+
+  const meta = [
+    plat.system && plat.release && `${plat.system} ${plat.release}`,
+    proc.git_sha && `git ${proc.git_sha}`,
+    plat.python && `py ${plat.python}`,
+    proc.cycles != null && `${proc.cycles} cycles`,
+    proc.last_symbol && `last ${proc.last_symbol}`,
+    proc.rss_mb != null && `rss ${formatMb(proc.rss_mb)}`,
+    host.net?.alpaca_ms != null && `alpaca ${host.net.alpaca_ms} ms`,
+    host.net?.supabase_ms != null && `supabase ${host.net.supabase_ms} ms`,
+  ].filter(Boolean) as string[];
 
   return (
     <Panel
-      title={
-        <span className="flex items-center gap-1.5">
-          <IconControls size={12} weight="bold" className="text-acc" />
-          Host — {host.label ?? "the trading host"}
-        </span>
-      }
+      title={title}
       right={
         <span
-          className={`font-mono text-[10px] ${
-            stale ? "text-acc" : "text-dim"
-          }`}
+          className={`font-mono text-[10px] ${stale ? "text-acc" : "text-dim"}`}
         >
-          {stale ? "stale · " : ""}
+          {stale ? "stale · " : "updated "}
           {timeAgo(capturedIso)}
         </span>
       }
     >
       <div className="flex flex-col gap-4">
-        {/* identity strip */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <Fact>
-            {[plat.system, plat.release].filter(Boolean).join(" ") || "—"}
-            {plat.machine ? ` · ${plat.machine}` : ""}
-          </Fact>
-          <Fact>up {formatUptime(host.uptime_seconds)}</Fact>
-          {host.cpu_count != null && <Fact>{host.cpu_count} CPU</Fact>}
-          {proc.git_sha && <Fact>git {proc.git_sha}</Fact>}
-          {plat.python && <Fact>py {plat.python}</Fact>}
-        </div>
-
-        {/* meters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {cm && (
-            <Meter
-              label="container mem"
-              pct={cm.used_pct ?? null}
-              value={
+            <Tile
+              label="Container mem"
+              Icon={IconData}
+              value={formatMb(cm.used_mb)}
+              sub={
                 cm.limit_mb
-                  ? `${formatMb(cm.used_mb)} / ${formatMb(cm.limit_mb)}${
+                  ? `/ ${formatMb(cm.limit_mb)}${
                       cm.used_pct != null ? ` · ${cm.used_pct}%` : ""
                     }`
-                  : formatMb(cm.used_mb)
+                  : undefined
               }
-            />
-          )}
-          {disk && (
-            <Meter
-              label="disk /"
-              pct={disk.used_pct}
-              value={`${formatGb(disk.free_gb)} free / ${formatGb(
-                disk.total_gb,
-              )} · ${disk.used_pct}%`}
-            />
-          )}
-          {mem && (
-            <Meter
-              label="host ram"
-              pct={mem.used_pct}
-              value={`${formatMb(mem.total_mb - mem.available_mb)} / ${formatGb(
-                mem.total_mb / 1024,
-              )} · ${mem.used_pct}%`}
-            />
-          )}
-          {load1 != null && (
-            <Meter
-              label="load (1m)"
-              pct={loadPct}
-              value={
-                host.load
-                  ? `${host.load.map((n) => n.toFixed(2)).join(" · ")}${
-                      host.cpu_count ? ` / ${host.cpu_count}` : ""
-                    }`
-                  : load1.toFixed(2)
-              }
+              pct={cm.used_pct ?? null}
             />
           )}
           {host.thermal_c != null && (
-            <Meter
-              label="cpu temp"
+            <Tile
+              label="CPU temp"
+              Icon={IconTemp}
+              value={`${host.thermal_c.toFixed(0)}°C`}
               pct={Math.min(100, (host.thermal_c / 90) * 100)}
-              value={`${host.thermal_c.toFixed(0)} °C`}
+              tone={
+                host.thermal_c >= 80 ? "crit" : host.thermal_c >= 65 ? "warn" : "ok"
+              }
             />
           )}
+          {load1 != null && (
+            <Tile
+              label="Load 1m"
+              Icon={IconCpu}
+              value={load1.toFixed(2)}
+              sub={host.cpu_count ? `/ ${host.cpu_count} cores` : undefined}
+              pct={loadPct}
+            />
+          )}
+          {disk && (
+            <Tile
+              label="Disk /"
+              Icon={IconData}
+              value={`${disk.used_pct}%`}
+              sub={`${formatGb(disk.free_gb)} free`}
+              pct={disk.used_pct}
+            />
+          )}
+          {mem && (
+            <Tile
+              label="Host RAM"
+              Icon={IconData}
+              value={`${mem.used_pct}%`}
+              sub={`${formatMb(mem.total_mb - mem.available_mb)} / ${formatGb(
+                mem.total_mb / 1024,
+              )}`}
+              pct={mem.used_pct}
+            />
+          )}
+          <Tile
+            label="Uptime"
+            Icon={IconPulse}
+            value={formatUptime(host.uptime_seconds)}
+            sub={
+              proc.started_at ? `runner ${timeAgo(proc.started_at)}` : undefined
+            }
+          />
         </div>
 
-        {/* sparklines */}
-        {(memPctSeries.length > 1 ||
-          loadSeries.length > 1 ||
-          tempSeries.length > 1) && (
-          <div className="flex flex-col gap-2 pt-1 border-t border-rowline">
-            <Spark label="mem %" points={memPctSeries} unit="%" />
-            <Spark label="load" points={loadSeries} unit="" />
-            <Spark label="temp" points={tempSeries} unit="°C" />
-            <span className="font-mono text-[9.5px] text-faint">
-              last {history.length} readings
+        {hasSpark && (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-rowline bg-inset/40 px-3 py-2.5">
+            <Spark label="mem %" points={memSpark} digits={0} unit="%" />
+            <Spark label="load" points={loadSpark} digits={2} unit="" />
+            <Spark label="temp" points={tempSpark} digits={0} unit="°C" />
+            <span className="font-mono text-[9px] text-faint ml-auto">
+              {history.length} readings
             </span>
           </div>
         )}
 
-        {/* runner line */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 border-t border-rowline">
-          {proc.cycles != null && <Fact>cycles {proc.cycles}</Fact>}
-          {proc.started_at && (
-            <Fact>runner up {timeAgo(proc.started_at)}</Fact>
-          )}
-          {proc.rss_mb != null && <Fact>rss {formatMb(proc.rss_mb)}</Fact>}
-          {proc.last_symbol && <Fact>last {proc.last_symbol}</Fact>}
-          {host.net?.supabase_ms != null && (
-            <Fact>supabase {host.net.supabase_ms} ms</Fact>
-          )}
-          {host.net?.alpaca_ms != null && (
-            <Fact>alpaca {host.net.alpaca_ms} ms</Fact>
-          )}
-        </div>
+        {meta.length > 0 && (
+          <p className="font-mono text-[10px] text-faint leading-relaxed">
+            {meta.join("  ·  ")}
+          </p>
+        )}
       </div>
     </Panel>
   );

@@ -12,7 +12,8 @@ export type ControlActionResult =
  * Flip the agent kill switch (`agent_status.paused`). Two guards: this action
  * refuses a non-master_admin caller, and the `beleth_set_agent_paused` RPC it
  * calls checks `beleth_role()` again in the database and touches nothing but
- * that one column. The RPC also appends the change to `agent_control_events`.
+ * that one column. The RPC also appends the change to `agent_control_events`
+ * (the audit trail) and to `agent_events` (the unified log the backoffice shows).
  */
 export async function setAgentPausedAction(
   paused: boolean,

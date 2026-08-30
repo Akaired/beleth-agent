@@ -31,6 +31,7 @@ import {
 } from "@/lib/equity";
 import type { SpreadPosition } from "@/lib/positions";
 import type { HostHistoryPoint } from "@/lib/host";
+import type { AgentEvent } from "@/lib/events";
 import {
   type AgentStatusRow,
   type DecisionRow,
@@ -316,50 +317,83 @@ export async function fetchLatestStrategyConfig(): Promise<{
   };
 }
 
-export type AgentControlEvent = {
-  id: string;
-  actor_email: string | null;
-  action: "pause" | "resume";
-  created_at: string;
-};
-
 export type ControlPanel = {
   agentStatus: AgentStatusRow | null;
-  events: AgentControlEvent[];
   hostHistory: HostHistoryPoint[];
+  recentEvents: AgentEvent[];
 };
 
+const EVENT_COLS =
+  "id,created_at,level,event,symbol,message,context,decision_id";
+
+export type EventLogPage = {
+  rows: AgentEvent[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+/** The backoffice "Logs" tab: filter by event slug and by time window, paged. */
+export async function fetchEventLog(opts: {
+  page?: number;
+  pageSize?: number;
+  events?: string[];
+  since?: string | null;
+}): Promise<EventLogPage> {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = opts.pageSize ?? 40;
+  const from = (page - 1) * pageSize;
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("agent_events")
+    .select(EVENT_COLS, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+  if (opts.events && opts.events.length > 0) {
+    query = query.in("event", opts.events);
+  }
+  if (opts.since) query = query.gte("created_at", opts.since);
+
+  const { data, count } = await query;
+  return {
+    rows: (data as AgentEvent[] | null) ?? [],
+    total: count ?? 0,
+    page,
+    pageSize,
+  };
+}
+
 /**
- * The master-admin control panel: current agent state + the kill-switch
- * audit trail + the trailing host-telemetry history. The audit and host tables
- * are both readable by demo_admin and up (0005 / 0011), so this query is safe
- * to run for the read-only backoffice too; the page layer decides who may
- * actually flip the switch.
+ * The master-admin control panel: current agent state, the trailing
+ * host-telemetry history, and the most recent agent events (kill-switch flips
+ * included — they land in `agent_events` now, so there is no separate control
+ * history). All three tables are readable by demo_admin and up (0011 / 0012).
  */
 export async function fetchControlPanel(): Promise<ControlPanel> {
   const supabase = await createClient();
-  const [status, events, host] = await Promise.all([
+  const [status, host, recent] = await Promise.all([
     supabase
       .from("agent_status")
       .select("state,paused,last_cycle_at,detail")
       .eq("id", 1)
       .maybeSingle(),
     supabase
-      .from("agent_control_events")
-      .select("id,actor_email,action,created_at")
-      .order("created_at", { ascending: false })
-      .limit(25),
-    supabase
       .from("host_metrics")
       .select("captured_at,metrics")
       .order("captured_at", { ascending: false })
       .limit(240),
+    supabase
+      .from("agent_events")
+      .select(EVENT_COLS)
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   return {
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
-    events: (events.data as AgentControlEvent[] | null) ?? [],
     hostHistory: ((host.data as HostHistoryPoint[] | null) ?? []).slice().reverse(),
+    recentEvents: (recent.data as AgentEvent[] | null) ?? [],
   };
 }
 
