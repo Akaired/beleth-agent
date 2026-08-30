@@ -23,7 +23,7 @@ import {
   IconClose,
   IconCaretRight,
   IconAccount,
-  IconSparkle,
+  IconBeleth,
   IconAdmin,
   IconCode,
   IconDocs,
@@ -59,7 +59,7 @@ const GROUPS: Group[] = [
     label: "User",
     items: [
       { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount, disabled: true },
-      { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconSparkle, disabled: true },
+      { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconBeleth, disabled: true },
       { href: "/forum", label: "Forum", min: "public_user", Icon: IconForum },
     ],
   },

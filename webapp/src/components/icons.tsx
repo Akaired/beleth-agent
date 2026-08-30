@@ -44,9 +44,8 @@ export {
   Crown as IconCrown,
   Bell as IconBell,
   House as IconHome,
-  UserCircle as IconAccount,
-  Sparkle as IconSparkle,
-  UserGear as IconAdmin,
+  User as IconAccount,
+  ShieldStar as IconAdmin,
   FileText as IconDocs,
   UsersThree as IconForum,
   ChartBar as IconReports,
@@ -81,3 +80,35 @@ export {
   Check as IconCheck,
   PencilSimple as IconPencil,
 } from "@phosphor-icons/react/dist/ssr";
+
+/**
+ * Beleth's own mark — the pixel sprite, not a Phosphor glyph. Same prop shape
+ * as a Phosphor icon (`size` / `className`; `weight` accepted and ignored) so
+ * it drops into the nav's icon slot. Desaturated by default so it reads as a
+ * quiet nav glyph next to the monochrome Phosphor set; pass `vivid` for the
+ * full-colour mascot.
+ */
+export function IconBeleth({
+  size = 16,
+  className = "",
+  vivid = false,
+}: {
+  size?: number;
+  weight?: "regular" | "bold" | "fill";
+  className?: string;
+  vivid?: boolean;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/beleth.png"
+      alt=""
+      aria-hidden="true"
+      width={size}
+      style={{ width: size, height: "auto" }}
+      className={`shrink-0 [image-rendering:pixelated] ${
+        vivid ? "" : "grayscale opacity-60"
+      } ${className}`}
+    />
+  );
+}
