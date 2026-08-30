@@ -232,20 +232,22 @@ function NavGroups({
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const docsActive = pathname === "/docs" || pathname.startsWith("/docs/");
   return (
     <div className="shrink-0 flex flex-col gap-2 border-t border-line px-3 py-2.5">
-      <div
-        aria-disabled="true"
-        title="Coming soon"
-        className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint cursor-default select-none"
+      <Link
+        href="/docs"
+        onClick={onNavigate}
+        aria-current={docsActive ? "page" : undefined}
+        className={`flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] transition-colors ${
+          docsActive ? "text-acc" : "text-sec hover:text-txt"
+        }`}
       >
         <IconDocs size={13} />
         Docs
-        <span className="ml-auto text-[8.5px] tracking-[0.12em] text-faint/70">
-          soon
-        </span>
-      </div>
+      </Link>
       <div
         aria-disabled="true"
         title="Coming soon"
@@ -403,7 +405,7 @@ export function DashboardChrome({
                   onNavigate={() => setOpen(false)}
                 />
               </div>
-              <SidebarFooter />
+              <SidebarFooter onNavigate={() => setOpen(false)} />
             </div>
           </div>
         </div>

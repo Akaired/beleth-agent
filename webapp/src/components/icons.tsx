@@ -80,6 +80,10 @@ export {
   Copy as IconCopy,
   Check as IconCheck,
   PencilSimple as IconPencil,
+  ArrowSquareOut as IconExternal,
+  PaperPlaneTilt as IconPublish,
+  ArrowUUpLeft as IconUnpublish,
+  TextT as IconHeading,
 } from "@phosphor-icons/react/dist/ssr";
 
 /**

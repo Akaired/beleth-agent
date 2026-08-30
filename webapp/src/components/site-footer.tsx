@@ -11,6 +11,9 @@ export function SiteFooter() {
           <Link href="/dashboard" className="transition-colors hover:text-acc">
             Dashboard
           </Link>
+          <Link href="/docs" className="transition-colors hover:text-acc">
+            Docs
+          </Link>
           <Link href="/forum" className="transition-colors hover:text-acc">
             Forum
           </Link>

@@ -3,7 +3,7 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconEnvelope, IconAccount, IconData } from "@/components/icons";
+import { IconEnvelope, IconAccount, IconDocs } from "@/components/icons";
 
 type IconProps = { size?: number; weight?: "regular" | "bold" | "fill"; className?: string };
 type Tab = {
@@ -19,8 +19,8 @@ type Tab = {
 // Beleth mono palette. Add a route + drop `disabled` to bring a tab online.
 const TABS: Tab[] = [
   { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope },
+  { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs },
   { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount, disabled: true },
-  { href: "/dashboard/admin/environment", label: "Environment", Icon: IconData, disabled: true },
 ];
 
 export function AdminTabs() {
