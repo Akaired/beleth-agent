@@ -15,14 +15,11 @@ import {
   fetchBelethTemplates,
   fetchBelethBroadcasts,
   tallyEvents,
-  BELETH_MAIL_DOMAIN,
   type ResendDomainStatus,
 } from "@/lib/admin/email";
 import { IconArrowUpRight, IconCheckCircle, IconWarning } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email — Beleth backoffice" };
-
-const SENDER_ADDRESS = `no-reply@${BELETH_MAIL_DOMAIN}`;
 
 function domainTone(status: ResendDomainStatus): "ok" | "warn" | "bad" {
   if (status === "verified") return "ok";
@@ -35,29 +32,9 @@ function pct(part: number, whole: number): string {
   return `${Math.round((part / whole) * 100)}%`;
 }
 
-function DeliveryPath() {
-  return (
-    <Panel title="Delivery path">
-      <p className="text-[13px] text-sec leading-relaxed">
-        The webapp sends no mail of its own. Supabase Auth produces the
-        confirmation / password-reset messages and hands them to{" "}
-        <span className="text-txt">Resend</span> over Custom SMTP, from{" "}
-        <span className="font-mono text-txt">{SENDER_ADDRESS}</span>. Marketing
-        mail goes out as Resend <span className="text-txt">broadcasts</span>,
-        driven from the Campaigns tab.
-      </p>
-    </Panel>
-  );
-}
-
 export default async function AdminEmailOverviewPage() {
   if (!getResendKey()) {
-    return (
-      <div className="flex flex-col gap-5">
-        <ResendUnavailable message="not-configured" />
-        <DeliveryPath />
-      </div>
-    );
+    return <ResendUnavailable message="not-configured" />;
   }
 
   const [domainsR, emailsR, templatesR, broadcastsR] = await Promise.all([
@@ -86,16 +63,8 @@ export default async function AdminEmailOverviewPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">
-        scoped to {BELETH_MAIL_DOMAIN}
-      </p>
-
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat
-          label="Recent sends"
-          value={total}
-          hint={`of ${recent.scanned} account sends`}
-        />
+        <Stat label="Recent sends" value={total} hint={`of ${recent.scanned} scanned`} />
         <Stat
           label="Delivered"
           value={pct(delivered, total)}
@@ -135,10 +104,7 @@ export default async function AdminEmailOverviewPage() {
             Could not load domains: {domainsR.message}
           </p>
         ) : domains.length === 0 ? (
-          <p className="text-[13px] text-sec">
-            No <span className="font-mono text-txt">{BELETH_MAIL_DOMAIN}</span>{" "}
-            domain in this Resend account yet.
-          </p>
+          <p className="text-[13px] text-sec">No verified sending domain yet.</p>
         ) : (
           <ul className="flex flex-col divide-y divide-line">
             {domains.map((d) => {
@@ -182,10 +148,7 @@ export default async function AdminEmailOverviewPage() {
 
       <Panel title="Recent sent mail">
         {total === 0 ? (
-          <p className="text-[13px] text-sec">
-            No Beleth mail in the last {recent.scanned} account sends. Auth mail
-            shows here once Custom SMTP routes through Resend.
-          </p>
+          <p className="text-[13px] text-sec">Nothing in the recent window.</p>
         ) : (
           <div className="-mx-4 -my-4 overflow-x-auto">
             <table className="w-full text-[12px]">
@@ -219,9 +182,7 @@ export default async function AdminEmailOverviewPage() {
           </div>
         )}
         <p className="mt-4 text-[11px] text-sec">
-          Filtered to <span className="font-mono">{BELETH_MAIL_DOMAIN}</span>.
-          Resend&apos;s API paginates without a total — for the all-time count
-          and the full deliverability breakdown, open the{" "}
+          For the full history and deliverability breakdown, open the{" "}
           <a
             href="https://resend.com/emails"
             target="_blank"
@@ -233,8 +194,6 @@ export default async function AdminEmailOverviewPage() {
           .
         </p>
       </Panel>
-
-      <DeliveryPath />
 
       <p className="text-[11px] text-sec">
         Manage{" "}
