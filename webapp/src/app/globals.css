@@ -1834,6 +1834,16 @@ body {
   color: var(--color-txt);
 }
 
+/* The TradingView toolbar glyph fills with `currentColor` (not Quill's
+   .ql-fill class), so retint it through the button's own colour. */
+.forum-editor .ql-toolbar.ql-snow button.ql-tradingview {
+  color: var(--color-sec);
+}
+.forum-editor .ql-toolbar.ql-snow button.ql-tradingview:hover,
+.forum-editor .ql-toolbar.ql-snow button.ql-tradingview.ql-active {
+  color: var(--color-acc);
+}
+
 /* TradingView widget — an inert labelled card in the editor, the live embed
    (built by <TradingViewEmbeds>) on the rendered post and in the insert modal
    preview. */

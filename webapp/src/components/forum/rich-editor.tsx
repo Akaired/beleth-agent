@@ -46,13 +46,14 @@ const TOOLBAR = [
   ["clean"],
 ];
 
-/** Toolbar glyph for the TradingView button — a two-candle chart (Lucide). */
+/** Toolbar glyph for the TradingView button — the official TradingView mark
+ *  (simple-icons, CC0). `fill:currentColor` so it retints with the button. */
 const TRADINGVIEW_ICON =
-  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" ' +
-  'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
-  'stroke-linejoin="round">' +
-  '<path d="M9 5v4"/><path d="M9 15v4"/><rect x="6" y="9" width="6" height="6" rx="1"/>' +
-  '<path d="M17 3v5"/><path d="M17 16v5"/><rect x="14" y="8" width="6" height="8" rx="1"/>' +
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">' +
+  '<path d="M15.8654 8.2789c0 1.3541-1.0978 2.4519-2.452 2.4519-1.354 ' +
+  "0-2.4519-1.0978-2.4519-2.452 0-1.354 1.0978-2.4518 2.452-2.4518 1.3541 " +
+  "0 2.4519 1.0977 2.4519 2.4519zM9.75 6H0v4.9038h4.8462v7.2692H9.75Zm8.5962 " +
+  '0H24l-5.1058 12.173h-5.6538z"/>' +
   "</svg>";
 
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";

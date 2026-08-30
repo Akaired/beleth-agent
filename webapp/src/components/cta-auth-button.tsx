@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
-import { IconSignIn, IconArrowUpRight } from "@/components/icons";
+import { IconSignIn } from "@/components/icons";
 
 /**
  * The primary CTA button in the homepage footer section. A client island so
@@ -34,7 +34,7 @@ export function CtaAuthButton({ className }: { className: string }) {
   if (status === "in") {
     return (
       <Link href="/dashboard" className={className}>
-        <IconArrowUpRight size={15} weight="fill" />
+        <IconSignIn size={15} weight="fill" />
         Dashboard
       </Link>
     );
