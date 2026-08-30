@@ -30,6 +30,7 @@ import {
   type TradeMarker,
 } from "@/lib/equity";
 import type { SpreadPosition } from "@/lib/positions";
+import type { HostHistoryPoint } from "@/lib/host";
 import {
   type AgentStatusRow,
   type DecisionRow,
@@ -325,17 +326,19 @@ export type AgentControlEvent = {
 export type ControlPanel = {
   agentStatus: AgentStatusRow | null;
   events: AgentControlEvent[];
+  hostHistory: HostHistoryPoint[];
 };
 
 /**
  * The master-admin control panel: current agent state + the kill-switch
- * audit trail. The audit table is readable by demo_admin and up (0005), so
- * this query is safe to run for the read-only backoffice too; the page layer
- * decides who may actually flip the switch.
+ * audit trail + the trailing host-telemetry history. The audit and host tables
+ * are both readable by demo_admin and up (0005 / 0011), so this query is safe
+ * to run for the read-only backoffice too; the page layer decides who may
+ * actually flip the switch.
  */
 export async function fetchControlPanel(): Promise<ControlPanel> {
   const supabase = await createClient();
-  const [status, events] = await Promise.all([
+  const [status, events, host] = await Promise.all([
     supabase
       .from("agent_status")
       .select("state,paused,last_cycle_at,detail")
@@ -346,11 +349,17 @@ export async function fetchControlPanel(): Promise<ControlPanel> {
       .select("id,actor_email,action,created_at")
       .order("created_at", { ascending: false })
       .limit(25),
+    supabase
+      .from("host_metrics")
+      .select("captured_at,metrics")
+      .order("captured_at", { ascending: false })
+      .limit(240),
   ]);
 
   return {
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
     events: (events.data as AgentControlEvent[] | null) ?? [],
+    hostHistory: ((host.data as HostHistoryPoint[] | null) ?? []).slice().reverse(),
   };
 }
 

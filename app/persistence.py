@@ -25,7 +25,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -46,6 +46,7 @@ EXPECTED_TABLES: tuple[str, ...] = (
     "trades",
     "positions",
     "agent_status",
+    "host_metrics",
 )
 
 # The state vocabulary that drives the public status page and the mascot. Kept here rather
@@ -452,6 +453,34 @@ def persist_agent_status(config: SupabaseConfig, row: Mapping[str, Any]) -> None
         params={"on_conflict": "id"},
         json_body=[dict(row)],
         prefer="resolution=merge-duplicates",
+    )
+
+
+def record_host_metrics(
+    config: SupabaseConfig,
+    metrics: Mapping[str, Any],
+    *,
+    retention_hours: int = 48,
+) -> None:
+    """Append one ``host_metrics`` row and prune anything older than ``retention_hours``.
+
+    The live panel reads ``agent_status.detail['host']``; this table is only the
+    trailing history the sparklines need. ``captured_at`` is DB-owned. The prune is a
+    single indexed DELETE — cheap enough to run on every append (once per runner loop,
+    a few times an hour), so no separate cron is needed.
+    """
+    _request(
+        config,
+        "POST",
+        "host_metrics",
+        json_body=[{"metrics": _ensure_json_safe(dict(metrics))}],
+    )
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).isoformat()
+    _request(
+        config,
+        "DELETE",
+        "host_metrics",
+        params={"captured_at": f"lt.{cutoff}"},
     )
 
 

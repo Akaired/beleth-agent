@@ -61,6 +61,7 @@ from app.alpaca_client import (  # noqa: E402
     get_trading_client,
 )
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.hostinfo import collect_host_metrics, read_runner_stats  # noqa: E402
 from app.decision import decide_from_llm, decide_from_risk_engine  # noqa: E402
 from app.evidence import AccountSnapshot, build_evidence_package  # noqa: E402
 from app.exits import (  # noqa: E402
@@ -900,6 +901,7 @@ def main() -> int:
                 )
             if exit_outcomes:
                 status_detail["closings"] = exit_outcomes
+            status_detail["host"] = collect_host_metrics(read_runner_stats())
             persist_agent_status(
                 supabase,
                 agent_status_row(

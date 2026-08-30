@@ -3,12 +3,23 @@
 # brings the agent back without manual action. No ports: the agent is outbound-only.
 services:
   beleth-agent:
-    build: .
+    build:
+      context: .
+      args:
+        # Short commit the image was built from — surfaced in the backoffice Host panel.
+        # Pass on the command line: `GIT_SHA=$(git rev-parse --short HEAD) docker compose up -d --build`.
+        GIT_SHA: ${GIT_SHA:-}
     image: beleth-agent:latest
     container_name: beleth-agent
+    # Stable name for the host telemetry (platform.node() would otherwise be the
+    # random container id).
+    hostname: trading-host
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      # Label shown on the backoffice Host panel.
+      BELETH_HOST_LABEL: the trading host
     stop_grace_period: 30s
     # P6 — cap Docker's own json-file logs so an unattended host cannot fill its disk.
     # These are still discarded on every `up --build` / recreate; the durable record is

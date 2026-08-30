@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth";
 import { fetchControlPanel } from "@/lib/dashboard-queries";
 import { Panel, timeAgo } from "@/components/dashboard/ui";
 import { KillSwitch } from "@/components/dashboard/kill-switch";
+import { HostPanel } from "@/components/dashboard/host-panel";
 import {
   IconControls,
   IconHistory,
@@ -29,7 +30,7 @@ export default async function ControlsPage() {
     );
   }
 
-  const { agentStatus, events } = await fetchControlPanel();
+  const { agentStatus, events, hostHistory } = await fetchControlPanel();
   const paused = agentStatus?.paused ?? false;
 
   return (
@@ -51,6 +52,12 @@ export default async function ControlsPage() {
         and Alpaca account detail are not built yet — they need agent-side
         changes first.
       </p>
+
+      <HostPanel
+        detail={agentStatus?.detail ?? null}
+        history={hostHistory}
+        lastCycleAt={agentStatus?.last_cycle_at ?? null}
+      />
 
       <Panel title="Kill switch">
         <KillSwitch paused={paused} />

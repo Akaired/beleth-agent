@@ -35,12 +35,18 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.alpaca_client import get_trading_client  # noqa: E402
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.hostinfo import (  # noqa: E402
+    collect_host_metrics,
+    new_runner_stats,
+    write_runner_stats,
+)
 from app.runlog import install_run_log  # noqa: E402
 from app.persistence import (  # noqa: E402
     PersistenceError,
     agent_status_row,
     fetch_agent_status,
     persist_agent_status,
+    record_host_metrics,
     supabase_config_from_settings,
 )
 
@@ -127,9 +133,10 @@ def read_paused(supabase_config: Any) -> bool:
     return bool(row and row.get("paused") is True)
 
 
-def send_heartbeat(supabase_config: Any) -> bool:
+def send_heartbeat(supabase_config: Any, runner_stats: Mapping[str, Any] | None = None) -> bool:
     """Upsert ``agent_status`` state='idle' outside market hours so the dashboard can
-    tell "alive, market closed" from "agent down". Never writes ``paused``.
+    tell "alive, market closed" from "agent down". Never writes ``paused``. Carries the
+    host snapshot so the backoffice "Host" panel stays live while the market is closed.
     Returns True when persisted; False when Supabase is not configured."""
     if supabase_config is None:
         return False
@@ -138,10 +145,26 @@ def send_heartbeat(supabase_config: Any) -> bool:
         agent_status_row(
             state="idle",
             last_cycle_at=datetime.now(timezone.utc),
-            detail={"runner": "heartbeat", "market_open": False},
+            detail={
+                "runner": "heartbeat",
+                "market_open": False,
+                "host": collect_host_metrics(runner_stats),
+            },
         ),
     )
     return True
+
+
+def record_host_history(supabase_config: Any, runner_stats: Mapping[str, Any]) -> None:
+    """Append one trailing ``host_metrics`` row (fail-open). The live value is written
+    into ``agent_status.detail['host']`` by the heartbeat and by every cycle; this is
+    only the 48 h history the backoffice sparklines read."""
+    if supabase_config is None:
+        return
+    try:
+        record_host_metrics(supabase_config, collect_host_metrics(runner_stats))
+    except Exception as exc:  # noqa: BLE001 — history is best-effort, never fatal
+        print(f"WARNING: host-metrics history append failed ({exc})", flush=True)
 
 
 def run_cycle(symbol: str, *, timeout_seconds: float) -> bool:
@@ -228,6 +251,12 @@ def main() -> int:
 
     client = get_trading_client(settings)
 
+    # Runner-owned stats the cycle subprocess cannot know (uptime, cycle count, last
+    # network round-trips). Flushed to the logs volume every loop so the cycle path can
+    # fold them into agent_status.detail['host'] during market hours too.
+    runner_stats = new_runner_stats()
+    write_runner_stats(runner_stats)
+
     print(
         "beleth runner up: " + ", ".join(symbols)
         + f" | open cycles every {cfg['open_cycle_interval_minutes']:.0f} min"
@@ -239,7 +268,9 @@ def main() -> int:
     paused_logged = False
     while not stop():
         try:
+            _t0 = time.monotonic()
             clock = client.get_clock()
+            runner_stats["net"]["alpaca_ms"] = int((time.monotonic() - _t0) * 1000)
             market_open = bool(clock.is_open)
         except Exception as exc:  # noqa: BLE001 — a clock failure must not kill the loop
             print(f"WARNING: market clock unavailable ({exc}) — retrying in 60 s", flush=True)
@@ -269,10 +300,17 @@ def main() -> int:
                 if stop():
                     break
                 run_cycle(symbol, timeout_seconds=cfg["cycle_timeout_seconds"])
+                runner_stats["cycles"] += 1
+                runner_stats["last_symbol"] = symbol
+            write_runner_stats(runner_stats)
+            record_host_history(supabase, runner_stats)
             chunked_sleep(cfg["open_cycle_interval_minutes"] * 60, should_stop=stop)
         else:
             try:
-                sent = send_heartbeat(supabase)
+                _t0 = time.monotonic()
+                sent = send_heartbeat(supabase, runner_stats)
+                if sent:
+                    runner_stats["net"]["supabase_ms"] = int((time.monotonic() - _t0) * 1000)
                 print(
                     f"[{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%SZ}] market closed — heartbeat "
                     + ("persisted to agent_status" if sent else "(Supabase off, logged only)"),
@@ -280,6 +318,8 @@ def main() -> int:
                 )
             except PersistenceError as exc:
                 print(f"WARNING: heartbeat persist failed ({exc})", flush=True)
+            write_runner_stats(runner_stats)
+            record_host_history(supabase, runner_stats)
             sleep_seconds = cfg["closed_heartbeat_interval_minutes"] * 60
             # Near the open, wake at the bell instead of drifting a full heartbeat past it.
             next_open = getattr(clock, "next_open", None)

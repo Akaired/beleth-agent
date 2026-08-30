@@ -5,6 +5,11 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# Short commit the image was built from (compose passes it in). Read by
+# app/hostinfo.collect_host_metrics for the backoffice Host panel; empty in a bare build.
+ARG GIT_SHA=""
+ENV BELETH_GIT_SHA=${GIT_SHA}
+
 WORKDIR /app
 
 # Runtime dependencies only, pinned via requirements.txt generated from uv.lock with:
