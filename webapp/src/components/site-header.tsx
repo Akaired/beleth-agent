@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { agentStateLine } from "@/lib/queries";
 import type { AgentStatusRow } from "@/lib/queries";
-import { IconLive } from "@/components/icons";
+import { IconLive, IconSignIn } from "@/components/icons";
 import { MarketChip } from "@/components/market-chip";
 
 export function SiteHeader({
@@ -31,19 +31,7 @@ export function SiteHeader({
             Autonomous options trading agent
           </span>
         </div>
-        <nav className="flex items-center gap-5">
-          <a
-            href="#method"
-            className="text-[12.5px] text-sec transition-colors hover:text-acc"
-          >
-            Method
-          </a>
-          <Link
-            href="/dashboard"
-            className="text-[12.5px] text-sec transition-colors hover:text-acc"
-          >
-            Dashboard
-          </Link>
+        <nav className="flex items-center gap-4">
           {state && (
             <span className="hidden items-center gap-1.5 font-mono text-[10px] tracking-[0.08em] text-sec md:flex">
               <IconLive
@@ -63,6 +51,13 @@ export function SiteHeader({
             </span>
           )}
           <MarketChip open={marketOpen} bordered />
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-1.5 rounded-[2px] bg-txt px-3 py-[7px] text-[12px] font-medium text-bg transition-colors hover:bg-acc"
+          >
+            <IconSignIn size={13} weight="fill" />
+            Log in / Register
+          </Link>
         </nav>
       </div>
     </header>

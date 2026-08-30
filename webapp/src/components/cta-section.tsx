@@ -1,4 +1,5 @@
-import { IconGithub } from "@/components/icons";
+import Link from "next/link";
+import { IconGithub, IconSignIn } from "@/components/icons";
 
 export function CtaSection() {
   return (
@@ -14,15 +15,24 @@ export function CtaSection() {
             the data layer are all in the open.
           </p>
         </div>
-        <a
-          href="https://github.com/Akaired/beleth-agent"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap self-start md:self-auto"
-        >
-          <IconGithub size={15} weight="fill" />
-          View the source on GitHub
-        </a>
+        <div className="flex flex-col gap-2.5 self-start md:self-auto">
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
+          >
+            <IconSignIn size={15} weight="fill" />
+            Log in / Register
+          </Link>
+          <a
+            href="https://github.com/Akaired/beleth-agent"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
+          >
+            <IconGithub size={15} weight="fill" />
+            View the source on GitHub
+          </a>
+        </div>
       </div>
     </section>
   );

@@ -11,6 +11,7 @@ export {
   Flag as IconStrategy,
   SlidersHorizontal as IconControls,
   SignOut as IconSignOut,
+  SignIn as IconSignIn,
   Lightning as IconLive,
   Broadcast as IconBroadcast,
   Pulse as IconPulse,
@@ -32,6 +33,7 @@ export {
   CaretRight as IconCaretRight,
   CaretLeft as IconCaretLeft,
   ArrowRight as IconArrowRight,
+  ArrowLeft as IconArrowLeft,
   ArrowDown as IconArrowDown,
   ArrowUpRight as IconArrowUpRight,
   Scales as IconScales,
@@ -48,6 +50,7 @@ export {
   LockSimple as IconLock,
   Code as IconCode,
   GithubLogo as IconGithub,
+  GoogleLogo as IconGoogle,
   List as IconMenu,
   X as IconClose,
 } from "@phosphor-icons/react/dist/ssr";

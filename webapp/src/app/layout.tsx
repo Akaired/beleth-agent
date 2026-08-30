@@ -20,7 +20,7 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Beleth — Autonomous options agent",
+  title: "Beleth: trading agent",
   description:
     "It measures the volatility risk premium before it sells any. Every decision and every refusal, published live. Paper trading only.",
 };
