@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
@@ -194,24 +193,6 @@ export default async function AdminEmailOverviewPage() {
           .
         </p>
       </Panel>
-
-      <p className="text-[11px] text-sec">
-        Manage{" "}
-        <Link
-          href="/dashboard/admin/email/templates"
-          className="text-acc hover:underline"
-        >
-          templates
-        </Link>{" "}
-        and{" "}
-        <Link
-          href="/dashboard/admin/email/campaigns"
-          className="text-acc hover:underline"
-        >
-          campaigns
-        </Link>{" "}
-        in their own tabs.
-      </p>
     </div>
   );
 }
