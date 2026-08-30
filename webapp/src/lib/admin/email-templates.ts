@@ -77,7 +77,15 @@ function shell(opts: {
   preheader: string;
   heading: string;
   blocks: Block[];
+  // Marketing broadcasts need an unsubscribe link; transactional mail must not
+  // have one. Resend fills {{{RESEND_UNSUBSCRIBE_URL}}} per recipient.
+  unsubscribe?: boolean;
 }): string {
+  const unsubRow = opts.unsubscribe
+    ? `<p style="margin:10px 0 0 0;font-family:${SANS};font-size:11.5px;line-height:1.6;color:${C.dim};">
+              <a href="{{{RESEND_UNSUBSCRIBE_URL}}}" style="color:${C.dim};text-decoration:underline;">Unsubscribe</a> from these updates.
+            </p>`
+    : "";
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -115,6 +123,7 @@ function shell(opts: {
             <p style="margin:6px 0 0 0;font-family:${SANS};font-size:11.5px;line-height:1.6;color:${C.dim};">
               This is an automated message from the Beleth dashboard. Not investment advice.
             </p>
+            ${unsubRow}
           </td>
         </tr>
       </table>
@@ -233,4 +242,28 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
 
 export function getStarterTemplate(alias: string): StarterTemplate | undefined {
   return STARTER_TEMPLATES.find((t) => t.alias === alias);
+}
+
+/**
+ * Starting HTML for a new marketing campaign — the same branded shell as the
+ * transactional templates, with placeholder copy and an unsubscribe footer.
+ * Uses Resend broadcast tokens ({{{FIRST_NAME|there}}}, {{{RESEND_UNSUBSCRIBE_URL}}}).
+ */
+export function campaignStarterHtml(): string {
+  return shell({
+    preheader: "News from Beleth.",
+    heading: "Hi {{{FIRST_NAME|there}}}",
+    blocks: [
+      { p: "Write your update here — what changed, what to look at, why it matters." },
+      { p: "Keep it short. One idea per paragraph reads best in an inbox." },
+      {
+        cta: {
+          label: "Open the dashboard",
+          url: `${SITE}/dashboard`,
+        },
+      },
+      { note: "You're getting this because you have a Beleth account." },
+    ],
+    unsubscribe: true,
+  });
 }

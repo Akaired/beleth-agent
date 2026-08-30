@@ -9,6 +9,7 @@ import {
   fetchSegments,
   BELETH_MAIL_DOMAIN,
 } from "@/lib/admin/email";
+import { campaignStarterHtml } from "@/lib/admin/email-templates";
 import { IconArrowLeft } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · New campaign — Beleth" };
@@ -32,6 +33,7 @@ export default async function NewCampaignPage() {
         <CampaignForm
           segments={res.data.map((s) => ({ id: s.id, name: s.name }))}
           defaultFrom={`Beleth <no-reply@${BELETH_MAIL_DOMAIN}>`}
+          defaultHtml={campaignStarterHtml()}
         />
       </Panel>
     </div>

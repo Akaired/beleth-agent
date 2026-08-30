@@ -10,9 +10,11 @@ type SegmentOption = { id: string; name: string };
 export function CampaignForm({
   segments,
   defaultFrom,
+  defaultHtml,
 }: {
   segments: SegmentOption[];
   defaultFrom: string;
+  defaultHtml: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -20,9 +22,7 @@ export function CampaignForm({
   const [from, setFrom] = useState(defaultFrom);
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
-  const [html, setHtml] = useState(
-    "<h1>Hi {{name}}</h1>\n<p>…</p>\n<p><a href=\"{{unsubscribe_url}}\">Unsubscribe</a></p>",
-  );
+  const [html, setHtml] = useState(defaultHtml);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
