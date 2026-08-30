@@ -158,6 +158,15 @@ export async function POST(req: Request) {
     // The answer is still valid even if we failed to store it.
   }
 
+  // Award chat XP for the user message (capped server-side per day). Best
+  // effort — a failure here must never turn a good answer into an error.
+  try {
+    const s = await createClient();
+    await s.rpc("beleth_award_chat_xp");
+  } catch (err) {
+    console.error("[chat] xp award failed", err);
+  }
+
   return NextResponse.json({
     sessionId: activeSessionId,
     answer: turn.answer,

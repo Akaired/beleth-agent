@@ -10,10 +10,18 @@ import { IconSignIn } from "@/components/icons";
 type AuthState =
   | { status: "unknown" }
   | { status: "out" }
-  | { status: "in"; email: string | null; role: Role };
+  | {
+      status: "in";
+      email: string | null;
+      role: Role;
+      displayName: string | null;
+      avatarUrl: string | null;
+    };
 
 const ROLE_KEY = "beleth-account-role";
 const EMAIL_KEY = "beleth-account-email";
+const NAME_KEY = "beleth-account-name";
+const AVATAR_KEY = "beleth-account-avatar";
 const ROLES: Role[] = ["public_user", "demo_admin", "master_admin"];
 
 /**
@@ -28,20 +36,39 @@ function hasAuthCookie(): boolean {
     .some((c) => /^sb-[^=]*-auth-token(\.\d+)?=./.test(c));
 }
 
-function readCache(): { email: string | null; role: Role } {
+function readCache(): {
+  email: string | null;
+  role: Role;
+  displayName: string | null;
+  avatarUrl: string | null;
+} {
   try {
     const cached = localStorage.getItem(ROLE_KEY) as Role | null;
     const role = cached && ROLES.includes(cached) ? cached : "public_user";
-    return { email: localStorage.getItem(EMAIL_KEY), role };
+    return {
+      email: localStorage.getItem(EMAIL_KEY),
+      role,
+      displayName: localStorage.getItem(NAME_KEY),
+      avatarUrl: localStorage.getItem(AVATAR_KEY),
+    };
   } catch {
-    return { email: null, role: "public_user" };
+    return { email: null, role: "public_user", displayName: null, avatarUrl: null };
   }
 }
 
-function writeCache(email: string | null, role: Role) {
+function writeCache(
+  email: string | null,
+  role: Role,
+  displayName: string | null,
+  avatarUrl: string | null,
+) {
   try {
     localStorage.setItem(ROLE_KEY, role);
     if (email) localStorage.setItem(EMAIL_KEY, email);
+    if (displayName) localStorage.setItem(NAME_KEY, displayName);
+    else localStorage.removeItem(NAME_KEY);
+    if (avatarUrl) localStorage.setItem(AVATAR_KEY, avatarUrl);
+    else localStorage.removeItem(AVATAR_KEY);
   } catch {
     /* private mode — the network path still corrects the UI */
   }
@@ -49,8 +76,9 @@ function writeCache(email: string | null, role: Role) {
 
 function clearCache() {
   try {
-    localStorage.removeItem(ROLE_KEY);
-    localStorage.removeItem(EMAIL_KEY);
+    for (const k of [ROLE_KEY, EMAIL_KEY, NAME_KEY, AVATAR_KEY]) {
+      localStorage.removeItem(k);
+    }
   } catch {
     /* ignore */
   }
@@ -76,8 +104,8 @@ export function HeaderAuth() {
       await Promise.resolve();
       if (cancelled) return;
       if (hasAuthCookie()) {
-        const { email, role } = readCache();
-        setState({ status: "in", email, role });
+        const { email, role, displayName, avatarUrl } = readCache();
+        setState({ status: "in", email, role, displayName, avatarUrl });
       } else {
         setState({ status: "out" });
       }
@@ -94,14 +122,16 @@ export function HeaderAuth() {
       }
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, display_name, avatar_url")
         .eq("user_id", user.id)
         .maybeSingle();
       if (cancelled) return;
       const role = (profile?.role as Role | undefined) ?? "public_user";
       const email = user.email ?? null;
-      writeCache(email, role);
-      setState({ status: "in", email, role });
+      const displayName = (profile?.display_name as string | null) ?? null;
+      const avatarUrl = (profile?.avatar_url as string | null) ?? null;
+      writeCache(email, role, displayName, avatarUrl);
+      setState({ status: "in", email, role, displayName, avatarUrl });
     })();
     return () => {
       cancelled = true;
@@ -113,6 +143,8 @@ export function HeaderAuth() {
       <AccountDropdown
         role={state.role}
         email={state.email}
+        displayName={state.displayName}
+        avatarUrl={state.avatarUrl}
         homeHref="/dashboard"
         homeLabel="Dashboard"
         showNotifications={false}

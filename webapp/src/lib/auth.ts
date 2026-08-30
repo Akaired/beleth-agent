@@ -16,12 +16,17 @@ export type SessionContext = {
   userId: string;
   email: string | null;
   role: Role;
+  /** Chosen nickname; when set it replaces the email local-part in the UI. */
+  displayName: string | null;
+  /** Public URL of the user's avatar image, or null for the initials disc. */
+  avatarUrl: string | null;
 };
 
 /**
  * The viewer's session + role, or null when signed out. Reads the profile
- * row (RLS: a user can read only their own) to get the role; falls back to
- * `public_user` if the row is missing (e.g. a race with the signup trigger).
+ * row (RLS: a user can read only their own) to get the role, nickname and
+ * avatar; falls back to `public_user` if the row is missing (e.g. a race with
+ * the signup trigger).
  */
 export const getSessionContext = cache(
   async (): Promise<SessionContext | null> => {
@@ -33,12 +38,18 @@ export const getSessionContext = cache(
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, display_name, avatar_url")
       .eq("user_id", user.id)
       .maybeSingle();
 
     const role = (profile?.role as Role | undefined) ?? "public_user";
-    return { userId: user.id, email: user.email ?? null, role };
+    return {
+      userId: user.id,
+      email: user.email ?? null,
+      role,
+      displayName: (profile?.display_name as string | null) ?? null,
+      avatarUrl: (profile?.avatar_url as string | null) ?? null,
+    };
   },
 );
 

@@ -58,7 +58,7 @@ const GROUPS: Group[] = [
   {
     label: "User",
     items: [
-      { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount, disabled: true },
+      { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount },
       { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconBeleth, disabled: true },
       { href: "/forum", label: "Forum", min: "public_user", Icon: IconForum },
     ],
@@ -131,12 +131,15 @@ function ForumRecentRows({
 function NavGroups({
   role,
   badges,
+  accountLevel,
   recentChats,
   recentForumTopics,
   onNavigate,
 }: {
   role: Role;
   badges?: Record<string, number>;
+  /** Current experience level — shown as a "lvl N" chip on the Account item. */
+  accountLevel?: number;
   recentChats: ChatSessionSummary[];
   recentForumTopics: ForumRecentTopic[];
   onNavigate?: () => void;
@@ -198,6 +201,14 @@ function NavGroups({
                       title={`${badge} open position${badge === 1 ? "" : "s"}`}
                     >
                       {badge}
+                    </span>
+                  )}
+                  {it.href === "/dashboard/account" && accountLevel != null && (
+                    <span
+                      className="ml-auto rounded bg-chipbg px-1.5 py-px font-mono text-[9px] uppercase tracking-[0.08em] text-sec"
+                      title={`Experience level ${accountLevel}`}
+                    >
+                      lvl {accountLevel}
                     </span>
                   )}
                 </Link>
@@ -274,6 +285,9 @@ function Brand({ onClick }: { onClick?: () => void }) {
 export function DashboardChrome({
   role,
   email,
+  displayName = null,
+  avatarUrl = null,
+  accountLevel,
   badges,
   recentChats = [],
   recentForumTopics = [],
@@ -281,6 +295,9 @@ export function DashboardChrome({
 }: {
   role: Role;
   email: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  accountLevel?: number;
   badges?: Record<string, number>;
   recentChats?: ChatSessionSummary[];
   recentForumTopics?: ForumRecentTopic[];
@@ -320,6 +337,8 @@ export function DashboardChrome({
         <AccountDropdown
           role={role}
           email={email}
+          displayName={displayName}
+          avatarUrl={avatarUrl}
           homeHref="/"
           homeLabel="Homepage"
         />
@@ -332,6 +351,7 @@ export function DashboardChrome({
             <NavGroups
               role={role}
               badges={badges}
+              accountLevel={accountLevel}
               recentChats={recentChats}
               recentForumTopics={recentForumTopics}
             />
@@ -377,6 +397,7 @@ export function DashboardChrome({
                 <NavGroups
                   role={role}
                   badges={badges}
+                  accountLevel={accountLevel}
                   recentChats={recentChats}
                   recentForumTopics={recentForumTopics}
                   onNavigate={() => setOpen(false)}

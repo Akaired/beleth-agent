@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOutAction } from "@/app/dashboard/actions";
 import type { Role } from "@/lib/roles";
+import { UserAvatar } from "@/components/user-avatar";
 import {
   IconAccount,
   IconBell,
@@ -13,10 +14,6 @@ import {
   IconHome,
   IconSignOut,
 } from "@/components/icons";
-
-function initials(name: string): string {
-  return name.slice(0, 2).toUpperCase() || "?";
-}
 
 /**
  * Role mark shown left of the name: a gold crown for the master admin, a gold
@@ -43,12 +40,16 @@ function RoleMark({ role }: { role: Role }) {
 export function AccountDropdown({
   role,
   email,
+  displayName = null,
+  avatarUrl = null,
   homeHref,
   homeLabel,
   showNotifications = true,
 }: {
   role: Role;
   email: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
   homeHref: string;
   homeLabel: string;
   /** The notification bell lives in the backoffice only, not the public header. */
@@ -56,7 +57,7 @@ export function AccountDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const name = (email ?? "account").split("@")[0];
+  const name = displayName || (email ?? "account").split("@")[0];
 
   useEffect(() => {
     if (!open) return;
@@ -93,9 +94,7 @@ export function AccountDropdown({
           aria-expanded={open}
           className="flex items-center gap-2 rounded px-1 py-1 text-sec transition-colors hover:text-txt"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-chipbg font-mono text-[10px] font-medium tracking-[0.06em] text-sec">
-            {initials(name)}
-          </span>
+          <UserAvatar name={name} avatarUrl={avatarUrl} size={28} />
           <RoleMark role={role} />
           <span className="hidden text-[12.5px] text-txt sm:inline">{name}</span>
           <IconCaretDown
@@ -118,15 +117,15 @@ export function AccountDropdown({
               <IconHome size={16} />
               {homeLabel}
             </Link>
-            <button
-              type="button"
+            <Link
+              href="/dashboard/account"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-[13px] text-sec transition-colors hover:bg-hoverbg hover:text-txt"
+              className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-sec transition-colors hover:bg-hoverbg hover:text-txt"
             >
               <IconAccount size={16} />
               Account
-            </button>
+            </Link>
             <form action={signOutAction}>
               <button
                 type="submit"
