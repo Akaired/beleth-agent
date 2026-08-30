@@ -75,7 +75,7 @@ const GROUPS: Group[] = [
   {
     label: "Operator",
     items: [
-      { href: "/dashboard/admin", label: "Admin", min: "master_admin", Icon: IconAdmin, disabled: true },
+      { href: "/dashboard/admin", label: "Admin", min: "master_admin", Icon: IconAdmin },
       { href: "/dashboard/controls", label: "Controls", min: "master_admin", Icon: IconControls },
       { href: "/dashboard/logs", label: "Logs", min: "master_admin", Icon: IconLogs },
       { href: "/dashboard/api", label: "API", min: "master_admin", Icon: IconCode, disabled: true },
