@@ -47,6 +47,7 @@ EXPECTED_TABLES: tuple[str, ...] = (
     "positions",
     "agent_status",
     "host_metrics",
+    "agent_events",
 )
 
 # The state vocabulary that drives the public status page and the mascot. Kept here rather
@@ -454,6 +455,33 @@ def persist_agent_status(config: SupabaseConfig, row: Mapping[str, Any]) -> None
         json_body=[dict(row)],
         prefer="resolution=merge-duplicates",
     )
+
+
+def event_rows(events: Sequence[Any], *, decision_id: str | None = None) -> list[dict[str, Any]]:
+    """Shape ``EventLog`` entries into ``agent_events`` rows. ``created_at`` is DB-owned;
+    ``decision_id`` (when given) is stamped on every row from the same cycle."""
+    rows: list[dict[str, Any]] = []
+    for e in events:
+        row: dict[str, Any] = {
+            "level": e.level,
+            "event": e.event,
+            "message": e.message,
+            "context": _ensure_json_safe(dict(e.context)),
+        }
+        if e.symbol is not None:
+            row["symbol"] = e.symbol
+        if decision_id is not None:
+            row["decision_id"] = decision_id
+        rows.append(row)
+    return rows
+
+
+def persist_events(config: SupabaseConfig, rows: Sequence[Mapping[str, Any]]) -> int:
+    """Batch-insert ``agent_events`` rows. Empty input writes nothing."""
+    if not rows:
+        return 0
+    _request(config, "POST", "agent_events", json_body=[dict(r) for r in rows])
+    return len(rows)
 
 
 def record_host_metrics(

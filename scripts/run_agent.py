@@ -35,6 +35,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from app.alpaca_client import get_trading_client  # noqa: E402
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.eventlog import EventLog  # noqa: E402
 from app.hostinfo import (  # noqa: E402
     collect_host_metrics,
     new_runner_stats,
@@ -155,6 +156,18 @@ def send_heartbeat(supabase_config: Any, runner_stats: Mapping[str, Any] | None 
     return True
 
 
+def emit_runner_event(
+    supabase_config: Any, level: str, event: str, message: str, **context: Any
+) -> None:
+    """One-shot ``agent_events`` write for a runner-level event (start/stop, pause
+    detected, clock/switch unreadable). Fail-open — never raises."""
+    if supabase_config is None:
+        return
+    log = EventLog(echo=False)
+    log.emit(level, event, message, **context)
+    log.flush(supabase_config)
+
+
 def record_host_history(supabase_config: Any, runner_stats: Mapping[str, Any]) -> None:
     """Append one trailing ``host_metrics`` row (fail-open). The live value is written
     into ``agent_status.detail['host']`` by the heartbeat and by every cycle; this is
@@ -264,6 +277,14 @@ def main() -> int:
         + f" | cycle timeout {cfg['cycle_timeout_seconds']:.0f} s",
         flush=True,
     )
+    emit_runner_event(
+        supabase,
+        "info",
+        "runner_start",
+        f"resident runner up for {', '.join(symbols)}",
+        symbols=symbols,
+        open_cycle_minutes=cfg["open_cycle_interval_minutes"],
+    )
 
     paused_logged = False
     while not stop():
@@ -274,6 +295,10 @@ def main() -> int:
             market_open = bool(clock.is_open)
         except Exception as exc:  # noqa: BLE001 — a clock failure must not kill the loop
             print(f"WARNING: market clock unavailable ({exc}) — retrying in 60 s", flush=True)
+            emit_runner_event(
+                supabase, "warn", "clock_unavailable",
+                f"market clock unavailable: {exc} — retrying in 60 s",
+            )
             chunked_sleep(60, should_stop=stop)
             continue
 
@@ -285,14 +310,27 @@ def main() -> int:
                 f"WARNING: pause switch unreadable ({exc}) — cycles skipped this poll",
                 flush=True,
             )
+            emit_runner_event(
+                supabase, "error", "switch_unreadable",
+                f"kill switch unreadable ({exc}) — cycles skipped, failing closed",
+            )
             paused = True
 
         if paused:
             if not paused_logged:
                 print("paused via agent_status.paused — cycles suspended (polling)", flush=True)
+                emit_runner_event(
+                    supabase, "warn", "paused",
+                    "kill switch engaged — cycles suspended, heartbeat only",
+                )
                 paused_logged = True
             chunked_sleep(cfg["pause_poll_seconds"], should_stop=stop)
             continue
+        if paused_logged:
+            emit_runner_event(
+                supabase, "info", "resumed",
+                "kill switch cleared — normal evaluation resumes",
+            )
         paused_logged = False
 
         if market_open:
@@ -329,6 +367,7 @@ def main() -> int:
             chunked_sleep(sleep_seconds, should_stop=stop)
 
     print("runner stopped gracefully", flush=True)
+    emit_runner_event(supabase, "info", "runner_stop", "resident runner stopped gracefully")
     stop_logging()
     return 0
 

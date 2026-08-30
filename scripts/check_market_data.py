@@ -61,6 +61,7 @@ from app.alpaca_client import (  # noqa: E402
     get_trading_client,
 )
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.eventlog import EventLog  # noqa: E402
 from app.hostinfo import collect_host_metrics, read_runner_stats  # noqa: E402
 from app.decision import decide_from_llm, decide_from_risk_engine  # noqa: E402
 from app.evidence import AccountSnapshot, build_evidence_package  # noqa: E402
@@ -779,6 +780,7 @@ def main() -> int:
     submitted_exits = 0
     failed_exits = 0
     exit_outcomes: list[dict[str, Any]] = []
+    elog = EventLog()
     try:
         supabase = supabase_config_from_settings(settings)
     except PersistenceConfigError as exc:
@@ -796,9 +798,46 @@ def main() -> int:
     else:
         try:
             decision_id = persist_decision(supabase, draft=draft)
+            elog.emit(
+                "info",
+                "decision" if draft.action == "trade" else "no_trade",
+                draft.summary[:280],
+                symbol=symbol,
+                action=draft.action,
+                source=draft.decision_source,
+            )
             persisted_checks = persist_risk_checks(
                 supabase, decision_id=decision_id, verdicts=verdicts
             )
+            approved_n = sum(1 for v in verdicts if v.approved)
+            if candidates and approved_n < len(candidates):
+                reject_reasons = sorted(
+                    {r.rule for v in verdicts for r in v.rejections}
+                )
+                elog.warn(
+                    "risk_rejected",
+                    f"{approved_n}/{len(candidates)} candidates cleared the risk gate "
+                    f"(rejected by {', '.join(reject_reasons) or 'n/a'})",
+                    symbol=symbol,
+                    approved=approved_n,
+                    candidates=len(candidates),
+                    rules=reject_reasons,
+                )
+            if position_anomalies:
+                elog.warn(
+                    "position_anomaly",
+                    f"{len(position_anomalies)} open leg(s) could not be paired into a spread",
+                    symbol=symbol,
+                    count=len(position_anomalies),
+                )
+            if triggered_exits:
+                elog.warn(
+                    "exit_triggered",
+                    f"{len(triggered_exits)} open spread(s) hit an exit target: "
+                    + "; ".join(e.reason for e in triggered_exits)[:240],
+                    symbol=symbol,
+                    count=len(triggered_exits),
+                )
             # Each open spread's R5 verdict is a persisted check row like any other: for a
             # triggered close it IS the pre-trade check of the closing order (constraint #3).
             persisted_exit_checks = persist_exit_checks(
@@ -817,10 +856,26 @@ def main() -> int:
                 try:
                     exit_order = submit_mleg_order(trading, exit_plan["request"])
                     submitted_exits += 1
+                    elog.info(
+                        "exit_submitted",
+                        f"closing {exit_plan['spread']['short_symbol']} "
+                        f"({exit_plan['exit_reason']}) — order {exit_order.get('id')}",
+                        symbol=symbol,
+                        exit_reason=exit_plan["exit_reason"],
+                        alpaca_order_id=exit_order.get("id"),
+                        qty=exit_plan["qty"],
+                    )
                 except OrderSubmissionError as exc:
                     exit_failure = str(exc)
                     failed_exits += 1
                     print(f"ERROR: exit order submission failed: {exit_failure}", file=sys.stderr)
+                    elog.error(
+                        "exit_failed",
+                        f"closing order for {exit_plan['spread']['short_symbol']} "
+                        f"rejected: {exit_failure}",
+                        symbol=symbol,
+                        exit_reason=exit_plan["exit_reason"],
+                    )
                 persist_trade(
                     supabase,
                     trade_row(
@@ -853,9 +908,25 @@ def main() -> int:
                 # (the hard constraint #3 — rejections are first-class).
                 try:
                     submitted_order = submit_mleg_order(trading, plan["request"])
+                    elog.info(
+                        "order_submitted",
+                        f"entry order {submitted_order.get('id')} — {plan['qty']}x, "
+                        f"credit {plan['credit']}, max loss {plan['max_loss']}",
+                        symbol=symbol,
+                        alpaca_order_id=submitted_order.get("id"),
+                        status=submitted_order.get("status"),
+                        qty=plan["qty"],
+                        credit=plan["credit"],
+                        max_loss=plan["max_loss"],
+                    )
                 except OrderSubmissionError as exc:
                     order_failure = str(exc)
                     print(f"ERROR: order submission failed: {order_failure}", file=sys.stderr)
+                    elog.error(
+                        "order_failed",
+                        f"entry order rejected: {order_failure}",
+                        symbol=symbol,
+                    )
 
                 persist_trade(
                     supabase,
@@ -911,11 +982,14 @@ def main() -> int:
                     detail=status_detail,
                 ),
             )
+            elog.flush(supabase, decision_id=decision_id)
         except PersistenceError as exc:
             print(
                 f"ERROR: persistence failed — cycle not fully logged: {exc}",
                 file=sys.stderr,
             )
+            elog.error("error", f"cycle persistence failed: {exc}", symbol=symbol)
+            elog.flush(supabase, decision_id=decision_id)
             print(json.dumps(package, indent=2, default=str))
             return 1
 
