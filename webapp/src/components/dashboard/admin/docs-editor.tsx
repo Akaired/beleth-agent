@@ -87,8 +87,10 @@ export function DocsEditor({
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstRun = useRef(true);
@@ -168,12 +170,14 @@ export function DocsEditor({
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
-  function applyToolbar(item: ToolbarItem) {
+  /** Replace the current selection with `insert`, then drop the caret after it. */
+  function insertText(insert: string) {
     const ta = textareaRef.current;
-    if (!ta) return;
+    if (!ta) {
+      setContentMd((v) => v + insert);
+      return;
+    }
     const { selectionStart, selectionEnd, value } = ta;
-    const selected = value.slice(selectionStart, selectionEnd);
-    const insert = item.apply(selected);
     const next = value.slice(0, selectionStart) + insert + value.slice(selectionEnd);
     setContentMd(next);
     requestAnimationFrame(() => {
@@ -181,6 +185,38 @@ export function DocsEditor({
       const pos = selectionStart + insert.length;
       ta.setSelectionRange(pos, pos);
     });
+  }
+
+  function applyToolbar(item: ToolbarItem) {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const selected = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    insertText(item.apply(selected));
+  }
+
+  /** Upload an image to `docs-media` and drop an `![alt](url)` at the caret. */
+  async function uploadImage(file: File) {
+    setError(null);
+    setUploading(true);
+    try {
+      const ta = textareaRef.current;
+      const alt = ta
+        ? ta.value.slice(ta.selectionStart, ta.selectionEnd).trim()
+        : "";
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/docs/upload", { method: "POST", body });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setError(data.error ?? "Image upload failed.");
+        return;
+      }
+      insertText(`![${alt || "image"}](${data.url})`);
+    } catch {
+      setError("Image upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   function togglePublish() {
@@ -350,12 +386,42 @@ export function DocsEditor({
                 {item.label}
               </button>
             ))}
+            <span className="mx-1 h-4 w-px bg-line" aria-hidden />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="rounded px-2 py-1 font-mono text-[11px] text-sec transition-colors hover:bg-hoverbg hover:text-txt disabled:opacity-40"
+            >
+              {uploading ? "Uploading…" : "Image"}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void uploadImage(file);
+              }}
+            />
           </div>
           <textarea
             ref={textareaRef}
             value={contentMd}
             onChange={(e) => setContentMd(e.target.value)}
-            placeholder="Write in Markdown…"
+            onPaste={(e) => {
+              const img = Array.from(e.clipboardData.items).find((it) =>
+                it.type.startsWith("image/"),
+              );
+              const file = img?.getAsFile();
+              if (file) {
+                e.preventDefault();
+                void uploadImage(file);
+              }
+            }}
+            placeholder="Write in Markdown… (paste an image to upload it)"
             spellCheck={false}
             className="min-h-[460px] w-full flex-1 rounded-b-md border border-t-0 border-inputline bg-inset px-3 py-2.5 font-mono text-[12.5px] leading-[1.6] text-txt outline-none"
           />
