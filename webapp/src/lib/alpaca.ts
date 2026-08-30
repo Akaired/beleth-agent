@@ -14,6 +14,7 @@
  */
 import "server-only";
 import { DataUnavailableError } from "@/lib/supabase";
+import type { MarketCalendarDay } from "@/lib/market-calendar";
 import type { PositionState, SpreadPosition } from "@/lib/positions";
 import {
   DEFAULT_EQUITY_RANGE,
@@ -219,6 +220,36 @@ export async function fetchMarketClock(): Promise<MarketClock> {
     nextOpen: raw.next_open ?? null,
     nextClose: raw.next_close ?? null,
   };
+}
+
+// --- Market calendar ------------------------------------------------------------
+
+type RawCalendarDay = {
+  date?: string;
+  open?: string;
+  close?: string;
+};
+
+/**
+ * The exchange trading calendar for `[start, end]` (inclusive, `YYYY-MM-DD`)
+ * from Alpaca `GET /v2/calendar`. Only open days come back; a weekday absent
+ * from the result is a market holiday. `open` / `close` are `HH:MM` US/Eastern
+ * and carry early closes (e.g. `13:00`). Throws `DataUnavailableError` on a
+ * missing key or non-2xx so the page can fail soft.
+ */
+export async function fetchMarketCalendar(
+  start: string,
+  end: string,
+): Promise<MarketCalendarDay[]> {
+  const raw = await alpacaGet<RawCalendarDay[]>(
+    `/v2/calendar?start=${start}&end=${end}`,
+  );
+  const out: MarketCalendarDay[] = [];
+  for (const d of raw) {
+    if (!d.date || !d.open || !d.close) continue;
+    out.push({ date: d.date, open: d.open, close: d.close });
+  }
+  return out;
 }
 
 // --- Trade markers ----------------------------------------------------------

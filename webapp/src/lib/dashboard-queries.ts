@@ -13,11 +13,16 @@ import { createClient } from "@/lib/supabase/server";
 import {
   fetchAccountSnapshot,
   fetchEquityHistory,
+  fetchMarketCalendar,
   fetchMarketClock,
   fetchSpreadPositions,
   fetchTradeMarkers,
   DEFAULT_EQUITY_RANGE,
 } from "@/lib/alpaca";
+import { matrixRange, nyDateKey } from "@/lib/month-grid";
+import type { MarketCalendarDay } from "@/lib/market-calendar";
+import type { MarketClock } from "@/lib/equity";
+import type { TradeCalendarDay } from "@/lib/trade-calendar";
 import {
   spreadLabel,
   type AccountSnapshot,
@@ -461,6 +466,89 @@ export async function fetchPositionsView(): Promise<PositionsView> {
   );
 
   return { open, history, alpacaOk: alpaca.ok };
+}
+
+export type MarketCalendarView = {
+  /** Open trading days in the requested grid window, keyed by `YYYY-MM-DD`. */
+  days: MarketCalendarDay[];
+  clock: MarketClock | null;
+  /** False when the Alpaca calendar read failed — the page shows a soft note. */
+  alpacaOk: boolean;
+};
+
+/**
+ * The "Calendar" view: the exchange trading calendar for the six-week grid
+ * around `year`/`month0`, plus the live market clock for the status strip.
+ * Alpaca is the only source; a failure degrades to an empty grid + a note.
+ */
+export async function fetchMarketCalendarView(
+  year: number,
+  month0: number,
+): Promise<MarketCalendarView> {
+  const { start, end } = matrixRange(year, month0);
+  const [cal, clock] = await Promise.all([
+    fetchMarketCalendar(start, end).then(
+      (days) => ({ days, ok: true }),
+      (err) => {
+        console.error("market calendar: alpaca fetch failed", err);
+        return { days: [] as MarketCalendarDay[], ok: false };
+      },
+    ),
+    fetchMarketClock().catch((err) => {
+      console.error("market calendar: clock fetch failed", err);
+      return null;
+    }),
+  ]);
+  return { days: cal.days, clock, alpacaOk: cal.ok };
+}
+
+export type TradeCalendarData = {
+  /** Every day with at least one closed round-trip, ascending by date. */
+  days: TradeCalendarDay[];
+  /** `YYYY-MM-DD` of the earliest / latest closed trade, for month nav bounds. */
+  firstDate: string | null;
+  lastDate: string | null;
+  alpacaOk: boolean;
+};
+
+/**
+ * Daily roll-up of closed spreads (count + realised P&L) for the trade
+ * calendar. Reuses the same Alpaca round-trip reconstruction as the Positions
+ * view; each closed spread counts once, on its exit-fill date in US/Eastern.
+ * Pre-submission and canceled orders are not trades and are excluded.
+ */
+export async function fetchTradeCalendar(): Promise<TradeCalendarData> {
+  let ok = true;
+  let rows: SpreadPosition[] = [];
+  try {
+    rows = await fetchSpreadPositions();
+  } catch (err) {
+    console.error("trade calendar: alpaca fetch failed", err);
+    ok = false;
+  }
+
+  const byDate = new Map<string, { trades: number; realizedPnl: number }>();
+  for (const p of rows) {
+    if (p.state !== "closed") continue;
+    const stamp = p.closedAt ?? p.openedAt;
+    if (!stamp) continue;
+    const key = nyDateKey(stamp);
+    const cur = byDate.get(key) ?? { trades: 0, realizedPnl: 0 };
+    cur.trades += 1;
+    cur.realizedPnl += p.realizedPnl ?? 0;
+    byDate.set(key, cur);
+  }
+
+  const days: TradeCalendarDay[] = [...byDate.entries()]
+    .map(([date, v]) => ({ date, ...v }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    days,
+    firstDate: days[0]?.date ?? null,
+    lastDate: days[days.length - 1]?.date ?? null,
+    alpacaOk: ok,
+  };
 }
 
 /**

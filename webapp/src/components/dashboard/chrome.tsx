@@ -15,6 +15,8 @@ import {
   IconDecisions,
   IconStrategy,
   IconControls,
+  IconMarketCalendar,
+  IconTradeCalendar,
   IconMenu,
   IconClose,
 } from "@/components/icons";
@@ -32,11 +34,13 @@ const GROUPS: Group[] = [
     items: [
       { href: "/dashboard", label: "Overview", min: "public_user", Icon: IconOverview },
       { href: "/dashboard/positions", label: "Positions", min: "demo_admin", Icon: IconPositions },
+      { href: "/dashboard/calendar", label: "Calendar", min: "demo_admin", Icon: IconMarketCalendar },
     ],
   },
   {
     label: "Records",
     items: [
+      { href: "/dashboard/trade-calendar", label: "Trade calendar", min: "demo_admin", Icon: IconTradeCalendar },
       { href: "/dashboard/decisions", label: "Decision history", min: "demo_admin", Icon: IconDecisions },
       { href: "/dashboard/strategy", label: "Strategy strategy", min: "demo_admin", Icon: IconStrategy },
     ],
