@@ -10,21 +10,19 @@ import {
 import {
   getResendKey,
   tolerant,
-  fetchDomains,
-  fetchRecentEmails,
-  fetchTemplates,
-  fetchBroadcasts,
+  fetchBelethDomains,
+  fetchBelethRecentEmails,
+  fetchBelethTemplates,
+  fetchBelethBroadcasts,
   tallyEvents,
+  BELETH_MAIL_DOMAIN,
   type ResendDomainStatus,
 } from "@/lib/admin/email";
 import { IconArrowUpRight, IconCheckCircle, IconWarning } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email — Beleth backoffice" };
 
-// Sender for auth mail — configured in Resend + the Supabase SMTP form, shown
-// here only as copy.
-const SENDER_DOMAIN = "beleth.davidemaiorana.dev";
-const SENDER_ADDRESS = `no-reply@${SENDER_DOMAIN}`;
+const SENDER_ADDRESS = `no-reply@${BELETH_MAIL_DOMAIN}`;
 
 function domainTone(status: ResendDomainStatus): "ok" | "warn" | "bad" {
   if (status === "verified") return "ok";
@@ -52,81 +50,33 @@ function DeliveryPath() {
   );
 }
 
-const SMTP_CHECKLIST: { label: string; hint: string }[] = [
-  {
-    label: "Resend domain verified",
-    hint: `${SENDER_DOMAIN} — DKIM + SPF/MX live in the Vercel DNS (account A).`,
-  },
-  {
-    label: "Supabase Custom SMTP enabled",
-    hint: "Auth → Emails → SMTP: smtp.resend.com:465, user resend, pass = a Resend API key.",
-  },
-  {
-    label: `Sender ${SENDER_ADDRESS}`,
-    hint: "Must sit on the verified domain or Resend rejects the send.",
-  },
-  {
-    label: "“Confirm email” turned on",
-    hint: "mailer_autoconfirm = false — until then signup is instant and reset mail never leaves.",
-  },
-  {
-    label: "Redirect allow-list covers every origin",
-    hint: "localhost, *.vercel.app previews, and the custom domain.",
-  },
-];
-
-function SmtpChecklist() {
-  return (
-    <Panel
-      title="Auth mail — Custom SMTP checklist"
-      right={
-        <a
-          href="https://supabase.com/dashboard/project/_/auth/templates"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.07em] text-acc hover:underline"
-        >
-          Supabase <IconArrowUpRight size={11} weight="bold" />
-        </a>
-      }
-    >
-      <ul className="flex flex-col gap-3">
-        {SMTP_CHECKLIST.map((item) => (
-          <li key={item.label} className="flex flex-col gap-0.5">
-            <span className="text-[13px] text-txt">{item.label}</span>
-            <span className="text-[12px] text-sec leading-relaxed">{item.hint}</span>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}
-
 export default async function AdminEmailOverviewPage() {
   if (!getResendKey()) {
     return (
       <div className="flex flex-col gap-5">
         <ResendUnavailable message="not-configured" />
         <DeliveryPath />
-        <SmtpChecklist />
       </div>
     );
   }
 
   const [domainsR, emailsR, templatesR, broadcastsR] = await Promise.all([
-    tolerant(fetchDomains),
-    tolerant(() => fetchRecentEmails(100)),
-    tolerant(fetchTemplates),
-    tolerant(fetchBroadcasts),
+    tolerant(fetchBelethDomains),
+    tolerant(() => fetchBelethRecentEmails(100)),
+    tolerant(fetchBelethTemplates),
+    tolerant(fetchBelethBroadcasts),
   ]);
 
   const domains = domainsR.ok ? domainsR.data : [];
   const verifiedDomains = domains.filter((d) => d.status === "verified").length;
 
-  const recent = emailsR.ok ? emailsR.data : { emails: [], hasMore: false };
+  const recent = emailsR.ok
+    ? emailsR.data
+    : { emails: [], hasMore: false, scanned: 0 };
   const tally = tallyEvents(recent.emails);
   const total = recent.emails.length;
-  const delivered = (tally.delivered ?? 0) + (tally.opened ?? 0) + (tally.clicked ?? 0);
+  const delivered =
+    (tally.delivered ?? 0) + (tally.opened ?? 0) + (tally.clicked ?? 0);
   const opened = (tally.opened ?? 0) + (tally.clicked ?? 0);
   const bounced = (tally.bounced ?? 0) + (tally.complained ?? 0);
 
@@ -136,13 +86,21 @@ export default async function AdminEmailOverviewPage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint">
+        scoped to {BELETH_MAIL_DOMAIN}
+      </p>
+
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
         <Stat
           label="Recent sends"
-          value={recent.hasMore ? `${total}+` : total}
-          hint="last 100 window"
+          value={total}
+          hint={`of ${recent.scanned} account sends`}
         />
-        <Stat label="Delivered" value={pct(delivered, total)} hint={`${delivered} of ${total}`} />
+        <Stat
+          label="Delivered"
+          value={pct(delivered, total)}
+          hint={`${delivered} of ${total}`}
+        />
         <Stat label="Opened" value={pct(opened, total)} hint={`${opened} tracked`} />
         <Stat label="Bounced" value={bounced} hint="+ complaints" />
         <Stat label="Templates" value={templateCount} />
@@ -173,9 +131,14 @@ export default async function AdminEmailOverviewPage() {
         }
       >
         {!domainsR.ok ? (
-          <p className="text-[12px] text-down">Could not load domains: {domainsR.message}</p>
+          <p className="text-[12px] text-down">
+            Could not load domains: {domainsR.message}
+          </p>
         ) : domains.length === 0 ? (
-          <p className="text-[13px] text-sec">No domains in this Resend account yet.</p>
+          <p className="text-[13px] text-sec">
+            No <span className="font-mono text-txt">{BELETH_MAIL_DOMAIN}</span>{" "}
+            domain in this Resend account yet.
+          </p>
         ) : (
           <ul className="flex flex-col divide-y divide-line">
             {domains.map((d) => {
@@ -210,16 +173,18 @@ export default async function AdminEmailOverviewPage() {
             })}
           </ul>
         )}
-        <p className="mt-3 font-mono text-[10.5px] text-faint">
-          {verifiedDomains} verified · {domains.length} total
-        </p>
+        {domains.length > 0 && (
+          <p className="mt-3 font-mono text-[10.5px] text-faint">
+            {verifiedDomains} verified · {domains.length} shown
+          </p>
+        )}
       </Panel>
 
       <Panel title="Recent sent mail">
         {total === 0 ? (
           <p className="text-[13px] text-sec">
-            Nothing in the recent window. Auth mail only shows here once Custom
-            SMTP is routing through Resend.
+            No Beleth mail in the last {recent.scanned} account sends. Auth mail
+            shows here once Custom SMTP routes through Resend.
           </p>
         ) : (
           <div className="-mx-4 -my-4 overflow-x-auto">
@@ -254,8 +219,9 @@ export default async function AdminEmailOverviewPage() {
           </div>
         )}
         <p className="mt-4 text-[11px] text-sec">
-          Resend&apos;s API paginates without a total — for the all-time count and
-          the full deliverability breakdown, open the{" "}
+          Filtered to <span className="font-mono">{BELETH_MAIL_DOMAIN}</span>.
+          Resend&apos;s API paginates without a total — for the all-time count
+          and the full deliverability breakdown, open the{" "}
           <a
             href="https://resend.com/emails"
             target="_blank"
@@ -269,11 +235,23 @@ export default async function AdminEmailOverviewPage() {
       </Panel>
 
       <DeliveryPath />
-      <SmtpChecklist />
 
       <p className="text-[11px] text-sec">
-        Manage <Link href="/dashboard/admin/email/templates" className="text-acc hover:underline">templates</Link>{" "}
-        and <Link href="/dashboard/admin/email/campaigns" className="text-acc hover:underline">campaigns</Link> in their own tabs.
+        Manage{" "}
+        <Link
+          href="/dashboard/admin/email/templates"
+          className="text-acc hover:underline"
+        >
+          templates
+        </Link>{" "}
+        and{" "}
+        <Link
+          href="/dashboard/admin/email/campaigns"
+          className="text-acc hover:underline"
+        >
+          campaigns
+        </Link>{" "}
+        in their own tabs.
       </p>
     </div>
   );

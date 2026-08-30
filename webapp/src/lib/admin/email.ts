@@ -86,6 +86,43 @@ export async function tolerant<T>(
   }
 }
 
+// --- Beleth scoping --------------------------------------------------------
+
+// The Resend account is shared with other projects. Everything the admin
+// section shows is filtered to this mail domain so another project's
+// customer mail never leaks in. Configurable, with the obvious default.
+export const BELETH_MAIL_DOMAIN =
+  process.env.BELETH_MAIL_DOMAIN?.trim().toLowerCase() || "beleth.davidemaiorana.dev";
+
+/** Domain part of a `from` value — handles "Name <a@b.com>" and "a@b.com". */
+export function fromDomain(from: string | null | undefined): string | null {
+  if (!from) return null;
+  const angle = from.match(/<([^>]+)>/);
+  const addr = (angle ? angle[1] : from).trim();
+  const at = addr.lastIndexOf("@");
+  return (at === -1 ? addr : addr.slice(at + 1)).toLowerCase() || null;
+}
+
+/** True when a `from` value (or a bare domain) belongs to the Beleth domain. */
+export function isBelethMail(from: string | null | undefined): boolean {
+  const d = fromDomain(from);
+  if (!d) return false;
+  return d === BELETH_MAIL_DOMAIN || d.endsWith(`.${BELETH_MAIL_DOMAIN}`);
+}
+
+/** Resolve a batch of promises in fixed-size waves (Resend rate limits). */
+async function inWaves<T, R>(
+  items: T[],
+  size: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  }
+  return out;
+}
+
 // --- Domains -----------------------------------------------------------------
 
 export type ResendDomainStatus =
@@ -121,6 +158,11 @@ export async function fetchDomains(): Promise<ResendDomain[]> {
     region: d.region ?? null,
     createdAt: d.created_at ?? null,
   }));
+}
+
+/** Only the Beleth sending domain(s). */
+export async function fetchBelethDomains(): Promise<ResendDomain[]> {
+  return (await fetchDomains()).filter((d) => isBelethMail(d.name));
 }
 
 // --- Sent emails -----------------------------------------------------------
@@ -163,6 +205,22 @@ export async function fetchRecentEmails(limit = 100): Promise<RecentEmails> {
     lastEvent: e.last_event ?? "unknown",
   }));
   return { emails, hasMore: Boolean(body.has_more) };
+}
+
+/**
+ * Recent sends narrowed to Beleth's own mail. `scanned` is how many account
+ * sends were looked at (the API paginates without a total), `emails` is the
+ * Beleth subset of those.
+ */
+export async function fetchBelethRecentEmails(
+  limit = 100,
+): Promise<RecentEmails & { scanned: number }> {
+  const { emails, hasMore } = await fetchRecentEmails(limit);
+  return {
+    scanned: emails.length,
+    emails: emails.filter((e) => isBelethMail(e.from)),
+    hasMore,
+  };
 }
 
 export type EventTally = Record<string, number>;
@@ -268,6 +326,24 @@ export async function updateTemplate(
   });
 }
 
+// The list endpoint carries no `from`, so each template is fetched once to
+// check its sender domain. A template with no explicit `from` (it inherits
+// at send time) is kept — only a foreign domain is filtered out.
+export async function fetchBelethTemplates(): Promise<TemplateSummary[]> {
+  const all = await fetchTemplates();
+  const checked = await inWaves(all, 4, async (t) => {
+    try {
+      const full = await fetchTemplate(t.id);
+      return { t, from: full.from };
+    } catch {
+      return { t, from: null as string | null };
+    }
+  });
+  return checked
+    .filter(({ from }) => !from || isBelethMail(from))
+    .map(({ t }) => t);
+}
+
 // --- Broadcasts (marketing campaigns) -----------------------------------------
 
 export type BroadcastStatus =
@@ -353,6 +429,24 @@ export async function fetchBroadcast(id: string): Promise<Broadcast> {
     html: b.html ?? "",
     text: b.text ?? "",
   };
+}
+
+// Same story as templates: the list has no `from`, so each broadcast is
+// fetched once and kept only if it sends from the Beleth domain (a missing
+// `from` is kept).
+export async function fetchBelethBroadcasts(): Promise<BroadcastSummary[]> {
+  const all = await fetchBroadcasts();
+  const checked = await inWaves(all, 4, async (b) => {
+    try {
+      const full = await fetchBroadcast(b.id);
+      return { b, from: full.from };
+    } catch {
+      return { b, from: null as string | null };
+    }
+  });
+  return checked
+    .filter(({ from }) => !from || isBelethMail(from))
+    .map(({ b }) => b);
 }
 
 export type CreateBroadcastInput = {

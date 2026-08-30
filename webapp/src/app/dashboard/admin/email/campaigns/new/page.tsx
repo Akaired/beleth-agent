@@ -3,7 +3,12 @@ import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import { ResendUnavailable } from "@/components/dashboard/admin/email-ui";
 import { CampaignForm } from "@/components/dashboard/admin/campaign-form";
-import { getResendKey, tolerant, fetchSegments } from "@/lib/admin/email";
+import {
+  getResendKey,
+  tolerant,
+  fetchSegments,
+  BELETH_MAIL_DOMAIN,
+} from "@/lib/admin/email";
 import { IconArrowLeft } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · New campaign — Beleth" };
@@ -24,7 +29,10 @@ export default async function NewCampaignPage() {
       </Link>
       <h2 className="text-[17px] font-light text-txt">New campaign</h2>
       <Panel title="Draft">
-        <CampaignForm segments={res.data.map((s) => ({ id: s.id, name: s.name }))} />
+        <CampaignForm
+          segments={res.data.map((s) => ({ id: s.id, name: s.name }))}
+          defaultFrom={`Beleth <no-reply@${BELETH_MAIL_DOMAIN}>`}
+        />
       </Panel>
     </div>
   );

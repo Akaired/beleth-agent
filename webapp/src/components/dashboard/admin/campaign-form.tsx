@@ -7,13 +7,17 @@ import { IconWarning } from "@/components/icons";
 
 type SegmentOption = { id: string; name: string };
 
-const DEFAULT_FROM = "Beleth <no-reply@beleth.davidemaiorana.dev>";
-
-export function CampaignForm({ segments }: { segments: SegmentOption[] }) {
+export function CampaignForm({
+  segments,
+  defaultFrom,
+}: {
+  segments: SegmentOption[];
+  defaultFrom: string;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [segmentId, setSegmentId] = useState(segments[0]?.id ?? "");
-  const [from, setFrom] = useState(DEFAULT_FROM);
+  const [from, setFrom] = useState(defaultFrom);
   const [subject, setSubject] = useState("");
   const [previewText, setPreviewText] = useState("");
   const [html, setHtml] = useState(

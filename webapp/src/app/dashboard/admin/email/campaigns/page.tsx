@@ -6,7 +6,7 @@ import {
   EventPill,
   formatDateTime,
 } from "@/components/dashboard/admin/email-ui";
-import { getResendKey, tolerant, fetchBroadcasts } from "@/lib/admin/email";
+import { getResendKey, tolerant, fetchBelethBroadcasts } from "@/lib/admin/email";
 import { IconCaretRight, IconPlus } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email campaigns — Beleth" };
@@ -25,7 +25,7 @@ function whenLabel(b: {
 export default async function EmailCampaignsPage() {
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 
-  const res = await tolerant(fetchBroadcasts);
+  const res = await tolerant(fetchBelethBroadcasts);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
   const campaigns = res.data;
 

@@ -6,7 +6,12 @@ import {
   EventPill,
   formatDateTime,
 } from "@/components/dashboard/admin/email-ui";
-import { getResendKey, tolerant, fetchTemplates } from "@/lib/admin/email";
+import {
+  getResendKey,
+  tolerant,
+  fetchBelethTemplates,
+  BELETH_MAIL_DOMAIN,
+} from "@/lib/admin/email";
 import { IconArrowUpRight, IconCaretRight } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email templates — Beleth" };
@@ -14,7 +19,7 @@ export const metadata: Metadata = { title: "Admin · Email templates — Beleth"
 export default async function EmailTemplatesPage() {
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 
-  const res = await tolerant(fetchTemplates);
+  const res = await tolerant(fetchBelethTemplates);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
   const templates = res.data;
 
@@ -34,8 +39,9 @@ export default async function EmailTemplatesPage() {
     >
       {templates.length === 0 ? (
         <p className="text-[13px] text-sec leading-relaxed">
-          No templates yet. Create one in the Resend dashboard, then edit its
-          subject and HTML here.
+          No templates sending from{" "}
+          <span className="font-mono text-txt">{BELETH_MAIL_DOMAIN}</span>. Create
+          one in the Resend dashboard, then edit its subject and HTML here.
         </p>
       ) : (
         <ul className="flex flex-col divide-y divide-line">

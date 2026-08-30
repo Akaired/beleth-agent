@@ -14,7 +14,13 @@ export default async function EmailAudiencesPage() {
 
   const res = await tolerant(fetchSegments);
   if (!res.ok) return <ResendUnavailable message={res.message} />;
-  const segments = res.data;
+
+  // Segments carry no sender domain — the only signal is the name. Show the
+  // ones that name Beleth; if none do, fall back to all so the view is never
+  // mysteriously empty.
+  const belethNamed = res.data.filter((s) => /beleth/i.test(s.name));
+  const scoped = belethNamed.length > 0;
+  const segments = scoped ? belethNamed : res.data;
 
   return (
     <Panel
@@ -51,8 +57,11 @@ export default async function EmailAudiencesPage() {
         </ul>
       )}
       <p className="mt-3 text-[11px] text-sec leading-relaxed">
-        Contact lists live in Resend — this view is read-only. Resend&apos;s API
-        reports no per-segment contact total, so counts aren&apos;t shown here.
+        {scoped
+          ? "Showing segments whose name mentions Beleth. "
+          : "No Beleth-named segment — showing all. "}
+        Contact lists live in Resend — this view is read-only, and the API
+        reports no per-segment contact total.
       </p>
     </Panel>
   );
