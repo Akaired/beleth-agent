@@ -9,6 +9,7 @@
  */
 import "server-only";
 import sanitizeHtml from "sanitize-html";
+import { isValidTvEmbed } from "@/lib/forum/tradingview";
 
 const SUPABASE_ORIGIN = (() => {
   try {
@@ -37,10 +38,14 @@ const OPTIONS: sanitizeHtml.IOptions = {
     "a",
     "img",
     "iframe",
+    // Only ever a TradingView placeholder — `exclusiveFilter` drops every other
+    // <div>. <TradingViewEmbeds> turns it into the real widget in the browser.
+    "div",
   ],
   allowedAttributes: {
     a: ["href", "title"],
     img: ["src", "alt", "width", "height", "style"],
+    div: ["class", "data-tv-widget", "data-tv-symbol", "data-tv-theme"],
     iframe: [
       "src",
       "width",
@@ -64,6 +69,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
   // also whitelists the `class` attribute itself — nothing else survives.
   allowedClasses: {
     "*": ["ql-align-center", "ql-align-right", "ql-align-justify"],
+    div: ["tv-embed"],
   },
   allowedSchemes: ["https", "mailto"],
   allowedSchemesByTag: { img: ["https"], iframe: ["https"] },
@@ -91,6 +97,8 @@ const OPTIONS: sanitizeHtml.IOptions = {
     }
     // Drop an iframe whose src was stripped for being off-host.
     if (frame.tag === "iframe") return !frame.attribs.src;
+    // The only <div> that survives is a well-formed TradingView placeholder.
+    if (frame.tag === "div") return !isValidTvEmbed(frame.attribs);
     return false;
   },
 };

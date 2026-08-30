@@ -27,7 +27,10 @@ const BODY_MAX = 100000;
  */
 function cleanBody(raw: string): { html: string } | { error: string } {
   const html = sanitizeForumHtml(raw);
-  if (htmlToText(html).length < 1) return { error: "Write something first." };
+  const hasEmbed = /<(img|iframe)\b|class="tv-embed"/i.test(html);
+  if (htmlToText(html).length < 1 && !hasEmbed) {
+    return { error: "Write something first." };
+  }
   if (html.length > BODY_MAX) return { error: "That is too long." };
   return { html };
 }

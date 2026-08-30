@@ -30,6 +30,11 @@ import type { Range as QuillRange } from "quill";
 import "quill/dist/quill.snow.css";
 import "highlight.js/styles/atom-one-dark.css";
 import { PromptDialog } from "@/components/forum/prompt-dialog";
+import {
+  TradingViewDialog,
+  type TvInsert,
+} from "@/components/forum/tradingview-dialog";
+import { TV_WIDGET_BY_ID } from "@/lib/forum/tradingview";
 
 const TOOLBAR = [
   [{ header: [2, 3, false] }],
@@ -37,9 +42,18 @@ const TOOLBAR = [
   [{ list: "ordered" }, { list: "bullet" }],
   [{ align: "" }, { align: "center" }, { align: "right" }],
   ["blockquote", "code-block"],
-  ["link", "image", "video"],
+  ["link", "image", "video", "tradingview"],
   ["clean"],
 ];
+
+/** Toolbar glyph for the TradingView button — a two-candle chart (Lucide). */
+const TRADINGVIEW_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" ' +
+  'stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+  'stroke-linejoin="round">' +
+  '<path d="M9 5v4"/><path d="M9 15v4"/><rect x="6" y="9" width="6" height="6" rx="1"/>' +
+  '<path d="M17 3v5"/><path d="M17 16v5"/><rect x="14" y="8" width="6" height="8" rx="1"/>' +
+  "</svg>";
 
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
 
@@ -87,6 +101,7 @@ export function RichEditor({
   const [html, setHtml] = useState(defaultValue);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [prompt, setPrompt] = useState<PromptKind>(null);
+  const [tvOpen, setTvOpen] = useState(false);
 
   // ── build the editor once ────────────────────────────────────────────────
   useEffect(() => {
@@ -95,11 +110,12 @@ export function RichEditor({
     if (!holder || quillRef.current) return;
 
     (async () => {
-      const [{ default: Quill }, { default: hljs }, resizeMod] =
+      const [{ default: Quill }, { default: hljs }, resizeMod, { BlockEmbed }] =
         await Promise.all([
           import("quill"),
           import("highlight.js/lib/common"),
           import("quill-resize-image"),
+          import("quill/blots/block"),
         ]);
       if (cancelled || !holderRef.current || quillRef.current) return;
 
@@ -108,6 +124,55 @@ export function RichEditor({
         (resizeMod as { default?: unknown }).default ?? resizeMod,
         true,
       );
+
+      // Inert block placeholder for a TradingView widget. The editor shows a
+      // labelled card; `getSemanticHTML()` emits only the bare
+      // <div class="tv-embed" data-tv-*> that the sanitiser whitelists, and
+      // <TradingViewEmbeds> turns that into the real widget on render.
+      class TradingViewBlot extends BlockEmbed {
+        static blotName = "tradingview";
+        static tagName = "div";
+        static className = "tv-embed";
+
+        static create(value: TvInsert): HTMLElement {
+          const node = super.create() as HTMLElement;
+          node.setAttribute("data-tv-widget", value.widget);
+          node.setAttribute("data-tv-symbol", value.symbol ?? "");
+          node.setAttribute("data-tv-theme", value.theme ?? "dark");
+          node.setAttribute("contenteditable", "false");
+          const label = TV_WIDGET_BY_ID[value.widget]?.label ?? value.widget;
+          node.innerHTML =
+            '<span class="tv-embed-badge">TV</span>' +
+            '<span class="tv-embed-text">TradingView — ' +
+            label +
+            (value.symbol ? " · " + value.symbol : "") +
+            "</span>";
+          return node;
+        }
+
+        static value(node: HTMLElement): TvInsert {
+          return {
+            widget: node.getAttribute("data-tv-widget") ?? "",
+            symbol: node.getAttribute("data-tv-symbol") ?? "",
+            theme:
+              node.getAttribute("data-tv-theme") === "light" ? "light" : "dark",
+          } as TvInsert;
+        }
+
+        html(): string {
+          const v = TradingViewBlot.value(this.domNode);
+          return (
+            '<div class="tv-embed" data-tv-widget="' +
+            v.widget +
+            '" data-tv-symbol="' +
+            v.symbol +
+            '" data-tv-theme="' +
+            v.theme +
+            '"></div>'
+          );
+        }
+      }
+      Quill.register(TradingViewBlot, true);
 
       // Store text alignment as a class (`ql-align-center`) rather than an
       // inline style, so the sanitiser can allow it with a tight allowlist.
@@ -127,6 +192,7 @@ export function RichEditor({
         '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0' +
         'l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/>' +
         '<path d="M22 21H7"/><path d="m5 11 9 9"/></svg>';
+      icons.tradingview = TRADINGVIEW_ICON;
 
       const uploadImage = async () => {
         const q = quillRef.current;
@@ -179,6 +245,20 @@ export function RichEditor({
         setPrompt(kind);
       };
 
+      const openTvDialog = () => {
+        const q = quillRef.current;
+        if (!q) return;
+        if (!q.getSelection()) {
+          q.focus();
+          q.setSelection(q.getLength(), 0);
+        }
+        savedRangeRef.current = q.getSelection() ?? {
+          index: q.getLength(),
+          length: 0,
+        };
+        setTvOpen(true);
+      };
+
       const quill = new Quill(holderRef.current, {
         theme: "snow",
         placeholder,
@@ -191,6 +271,7 @@ export function RichEditor({
               image: uploadImage,
               link: () => openPrompt("link"),
               video: () => openPrompt("video"),
+              tradingview: openTvDialog,
             },
           },
         },
@@ -203,7 +284,7 @@ export function RichEditor({
       const sync = () => {
         const semantic = quill.getSemanticHTML();
         const hasText = /\S/.test(semantic.replace(/<[^>]+>/g, ""));
-        const hasEmbed = /<(img|iframe)\b/i.test(semantic);
+        const hasEmbed = /<(img|iframe)\b|class="tv-embed"/i.test(semantic);
         setHtml(hasText || hasEmbed ? semantic : "");
       };
       sync();
@@ -298,6 +379,15 @@ export function RichEditor({
     }
   };
 
+  const applyTv = (value: TvInsert) => {
+    const q = quillRef.current;
+    const range = savedRangeRef.current;
+    setTvOpen(false);
+    if (!q || !range) return;
+    q.insertEmbed(range.index, "tradingview", value, "user");
+    q.setSelection(range.index + 1, 0, "user");
+  };
+
   return (
     <div className="forum-editor">
       <div ref={holderRef} style={{ minHeight }} />
@@ -326,6 +416,11 @@ export function RichEditor({
         hint="Only YouTube and Vimeo links can be embedded."
         onConfirm={applyPrompt}
         onCancel={() => setPrompt(null)}
+      />
+      <TradingViewDialog
+        open={tvOpen}
+        onConfirm={applyTv}
+        onCancel={() => setTvOpen(false)}
       />
     </div>
   );

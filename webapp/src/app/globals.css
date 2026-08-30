@@ -1834,6 +1834,53 @@ body {
   color: var(--color-txt);
 }
 
+/* TradingView widget — an inert labelled card in the editor, the live embed
+   (built by <TradingViewEmbeds>) on the rendered post and in the insert modal
+   preview. */
+.forum-editor .tv-embed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0.6em 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--color-inputline);
+  border-radius: 6px;
+  background: var(--color-panel-head);
+  color: var(--color-sec);
+  font-size: 12px;
+  user-select: none;
+}
+.tv-embed-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-acc);
+  color: #0a0a0a;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.forum-prose .tv-embed {
+  display: block;
+  margin: 0.8em 0;
+}
+.tv-preview {
+  min-height: 260px;
+}
+.forum-prose .tv-embed .tradingview-widget-copyright,
+.tv-preview .tradingview-widget-copyright {
+  height: 32px;
+  line-height: 32px;
+  font-size: 11px;
+  text-align: center;
+}
+.forum-prose .tv-embed .tradingview-widget-copyright a,
+.tv-preview .tradingview-widget-copyright a {
+  color: var(--color-dim);
+  text-decoration: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1841,4 +1888,122 @@ body {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ── Documentation ────────────────────────────────────────────────────────
+   Rendered Markdown for /docs/[slug] and the admin editor's live preview —
+   one renderer (src/lib/docs/markdown.ts), so both share this typography.
+   Mirrors .forum-prose, sized up a touch for long-form reading. */
+.docs-content {
+  font-size: 14px;
+  line-height: 1.72;
+  color: var(--color-txt);
+  max-width: 72ch;
+}
+.docs-content > :first-child {
+  margin-top: 0;
+}
+.docs-content > :last-child {
+  margin-bottom: 0;
+}
+.docs-content p {
+  margin: 0 0 1.1em;
+}
+.docs-content h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 1.9em 0 0.6em;
+  scroll-margin-top: 84px;
+}
+.docs-content h3 {
+  font-size: 1.12em;
+  font-weight: 600;
+  margin: 1.6em 0 0.5em;
+  scroll-margin-top: 84px;
+}
+.docs-content h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 1.4em 0 0.4em;
+}
+.docs-content ul,
+.docs-content ol {
+  margin: 0 0 1.1em;
+  padding-left: 1.5em;
+}
+.docs-content ul {
+  list-style: disc;
+}
+.docs-content ol {
+  list-style: decimal;
+}
+.docs-content li {
+  margin: 0.3em 0;
+}
+.docs-content li > ul,
+.docs-content li > ol {
+  margin: 0.3em 0;
+}
+.docs-content blockquote {
+  margin: 1.3em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--color-emphline);
+  color: var(--color-sec);
+}
+.docs-content a {
+  color: var(--color-acc);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.docs-content code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--color-inset);
+  border: 1px solid var(--color-line);
+  border-radius: 3px;
+  padding: 0.05em 0.35em;
+}
+.docs-content pre {
+  margin: 0 0 1.2em;
+  padding: 0.9em 1em;
+  background: var(--color-inset);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.docs-content pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+}
+.docs-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.6em 0;
+}
+.docs-content hr {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  margin: 2.2em 0;
+}
+.docs-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.2em;
+  font-size: 0.94em;
+  display: block;
+  overflow-x: auto;
+}
+.docs-content th,
+.docs-content td {
+  border: 1px solid var(--color-line);
+  padding: 0.5em 0.7em;
+  text-align: left;
+}
+.docs-content th {
+  background: var(--color-inset);
+  font-weight: 600;
 }

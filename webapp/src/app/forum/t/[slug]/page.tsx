@@ -9,6 +9,7 @@ import { LoginToPost } from "@/components/forum/login-to-post";
 import { TopicManage } from "@/components/forum/topic-manage";
 import { ViewPing } from "@/components/forum/view-ping";
 import { HighlightCode } from "@/components/forum/highlight-code";
+import { TradingViewEmbeds } from "@/components/forum/tradingview-embeds";
 
 export const metadata: Metadata = { title: "Forum — Beleth" };
 
@@ -60,6 +61,9 @@ export default async function ForumTopicPage({
       </div>
 
       <HighlightCode
+        signature={data.posts.map((p) => `${p.id}:${p.updated_at}`).join("|")}
+      />
+      <TradingViewEmbeds
         signature={data.posts.map((p) => `${p.id}:${p.updated_at}`).join("|")}
       />
 
