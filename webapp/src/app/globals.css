@@ -1521,6 +1521,23 @@ body {
   }
 }
 
+/* "Chat with Beleth" — composing indicator + typewriter caret. */
+@keyframes b-compose {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+.b-compose-dot {
+  animation: b-compose 1.15s ease-in-out infinite;
+}
+
 /* /beleth gallery: emulate prefers-reduced-motion on demand. */
 .beleth-freeze,
 .beleth-freeze *,

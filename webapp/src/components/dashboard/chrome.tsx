@@ -5,7 +5,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { roleAtLeast, type Role } from "@/lib/roles";
+import type { ChatSessionSummary } from "@/lib/chat/types";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { ChatNav } from "@/components/dashboard/chat-nav";
 import { RoleChip } from "@/components/dashboard/ui";
 import {
   IconOverview,
@@ -56,10 +58,12 @@ function isActive(pathname: string, href: string): boolean {
 function NavGroups({
   role,
   badges,
+  recentChats,
   onNavigate,
 }: {
   role: Role;
   badges?: Record<string, number>;
+  recentChats: ChatSessionSummary[];
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -71,7 +75,8 @@ function NavGroups({
   return (
     <nav className="flex flex-col py-1">
       {groups.map((g) => (
-        <div key={g.label} className="pt-3 pb-1">
+        <div key={g.label}>
+        <div className="pt-3 pb-1">
           <div className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">
             {g.label}
           </div>
@@ -107,6 +112,11 @@ function NavGroups({
               </Link>
             );
           })}
+        </div>
+        {/* The Chat section sits right after Live (present for every role). */}
+        {g.label === "Live" && (
+          <ChatNav recentChats={recentChats} onNavigate={onNavigate} />
+        )}
         </div>
       ))}
     </nav>
@@ -145,11 +155,13 @@ export function DashboardChrome({
   role,
   email,
   badges,
+  recentChats = [],
   children,
 }: {
   role: Role;
   email: string | null;
   badges?: Record<string, number>;
+  recentChats?: ChatSessionSummary[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -192,7 +204,7 @@ export function DashboardChrome({
       <div className="flex-1 min-h-0 md:grid md:grid-cols-[196px_minmax(0,1fr)] md:overflow-hidden">
         {/* Desktop rail */}
         <aside className="hidden md:flex md:flex-col md:border-r md:border-line md:overflow-y-auto">
-          <NavGroups role={role} badges={badges} />
+          <NavGroups role={role} badges={badges} recentChats={recentChats} />
           <SidebarFooter />
         </aside>
 
@@ -233,6 +245,7 @@ export function DashboardChrome({
               <NavGroups
                 role={role}
                 badges={badges}
+                recentChats={recentChats}
                 onNavigate={() => setOpen(false)}
               />
               <SidebarFooter />

@@ -113,7 +113,9 @@ is off; only new decisions pause.
   curated dashboard), demo admin (full backoffice, read-only — a shared account for the
   judges), master admin (full operational control, operator only). Anonymous reads are opened
   by permissive SELECT policies (`db/migrations/0003_anon_read_policies.sql`); writes stay
-  service-role only.
+  service-role only. Signed-in users also get **"Chat with Beleth"** — an in-character,
+  **read-only** conversation (tools query Supabase + Alpaca, nothing acts) powered by AI/ML
+  API on a free model; transcripts in `chat_sessions` / `chat_messages` with owner-scoped RLS.
 - **Supabase:** shared Postgres — single source of truth for both sides — plus Auth for the
   webapp's access states.
 

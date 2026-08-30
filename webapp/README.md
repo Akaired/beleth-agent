@@ -14,6 +14,7 @@ every write.
 - `src/lib/auth.ts` — session + role data-access layer (server only); `src/lib/roles.ts` — the client-safe role helper
 - `src/lib/dashboard-queries.ts` — authenticated reads (overview, decision history/detail, strategy snapshot, control panel)
 - `src/app/dashboard/controls/` — master-admin kill switch: `page.tsx`, `actions.ts` (`setAgentPausedAction`); `src/components/dashboard/kill-switch.tsx` is the client toggle
+- `src/app/dashboard/chat/`, `src/app/dashboard/chats/`, `src/app/api/chat/` — "Chat with Beleth" (see below); engine in `src/lib/chat/`
 - `src/proxy.ts` — Next 16 proxy (renamed middleware): refreshes the auth session, gates `/dashboard/*`
 - `public/beleth.png`, `public/beleth-animated.svg` — the mascot
 
@@ -52,6 +53,34 @@ writes a heartbeat and produces no decisions; nothing is cancelled. The
   and wire a custom SMTP sender.
 - `site_url` = the Vercel production URL; `uri_allow_list` covers localhost,
   Vercel previews, and the custom domain.
+
+### Chat with Beleth (`/dashboard/chat`, any signed-in user)
+
+A conversational surface in the dashboard sidebar (its own section, between
+*Live* and *Records*): **New chat**, **All chats**, then the three most recent
+conversations. Beleth answers in character, in English, and **can only read** —
+the tool layer (`src/lib/chat/tools.ts`) exposes nothing that writes, places a
+trade, edits config, or pauses the agent.
+
+- **Provider:** AI/ML API (`aimlapi.com`), an OpenAI-compatible endpoint,
+  reached with a plain `fetch` (no SDK) in `src/lib/chat/aiml.ts`. This is the
+  webapp's own LLM layer — **separate from the agent, which keeps OpenRouter**
+  (the project notes resolved decision 2). Free model only, tool-calling required;
+  default `AIML_MODEL=openai/gpt-oss-20b`, env-swappable.
+- **Persistence:** `db/migrations/0006_chat_sessions.sql` adds `chat_sessions`
+  + `chat_messages` with owner-scoped RLS (`user_id = auth.uid()`) — the
+  webapp's first *per-user* write path. `POST /api/chat` runs a bounded
+  tool-calling loop server-side, persists the transcript, and titles the
+  session from the first message. Per-message and per-conversation caps bound
+  free-tier usage; token use is logged per turn.
+- **Mood:** the chat reuses the homepage mascot's state machine
+  (`src/lib/beleth.ts`) — the sprite in the header shows the current scene, and
+  Beleth's tone tracks the day's P&L (happy / neutral / sad).
+- **Config:** `AIML_API_KEY` (required, **server-only**, never `NEXT_PUBLIC_`).
+  Without it the chat replies "not configured". `AIML_MODEL` / `AIML_BASE_URL`
+  are optional (defaults in `src/lib/chat/aiml.ts`). AI/ML API's free tier has a
+  small **daily request quota** — once it is spent the chat surfaces a clear
+  "quota used up, try again later" message.
 
 ## Rendering model
 
@@ -95,6 +124,10 @@ equity chart, market-status chip and trade markers. They are read server-side
 only — do **not** prefix them with `NEXT_PUBLIC_`. `ALPACA_API_BASE_URL` is an
 optional override (defaults to the paper endpoint).
 
+`AIML_API_KEY` (server-side only) enables "Chat with Beleth". `AIML_MODEL`
+defaults to `openai/gpt-oss-20b`; `AIML_BASE_URL` to `https://api.aimlapi.com/v1`.
+Apply `db/migrations/0006_chat_sessions.sql` to Supabase before using the chat.
+
 ## Deploy (Vercel)
 
 1. Push this repo to GitHub.
@@ -109,6 +142,9 @@ optional override (defaults to the paper endpoint).
    - `ALPACA_SECRET_KEY`
      (server-side only — the equity chart, market-status chip and trade
      markers; **not** `NEXT_PUBLIC_`)
-5. Deploy. Every push to `main` deploys automatically.
-6. Custom domain later: Project → Settings → Domains → `beleth.davidemaiorana.dev`
+   - `AIML_API_KEY` (server-side only — "Chat with Beleth"; **not**
+     `NEXT_PUBLIC_`). Optionally `AIML_MODEL` to override the default free model.
+5. Apply `db/migrations/0006_chat_sessions.sql` to Supabase (SQL Editor).
+6. Deploy. Every push to `main` deploys automatically.
+7. Custom domain later: Project → Settings → Domains → `beleth.davidemaiorana.dev`
    (CNAME per Vercel's instructions).

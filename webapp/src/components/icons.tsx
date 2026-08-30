@@ -53,4 +53,13 @@ export {
   GoogleLogo as IconGoogle,
   List as IconMenu,
   X as IconClose,
+  ChatCircleText as IconChat,
+  ChatsCircle as IconChats,
+  Plus as IconPlus,
+  Trash as IconTrash,
+  ThumbsUp as IconThumbsUp,
+  ThumbsDown as IconThumbsDown,
+  Copy as IconCopy,
+  Check as IconCheck,
+  PencilSimple as IconPencil,
 } from "@phosphor-icons/react/dist/ssr";
