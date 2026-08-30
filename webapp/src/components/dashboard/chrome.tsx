@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { roleAtLeast, type Role } from "@/lib/roles";
 import type { ChatSessionSummary } from "@/lib/chat/types";
+import type { ForumRecentTopic } from "@/lib/forum/types";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { ChatNav } from "@/components/dashboard/chat-nav";
 import { AccountDropdown } from "@/components/account-dropdown";
@@ -15,10 +16,12 @@ import {
   IconDecisions,
   IconStrategy,
   IconControls,
+  IconLogs,
   IconMarketCalendar,
   IconTradeCalendar,
   IconMenu,
   IconClose,
+  IconCaretRight,
   IconAccount,
   IconSparkle,
   IconAdmin,
@@ -74,6 +77,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/dashboard/admin", label: "Admin", min: "master_admin", Icon: IconAdmin, disabled: true },
       { href: "/dashboard/controls", label: "Controls", min: "master_admin", Icon: IconControls },
+      { href: "/dashboard/logs", label: "Logs", min: "master_admin", Icon: IconLogs },
       { href: "/dashboard/api", label: "API", min: "master_admin", Icon: IconCode, disabled: true },
     ],
   },
@@ -85,15 +89,56 @@ function isActive(pathname: string, href: string): boolean {
     : pathname.startsWith(href);
 }
 
+function ForumRecentRows({
+  topics,
+  onNavigate,
+}: {
+  topics: ForumRecentTopic[];
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
+  if (topics.length === 0) return null;
+  return (
+    <>
+      {topics.map((t) => {
+        const active = pathname === `/forum/t/${t.slug}`;
+        return (
+          <Link
+            key={t.id}
+            href={`/forum/t/${t.slug}`}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            title={t.title}
+            className={`flex items-center gap-2 border-l-2 py-[3px] pl-7 pr-3 text-[12px] transition-colors ${
+              active
+                ? "border-acc bg-hoverbg text-txt"
+                : "border-transparent text-sec hover:text-txt"
+            }`}
+          >
+            <IconCaretRight
+              size={10}
+              weight="bold"
+              className={active ? "text-acc" : "text-faint"}
+            />
+            <span className="truncate">{t.title}</span>
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
 function NavGroups({
   role,
   badges,
   recentChats,
+  recentForumTopics,
   onNavigate,
 }: {
   role: Role;
   badges?: Record<string, number>;
   recentChats: ChatSessionSummary[];
+  recentForumTopics: ForumRecentTopic[];
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -103,11 +148,11 @@ function NavGroups({
   })).filter((g) => g.items.length > 0);
 
   return (
-    <nav className="flex flex-col py-1">
+    <nav className="flex flex-col py-0.5">
       {groups.map((g) => (
         <div key={g.label}>
-        <div className="pt-3 pb-1">
-          <div className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">
+        <div className="pt-2 pb-0.5">
+          <div className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">
             {g.label}
           </div>
           {g.items.map((it) => {
@@ -117,7 +162,7 @@ function NavGroups({
                   key={it.href}
                   aria-disabled="true"
                   title="Coming soon"
-                  className="flex items-center gap-2.5 border-l-2 border-transparent py-[7px] pl-2.5 pr-3 text-[12.5px] text-faint cursor-default select-none"
+                  className="flex items-center gap-2.5 border-l-2 border-transparent py-[4px] pl-2.5 pr-3 text-[12.5px] text-faint cursor-default select-none"
                 >
                   <it.Icon size={15} weight="regular" className="text-faint" />
                   <span>{it.label}</span>
@@ -130,32 +175,39 @@ function NavGroups({
             const active = isActive(pathname, it.href);
             const badge = badges?.[it.href] ?? 0;
             return (
-              <Link
-                key={it.href}
-                href={it.href}
-                onClick={onNavigate}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2.5 border-l-2 py-[7px] pl-2.5 pr-3 text-[12.5px] transition-colors ${
-                  active
-                    ? "border-acc bg-hoverbg text-txt"
-                    : "border-transparent text-sec hover:text-txt"
-                }`}
-              >
-                <it.Icon
-                  size={15}
-                  weight={active ? "bold" : "regular"}
-                  className={active ? "text-acc" : "text-dim"}
-                />
-                <span>{it.label}</span>
-                {badge > 0 && (
-                  <span
-                    className="ml-auto min-w-[18px] rounded-full bg-acc/15 px-1.5 py-px text-center font-mono text-[10px] font-medium text-acc"
-                    title={`${badge} open position${badge === 1 ? "" : "s"}`}
-                  >
-                    {badge}
-                  </span>
+              <div key={it.href}>
+                <Link
+                  href={it.href}
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-2.5 border-l-2 py-[5px] pl-2.5 pr-3 text-[12.5px] transition-colors ${
+                    active
+                      ? "border-acc bg-hoverbg text-txt"
+                      : "border-transparent text-sec hover:text-txt"
+                  }`}
+                >
+                  <it.Icon
+                    size={15}
+                    weight={active ? "bold" : "regular"}
+                    className={active ? "text-acc" : "text-dim"}
+                  />
+                  <span>{it.label}</span>
+                  {badge > 0 && (
+                    <span
+                      className="ml-auto min-w-[18px] rounded-full bg-acc/15 px-1.5 py-px text-center font-mono text-[10px] font-medium text-acc"
+                      title={`${badge} open position${badge === 1 ? "" : "s"}`}
+                    >
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+                {it.href === "/forum" && (
+                  <ForumRecentRows
+                    topics={recentForumTopics}
+                    onNavigate={onNavigate}
+                  />
                 )}
-              </Link>
+              </div>
             );
           })}
         </div>
@@ -171,7 +223,7 @@ function NavGroups({
 
 function SidebarFooter() {
   return (
-    <div className="mt-auto flex flex-col gap-2.5 border-t border-line px-3 py-3">
+    <div className="shrink-0 flex flex-col gap-2 border-t border-line px-3 py-2.5">
       <div
         aria-disabled="true"
         title="Coming soon"
@@ -224,12 +276,14 @@ export function DashboardChrome({
   email,
   badges,
   recentChats = [],
+  recentForumTopics = [],
   children,
 }: {
   role: Role;
   email: string | null;
   badges?: Record<string, number>;
   recentChats?: ChatSessionSummary[];
+  recentForumTopics?: ForumRecentTopic[];
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -272,9 +326,16 @@ export function DashboardChrome({
       </header>
 
       <div className="flex-1 min-h-0 md:grid md:grid-cols-[196px_minmax(0,1fr)] md:overflow-hidden">
-        {/* Desktop rail */}
-        <aside className="hidden md:flex md:flex-col md:border-r md:border-line md:overflow-y-auto">
-          <NavGroups role={role} badges={badges} recentChats={recentChats} />
+        {/* Desktop rail — nav list scrolls, footer stays pinned */}
+        <aside className="hidden md:flex md:min-h-0 md:flex-col md:border-r md:border-line">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <NavGroups
+              role={role}
+              badges={badges}
+              recentChats={recentChats}
+              recentForumTopics={recentForumTopics}
+            />
+          </div>
           <SidebarFooter />
         </aside>
 
@@ -311,13 +372,16 @@ export function DashboardChrome({
                 <IconClose size={18} />
               </button>
             </div>
-            <div className="flex flex-1 flex-col overflow-y-auto">
-              <NavGroups
-                role={role}
-                badges={badges}
-                recentChats={recentChats}
-                onNavigate={() => setOpen(false)}
-              />
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <NavGroups
+                  role={role}
+                  badges={badges}
+                  recentChats={recentChats}
+                  recentForumTopics={recentForumTopics}
+                  onNavigate={() => setOpen(false)}
+                />
+              </div>
               <SidebarFooter />
             </div>
           </div>

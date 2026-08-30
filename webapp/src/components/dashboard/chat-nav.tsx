@@ -28,7 +28,7 @@ function Row({
       href={href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-2.5 border-l-2 py-[7px] pl-2.5 pr-3 text-[12.5px] transition-colors ${
+      className={`flex items-center gap-2.5 border-l-2 py-[5px] pl-2.5 pr-3 text-[12.5px] transition-colors ${
         active
           ? "border-acc bg-hoverbg text-txt"
           : "border-transparent text-sec hover:text-txt"
@@ -89,7 +89,7 @@ function RecentRow({
         href={`/dashboard/chat/${chat.id}`}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
-        className={`flex min-w-0 flex-1 items-center gap-2 py-[7px] pl-7 pr-1 text-[12px] transition-colors ${
+        className={`flex min-w-0 flex-1 items-center gap-2 py-[3px] pl-7 pr-1 text-[12px] transition-colors ${
           active ? "text-txt" : "text-sec group-hover:text-txt"
         }`}
       >
@@ -143,8 +143,8 @@ export function ChatNav({
   const pathname = usePathname();
 
   return (
-    <div className="pt-3 pb-1">
-      <div className="px-3 pb-1.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">
+    <div className="pt-2 pb-0.5">
+      <div className="px-3 pb-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-faint">
         Chat
       </div>
 

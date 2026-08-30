@@ -17,6 +17,9 @@ export type ForumCategoryWithCount = ForumCategory & {
   topic_count: number;
 };
 
+/** Minimal topic shape for the sidebar's "recent" list under Forum. */
+export type ForumRecentTopic = { id: string; slug: string; title: string };
+
 /** A row in the Discourse-style topic list (category + author flattened in). */
 export type ForumTopicListItem = {
   id: string;

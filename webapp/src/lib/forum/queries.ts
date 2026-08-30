@@ -11,6 +11,7 @@ import { sanitizeForumHtml } from "@/lib/forum/sanitize";
 import type {
   ForumCategoryWithCount,
   ForumPost,
+  ForumRecentTopic,
   ForumTopicDetail,
   ForumTopicListItem,
 } from "@/lib/forum/types";
@@ -63,6 +64,35 @@ export async function fetchForumCategories(): Promise<ForumCategoryWithCount[]> 
     }));
   } catch (err) {
     console.error("fetchForumCategories failed", err);
+    return [];
+  }
+}
+
+/**
+ * The signed-in viewer's own most recently started topics — the indented
+ * "recent" list under Forum in the sidebar, mirroring recent chats. Empty for
+ * a logged-out visitor or one who has never posted.
+ */
+export async function fetchRecentForumTopicsByAuthor(
+  authorId: string,
+  limit = 3,
+): Promise<ForumRecentTopic[]> {
+  if (!authorId) return [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("forum_topics")
+      .select("id,slug,title")
+      .eq("author_id", authorId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    return ((data as Row[] | null) ?? []).map((r) => ({
+      id: String(r.id),
+      slug: String(r.slug),
+      title: String(r.title),
+    }));
+  } catch (err) {
+    console.error("fetchRecentForumTopicsByAuthor failed", err);
     return [];
   }
 }

@@ -1,6 +1,7 @@
 import { getSessionContext, roleAtLeast } from "@/lib/auth";
 import { fetchOpenSpreadCount } from "@/lib/dashboard-queries";
 import { fetchRecentChatSessions } from "@/lib/chat/queries";
+import { fetchRecentForumTopicsByAuthor } from "@/lib/forum/queries";
 import { DashboardChrome } from "@/components/dashboard/chrome";
 import { PublicForumShell } from "@/components/forum/public-forum-shell";
 
@@ -17,11 +18,12 @@ export default async function ForumLayout({
   const ctx = await getSessionContext();
   if (!ctx) return <PublicForumShell>{children}</PublicForumShell>;
 
-  const [openSpreads, recentChats] = await Promise.all([
+  const [openSpreads, recentChats, recentForumTopics] = await Promise.all([
     roleAtLeast(ctx.role, "demo_admin")
       ? fetchOpenSpreadCount()
       : Promise.resolve(0),
     fetchRecentChatSessions(3),
+    fetchRecentForumTopicsByAuthor(ctx.userId, 3),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function ForumLayout({
       email={ctx.email}
       badges={{ "/dashboard/positions": openSpreads }}
       recentChats={recentChats}
+      recentForumTopics={recentForumTopics}
     >
       {children}
     </DashboardChrome>
