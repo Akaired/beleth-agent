@@ -28,6 +28,14 @@ const SANS =
 const MONO =
   "'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
+// Absolute origin for images in email — clients need a hosted URL (no inline
+// SVG, no data: URIs). Overridable while the custom domain isn't bound.
+const SITE = (process.env.BELETH_SITE_URL || "https://beleth.davidemaiorana.dev").replace(
+  /\/$/,
+  "",
+);
+const LOGO_SRC = `${SITE}/beleth.png`;
+
 export type TemplateVarSpec = {
   key: string;
   type: "string" | "number";
@@ -86,8 +94,8 @@ function shell(opts: {
     <td align="center" style="padding:32px 16px;">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:100%;background-color:${C.card};border:1px solid ${C.border};border-radius:12px;overflow:hidden;">
         <tr>
-          <td style="padding:20px 28px;background-color:${C.headBand};border-bottom:1px solid ${C.border};">
-            <span style="display:inline-block;width:9px;height:9px;background-color:${C.acc};border-radius:2px;vertical-align:middle;"></span>
+          <td style="padding:18px 28px;background-color:${C.headBand};border-bottom:1px solid ${C.border};">
+            <img src="${LOGO_SRC}" width="22" height="26" alt="Beleth" style="display:inline-block;vertical-align:middle;border:0;outline:none;">
             <span style="font-family:${MONO};font-size:13px;letter-spacing:0.18em;color:${C.txt};vertical-align:middle;margin-left:10px;">BELETH</span>
           </td>
         </tr>
@@ -218,27 +226,6 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
           tone: "warn",
         },
         { cta: { label: "Review account", url: "{{support_url}}" } },
-      ],
-    }),
-  },
-  {
-    alias: "beleth-magic-link",
-    name: "Magic sign-in link",
-    subject: "Your Beleth sign-in link",
-    description: "Passwordless sign-in. Maps to Supabase Auth's magic-link mail.",
-    variables: [
-      { key: "magic_link_url", type: "string", fallback_value: "https://beleth.davidemaiorana.dev/login" },
-    ],
-    html: shell({
-      preheader: "Your one-time sign-in link for Beleth.",
-      heading: "Sign in to Beleth",
-      blocks: [
-        { p: "Here's your one-time sign-in link. It works once and expires in a few minutes." },
-        { cta: { label: "Sign in", url: "{{magic_link_url}}" } },
-        {
-          p: `Or paste this into your browser:<br><span style="font-family:${MONO};font-size:12px;color:${C.sec};word-break:break-all;">{{magic_link_url}}</span>`,
-        },
-        { note: "Didn't try to sign in? Ignore this email and the link stays unused." },
       ],
     }),
   },
