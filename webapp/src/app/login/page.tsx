@@ -3,24 +3,33 @@ import type { Metadata } from "next";
 import { LoginForm } from "@/app/login/login-form";
 
 export const metadata: Metadata = {
-  title: "Sign in — Beleth",
+  title: "Log in / Register — Beleth",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const sp = await searchParams;
-  const raw = sp?.next;
-  const nextParam = Array.isArray(raw) ? raw[0] : raw;
+
+  const rawNext = Array.isArray(sp?.next) ? sp?.next[0] : sp?.next;
   const next =
-    typeof nextParam === "string" && nextParam.startsWith("/dashboard")
-      ? nextParam
+    typeof rawNext === "string" && rawNext.startsWith("/dashboard")
+      ? rawNext
       : "/dashboard";
 
+  const rawMode = Array.isArray(sp?.mode) ? sp?.mode[0] : sp?.mode;
+  const initialMode = rawMode === "signup" ? "signup" : "signin";
+
+  const rawError = Array.isArray(sp?.error) ? sp?.error[0] : sp?.error;
+  const initialError =
+    rawError === "auth"
+      ? "That sign-in link didn't work. Try again."
+      : null;
+
   return (
-    <main className="flex flex-1 min-h-screen items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm">
+    <main className="flex flex-1 items-center justify-center px-6 py-16">
+      <div className="w-full max-w-[400px]">
         <Link
           href="/"
-          className="flex items-center gap-2.5 mb-10 font-mono text-[13px] font-medium tracking-[0.14em]"
+          className="mb-8 flex items-center justify-center gap-2.5 font-mono text-[13px] font-medium tracking-[0.14em]"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -32,7 +41,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           />
           BELETH
         </Link>
-        <LoginForm next={next} />
+        <LoginForm
+          next={next}
+          initialMode={initialMode}
+          initialError={initialError}
+        />
       </div>
     </main>
   );

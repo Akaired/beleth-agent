@@ -11,9 +11,12 @@
  */
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { applySessionLifetime, REMEMBER_COOKIE } from "@/lib/supabase/remember";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  const remembered = request.cookies.get(REMEMBER_COOKIE)?.value === "1";
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,11 +27,12 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
+          const adjusted = applySessionLifetime(cookiesToSet, remembered);
+          for (const { name, value } of adjusted) {
             request.cookies.set(name, value);
           }
           response = NextResponse.next({ request });
-          for (const { name, value, options } of cookiesToSet) {
+          for (const { name, value, options } of adjusted) {
             response.cookies.set(name, value, options);
           }
         },

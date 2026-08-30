@@ -10,9 +10,11 @@
  */
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { applySessionLifetime, REMEMBER_COOKIE } from "@/lib/supabase/remember";
 
 export async function createClient() {
   const cookieStore = await cookies();
+  const remembered = cookieStore.get(REMEMBER_COOKIE)?.value === "1";
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +29,10 @@ export async function createClient() {
           // read-only there). The session is refreshed in `src/proxy.ts`
           // instead, so swallowing this is safe.
           try {
-            for (const { name, value, options } of cookiesToSet) {
+            for (const { name, value, options } of applySessionLifetime(
+              cookiesToSet,
+              remembered,
+            )) {
               cookieStore.set(name, value, options);
             }
           } catch {
