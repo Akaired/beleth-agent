@@ -64,7 +64,6 @@ export {
   LockSimple as IconLock,
   Code as IconCode,
   GithubLogo as IconGithub,
-  GoogleLogo as IconGoogle,
   List as IconMenu,
   X as IconClose,
   ChatCircleText as IconChat,
