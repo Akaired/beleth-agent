@@ -11,9 +11,8 @@ import {
 } from "@/app/dashboard/admin/docs/actions";
 import { DocsCategoriesModal } from "@/components/dashboard/admin/docs-categories-modal";
 import {
-  IconArrowDown,
-  IconArrowUp,
   IconCheck,
+  IconDragHandle,
   IconEye,
   IconPencil,
   IconPlus,
@@ -48,6 +47,9 @@ export function DocsAdminList({
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [catsOpen, setCatsOpen] = useState(false);
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -68,26 +70,27 @@ export function DocsAdminList({
     (p) => !categories.some((c) => c.slug === p.category),
   );
 
-  function move(groupPages: DocPage[], index: number, dir: -1 | 1) {
-    const swap = index + dir;
-    if (swap < 0 || swap >= groupPages.length) return;
-    const a = groupPages[index];
-    const b = groupPages[swap];
-    run(() =>
-      reorderPagesAction([
-        { id: a.id, order_index: b.order_index },
-        { id: b.id, order_index: a.order_index },
-      ]),
-    );
+  /** Drop `fromId` onto `toId`'s slot within one category, keeping the group's
+   * existing set of order_index values so only the moved rows shift. */
+  function reorder(groupPages: DocPage[], fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const from = groupPages.findIndex((p) => p.id === fromId);
+    const to = groupPages.findIndex((p) => p.id === toId);
+    if (from === -1 || to === -1) return;
+    const next = [...groupPages];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const slots = groupPages.map((p) => p.order_index).sort((a, b) => a - b);
+    const changed = next
+      .map((p, i) => ({ id: p.id, order_index: slots[i] }))
+      .filter((row, i) => row.order_index !== groupPages[i].order_index);
+    if (changed.length === 0) return;
+    run(() => reorderPagesAction(changed));
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[13px] text-sec">
-          Pages served at <span className="font-mono text-txt">/docs</span>. Drafts
-          stay invisible to the public until published.
-        </p>
+      <div className="flex items-center justify-end gap-3">
         <button
           type="button"
           onClick={() => setCatsOpen(true)}
@@ -126,112 +129,135 @@ export function DocsAdminList({
             <p className="px-4 py-3 text-[12px] text-dim">No pages yet.</p>
           ) : (
             <ul className="divide-y divide-rowline">
-              {groupPages.map((page, i) => (
-                <li
-                  key={page.id}
-                  className="flex items-center gap-3 px-4 py-2.5 text-[13px]"
-                >
-                  <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={i === 0 || pending}
-                      onClick={() => move(groupPages, i, -1)}
-                      className="text-dim transition-colors hover:text-txt disabled:opacity-30"
-                    >
-                      <IconArrowUp size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={i === groupPages.length - 1 || pending}
-                      onClick={() => move(groupPages, i, 1)}
-                      className="text-dim transition-colors hover:text-txt disabled:opacity-30"
-                    >
-                      <IconArrowDown size={12} />
-                    </button>
-                  </div>
-
-                  <Link
-                    href={`/dashboard/admin/docs/${page.id}`}
-                    className="min-w-0 flex-1 truncate font-medium text-txt transition-colors hover:text-acc"
+              {groupPages.map((page) => {
+                const isDragging = draggingId === page.id;
+                const isOver =
+                  overId === page.id && draggingId !== null && !isDragging;
+                return (
+                  <li
+                    key={page.id}
+                    draggable={armedId === page.id}
+                    onDragStart={(e) => {
+                      setDraggingId(page.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setArmedId(null);
+                      setDraggingId(null);
+                      setOverId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (!draggingId) return;
+                      if (!groupPages.some((p) => p.id === draggingId)) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (overId !== page.id) setOverId(page.id);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggingId) reorder(groupPages, draggingId, page.id);
+                      setOverId(null);
+                    }}
+                    className={`flex items-center gap-3 px-4 py-2.5 text-[13px] transition-colors ${
+                      isDragging ? "opacity-40" : ""
+                    } ${isOver ? "bg-acc/10 shadow-[inset_0_2px_0_0_var(--color-acc)]" : ""}`}
                   >
-                    {page.title}
-                    <span className="ml-2 font-mono text-[11px] text-dim">
-                      /{page.slug}
-                    </span>
-                  </Link>
+                    <button
+                      type="button"
+                      aria-label="Drag to reorder"
+                      disabled={pending || groupPages.length < 2}
+                      onPointerDown={() => setArmedId(page.id)}
+                      onPointerUp={() =>
+                        setArmedId((id) => (id === page.id ? null : id))
+                      }
+                      className="flex shrink-0 cursor-grab touch-none items-center text-dim transition-colors hover:text-txt active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
+                    >
+                      <IconDragHandle size={16} />
+                    </button>
 
-                  <StatusPill published={page.status === "published"} />
-
-                  <div className="flex shrink-0 items-center gap-1">
                     <Link
                       href={`/dashboard/admin/docs/${page.id}`}
-                      aria-label="Edit"
-                      className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt"
+                      className="min-w-0 flex-1 truncate font-medium text-txt transition-colors hover:text-acc"
                     >
-                      <IconPencil size={14} />
+                      {page.title}
+                      <span className="ml-2 font-mono text-[11px] text-dim">
+                        /{page.slug}
+                      </span>
                     </Link>
-                    {page.status === "published" && (
-                      <a
-                        href={`/docs/${page.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="View"
+
+                    <StatusPill published={page.status === "published"} />
+
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Link
+                        href={`/dashboard/admin/docs/${page.id}`}
+                        aria-label="Edit"
                         className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt"
                       >
-                        <IconEye size={14} />
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      aria-label={
-                        page.status === "published" ? "Unpublish" : "Publish"
-                      }
-                      disabled={pending}
-                      onClick={() =>
-                        run(() =>
-                          setPageStatusAction(
-                            page.id,
-                            page.status === "published" ? "draft" : "published",
-                          ),
-                        )
-                      }
-                      className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt disabled:opacity-40"
-                    >
-                      {page.status === "published" ? (
-                        <IconUnpublish size={14} />
-                      ) : (
-                        <IconPublish size={14} />
+                        <IconPencil size={14} />
+                      </Link>
+                      {page.status === "published" && (
+                        <a
+                          href={`/docs/${page.slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="View"
+                          className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt"
+                        >
+                          <IconEye size={14} />
+                        </a>
                       )}
-                    </button>
-                    {confirmId === page.id ? (
                       <button
                         type="button"
+                        aria-label={
+                          page.status === "published" ? "Unpublish" : "Publish"
+                        }
                         disabled={pending}
-                        onClick={() => {
-                          setConfirmId(null);
-                          run(() => deletePageAction(page.id));
-                        }}
-                        className="flex h-7 items-center gap-1 rounded bg-down/15 px-2 font-mono text-[10px] uppercase tracking-[0.08em] text-down"
+                        onClick={() =>
+                          run(() =>
+                            setPageStatusAction(
+                              page.id,
+                              page.status === "published"
+                                ? "draft"
+                                : "published",
+                            ),
+                          )
+                        }
+                        className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt disabled:opacity-40"
                       >
-                        <IconCheck size={12} />
-                        Sure?
+                        {page.status === "published" ? (
+                          <IconUnpublish size={14} />
+                        ) : (
+                          <IconPublish size={14} />
+                        )}
                       </button>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label="Delete"
-                        disabled={pending}
-                        onClick={() => setConfirmId(page.id)}
-                        className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-down/10 hover:text-down disabled:opacity-40"
-                      >
-                        <IconTrash size={14} />
-                      </button>
-                    )}
-                  </div>
-                </li>
-              ))}
+                      {confirmId === page.id ? (
+                        <button
+                          type="button"
+                          disabled={pending}
+                          onClick={() => {
+                            setConfirmId(null);
+                            run(() => deletePageAction(page.id));
+                          }}
+                          className="flex h-7 items-center gap-1 rounded bg-down/15 px-2 font-mono text-[10px] uppercase tracking-[0.08em] text-down"
+                        >
+                          <IconCheck size={12} />
+                          Sure?
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label="Delete"
+                          disabled={pending}
+                          onClick={() => setConfirmId(page.id)}
+                          className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-down/10 hover:text-down disabled:opacity-40"
+                        >
+                          <IconTrash size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>

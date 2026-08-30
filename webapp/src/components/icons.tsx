@@ -55,6 +55,7 @@ export {
   ArrowUp as IconArrowUp,
   ArrowDown as IconArrowDown,
   ArrowUpRight as IconArrowUpRight,
+  DotsSixVertical as IconDragHandle,
   Scales as IconScales,
   Target as IconTarget,
   Door as IconExit,
