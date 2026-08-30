@@ -1,5 +1,8 @@
-import Link from "next/link";
-import { IconGithub, IconSignIn } from "@/components/icons";
+import { IconGithub } from "@/components/icons";
+import { CtaAuthButton } from "@/components/cta-auth-button";
+
+const CTA_BTN =
+  "inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap";
 
 export function CtaSection() {
   return (
@@ -16,18 +19,12 @@ export function CtaSection() {
           </p>
         </div>
         <div className="flex flex-col gap-2.5 self-start md:self-auto">
-          <Link
-            href="/login"
-            className="inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
-          >
-            <IconSignIn size={15} weight="fill" />
-            Log in / Register
-          </Link>
+          <CtaAuthButton className={CTA_BTN} />
           <a
             href="https://github.com/Akaired/beleth-agent"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
+            className={CTA_BTN}
           >
             <IconGithub size={15} weight="fill" />
             View the source on GitHub

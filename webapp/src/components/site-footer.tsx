@@ -8,9 +8,6 @@ export function SiteFooter() {
     <footer className="mt-auto border-t border-line">
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-7 px-4 py-12 md:px-[clamp(16px,3vw,40px)]">
         <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-[12.5px] text-sec">
-          <a href="#method" className="transition-colors hover:text-acc">
-            Method
-          </a>
           <Link href="/dashboard" className="transition-colors hover:text-acc">
             Dashboard
           </Link>

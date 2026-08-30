@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
 import type { Role } from "@/lib/roles";
 import { AccountDropdown } from "@/components/account-dropdown";
 import { IconSignIn } from "@/components/icons";
@@ -23,18 +24,6 @@ const EMAIL_KEY = "beleth-account-email";
 const NAME_KEY = "beleth-account-name";
 const AVATAR_KEY = "beleth-account-avatar";
 const ROLES: Role[] = ["public_user", "demo_admin", "master_admin"];
-
-/**
- * Is a Supabase auth-token cookie present? `@supabase/ssr` does not mark it
- * httpOnly (the browser client needs to read it), so this is a synchronous,
- * network-free signal we can trust for the first render.
- */
-function hasAuthCookie(): boolean {
-  if (typeof document === "undefined") return false;
-  return document.cookie
-    .split("; ")
-    .some((c) => /^sb-[^=]*-auth-token(\.\d+)?=./.test(c));
-}
 
 function readCache(): {
   email: string | null;
@@ -103,7 +92,7 @@ export function HeaderAuth() {
       // an auth cookie is enough to swap in the dropdown before getUser().
       await Promise.resolve();
       if (cancelled) return;
-      if (hasAuthCookie()) {
+      if (hasSupabaseAuthCookie()) {
         const { email, role, displayName, avatarUrl } = readCache();
         setState({ status: "in", email, role, displayName, avatarUrl });
       } else {
