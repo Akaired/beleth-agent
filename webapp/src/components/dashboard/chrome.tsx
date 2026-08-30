@@ -57,7 +57,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount, disabled: true },
       { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconSparkle, disabled: true },
-      { href: "/dashboard/forum", label: "Forum", min: "public_user", Icon: IconForum, disabled: true },
+      { href: "/forum", label: "Forum", min: "public_user", Icon: IconForum },
     ],
   },
   {

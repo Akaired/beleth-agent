@@ -1547,6 +1547,293 @@ body {
   transition: none !important;
 }
 
+/* ==========================================================================
+   Forum — a Discourse-styled skin on the Beleth token set. Layout ported from
+   discourse/discourse (common/base/_topic-list.scss, category-list.scss,
+   common/components/navs.scss); every colour is one of our own --color-* tokens.
+   ========================================================================== */
+
+/* Nav pills: Categories | Latest, active pill underlined in gold. */
+.forum-pills {
+  display: flex;
+  gap: 1.25rem;
+  border-bottom: 1px solid var(--color-line);
+}
+.forum-pill {
+  padding: 0.55rem 0.1rem;
+  margin-bottom: -1px;
+  font-size: 13px;
+  color: var(--color-sec);
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s;
+}
+.forum-pill:hover {
+  color: var(--color-txt);
+}
+.forum-pill[data-active="true"] {
+  color: var(--color-txt);
+  border-bottom-color: var(--color-acc);
+}
+
+/* Category rows: 6px coloured left border, Discourse's signature. */
+.forum-cat-row {
+  border-left: 6px solid var(--cat-color, var(--color-line));
+}
+
+/* Topic list table. */
+.forum-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.forum-table thead th {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--color-sec);
+  border-bottom: 1px solid var(--color-line);
+}
+.forum-table tbody td {
+  padding: 0.7rem 0.75rem;
+  border-top: 1px solid var(--color-rowline);
+  vertical-align: middle;
+}
+.forum-table tbody tr:hover {
+  background: var(--color-hoverbg);
+}
+.forum-table .forum-num {
+  width: 4.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-sec);
+}
+.forum-table .forum-activity {
+  width: 5rem;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-dim);
+}
+
+/* Rendered post body (sanitised HTML from the editor). */
+.forum-prose {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-txt);
+}
+.forum-prose > :first-child {
+  margin-top: 0;
+}
+.forum-prose > :last-child {
+  margin-bottom: 0;
+}
+.forum-prose p {
+  margin: 0 0 0.75em;
+}
+.forum-prose h2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+.forum-prose h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 1.1em 0 0.4em;
+}
+.forum-prose ul,
+.forum-prose ol {
+  margin: 0 0 0.75em;
+  padding-left: 1.5em;
+}
+.forum-prose ul {
+  list-style: disc;
+}
+.forum-prose ol {
+  list-style: decimal;
+}
+.forum-prose li {
+  margin: 0.15em 0;
+}
+.forum-prose blockquote {
+  margin: 0 0 0.75em;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--color-emphline);
+  color: var(--color-sec);
+}
+.forum-prose a {
+  color: var(--color-acc);
+  text-decoration: underline;
+}
+.forum-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--color-inset);
+  border: 1px solid var(--color-line);
+  border-radius: 3px;
+  padding: 0.05em 0.35em;
+}
+.forum-prose pre {
+  margin: 0 0 0.75em;
+  padding: 0.8em;
+  background: var(--color-inset);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.forum-prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+}
+.forum-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.4em 0;
+}
+.forum-prose .ql-align-center {
+  text-align: center;
+}
+.forum-prose .ql-align-right {
+  text-align: right;
+}
+.forum-prose .ql-align-justify {
+  text-align: justify;
+}
+.forum-prose img.ql-align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+.forum-prose img.ql-align-right {
+  display: block;
+  margin-left: auto;
+}
+.forum-prose iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 6px;
+  margin: 0.5em 0;
+  background: #000;
+}
+.forum-editor .ql-video {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: 6px;
+  margin: 0.5em 0;
+  background: #000;
+}
+
+/* Quill "snow" editor, retinted to the Beleth tokens. */
+.forum-editor .ql-toolbar.ql-snow {
+  border-color: var(--color-inputline);
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  background: var(--color-panel-head);
+}
+
+/* Tailwind Preflight sets `svg { display:block }`, which breaks Quill's
+   `float:left` icon layout (icons land at different vertical offsets). Lay the
+   toolbar out with flexbox instead: one uniform gap so every control is
+   equidistant, no per-group margins, every button the same box. */
+.forum-editor .ql-toolbar.ql-snow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+}
+.forum-editor .ql-toolbar.ql-snow .ql-formats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+.forum-editor .ql-toolbar.ql-snow button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+}
+.forum-editor .ql-toolbar.ql-snow button svg {
+  float: none;
+  width: 18px;
+  height: 18px;
+}
+.forum-editor .ql-toolbar.ql-snow .ql-picker {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+}
+.forum-editor .ql-toolbar.ql-snow .ql-picker-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+}
+.forum-editor .ql-container.ql-snow {
+  border-color: var(--color-inputline);
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-txt);
+  background: var(--color-inset);
+}
+.forum-editor .ql-editor {
+  min-height: inherit;
+}
+.forum-editor .ql-editor.ql-blank::before {
+  color: var(--color-dim);
+  font-style: normal;
+}
+.forum-editor .ql-snow .ql-stroke {
+  stroke: var(--color-sec);
+}
+.forum-editor .ql-snow .ql-fill {
+  fill: var(--color-sec);
+}
+.forum-editor .ql-snow .ql-picker {
+  color: var(--color-sec);
+}
+.forum-editor .ql-snow.ql-toolbar button:hover .ql-stroke,
+.forum-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--color-acc);
+}
+.forum-editor .ql-snow.ql-toolbar button:hover .ql-fill,
+.forum-editor .ql-snow.ql-toolbar button.ql-active .ql-fill {
+  fill: var(--color-acc);
+}
+.forum-editor .ql-snow .ql-picker-options {
+  background: var(--color-panel);
+  border-color: var(--color-line);
+}
+.forum-editor .ql-snow .ql-tooltip {
+  background: var(--color-panel);
+  border-color: var(--color-line);
+  color: var(--color-txt);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.4);
+}
+.forum-editor .ql-snow .ql-tooltip input[type="text"] {
+  background: var(--color-inset);
+  border-color: var(--color-inputline);
+  color: var(--color-txt);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
