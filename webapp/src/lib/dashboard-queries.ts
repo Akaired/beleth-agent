@@ -33,6 +33,7 @@ import type { SpreadPosition } from "@/lib/positions";
 import type { HostHistoryPoint } from "@/lib/host";
 import type { AgentEvent } from "@/lib/events";
 import {
+  deriveOrderOutcome,
   type AgentStatusRow,
   type DecisionRow,
   type EvidencePackage,
@@ -185,6 +186,19 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
     ),
   ).size;
 
+  // Resolve `orderOutcome` for the decisions we render, so a `trade` decision
+  // that was stood down by the marketability gate is not labelled a live order.
+  const decisionsWithOutcome = await attachOrderOutcomes(supabase, [
+    ...((latest.data ? [latest.data] : []) as DecisionRow[]),
+    ...((recent.data as DecisionRow[] | null) ?? []),
+  ]);
+  const latestWithOutcome =
+    decisionsWithOutcome.find((d) => d.id === (latest.data as DecisionRow | null)?.id) ??
+    null;
+  const recentWithOutcome = ((recent.data as DecisionRow[] | null) ?? []).map(
+    (r) => decisionsWithOutcome.find((d) => d.id === r.id) ?? r,
+  );
+
   // Trades that actually executed on the paper account: an entry marker
   // exists only for a filled order, so canceled / expired / rejected orders
   // are excluded, and "exit" markers are a round trip's closing leg, not a
@@ -196,9 +210,9 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
     : (trades.count ?? 0);
 
   return {
-    latestDecision: (latest.data as DecisionRow | null) ?? null,
+    latestDecision: latestWithOutcome,
     agentStatus: (status.data as AgentStatusRow | null) ?? null,
-    recentDecisions: (recent.data as DecisionRow[] | null) ?? [],
+    recentDecisions: recentWithOutcome,
     equity,
     account,
     tradeMarkers,
@@ -210,6 +224,45 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       (first.data as { created_at: string } | null)?.created_at ?? null,
     openPositions: positions.count ?? 0,
   };
+}
+
+/**
+ * Fill `orderOutcome` on each decision by loading the `trades` rows the same
+ * cycle wrote. One round trip regardless of how many rows are passed;
+ * `no_trade` decisions resolve to `null` without hitting the table.
+ */
+async function attachOrderOutcomes<T extends DecisionRow>(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: T[],
+): Promise<T[]> {
+  const tradeDecisionIds = rows
+    .filter((r) => r.action === "trade")
+    .map((r) => r.id);
+
+  const byDecision = new Map<
+    string,
+    { alpaca_order_id: string | null; status: string | null }[]
+  >();
+  if (tradeDecisionIds.length > 0) {
+    const { data } = await supabase
+      .from("trades")
+      .select("decision_id,alpaca_order_id,status")
+      .in("decision_id", tradeDecisionIds);
+    for (const t of (data ?? []) as {
+      decision_id: string;
+      alpaca_order_id: string | null;
+      status: string | null;
+    }[]) {
+      const list = byDecision.get(t.decision_id) ?? [];
+      list.push({ alpaca_order_id: t.alpaca_order_id, status: t.status });
+      byDecision.set(t.decision_id, list);
+    }
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    orderOutcome: deriveOrderOutcome(r.action, byDecision.get(r.id) ?? []),
+  }));
 }
 
 export type DecisionHistoryPage = {
@@ -239,7 +292,7 @@ export async function fetchDecisionHistory(opts: {
 
   const { data, count } = await query;
   return {
-    rows: (data as DecisionRow[] | null) ?? [],
+    rows: await attachOrderOutcomes(supabase, (data as DecisionRow[] | null) ?? []),
     total: count ?? 0,
     page,
     pageSize,

@@ -165,7 +165,9 @@ export default async function DashboardOverview() {
       <Panel
         title="Latest decision"
         right={
-          latest ? <ActionBadge action={latest.action} /> : undefined
+          latest ? (
+            <ActionBadge action={latest.action} outcome={latest.orderOutcome} />
+          ) : undefined
         }
       >
         {latest ? (
@@ -206,7 +208,7 @@ export default async function DashboardOverview() {
                   {timeAgo(row.created_at)}
                 </span>
                 <span className="shrink-0 pt-0.5">
-                  <ActionBadge action={row.action} />
+                  <ActionBadge action={row.action} outcome={row.orderOutcome} />
                 </span>
                 <span className="text-[12px] text-sec leading-snug line-clamp-2">
                   {row.summary}

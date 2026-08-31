@@ -103,7 +103,7 @@ export default async function DecisionsPage({
                     {r.symbol}
                   </td>
                   <td className="px-3 py-2">
-                    <ActionBadge action={r.action} />
+                    <ActionBadge action={r.action} outcome={r.orderOutcome} />
                   </td>
                   <td className="px-3 py-2 font-mono text-[10.5px] text-sec">
                     {r.decision_source}

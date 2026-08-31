@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchDecisionDetail } from "@/lib/dashboard-queries";
+import { deriveOrderOutcome } from "@/lib/queries";
 import {
   ActionBadge,
   ForbiddenPanel,
@@ -53,7 +54,10 @@ export default async function DecisionDetailPage({
           <h1 className="text-[18px] font-sans font-light">
             {decision.symbol}
           </h1>
-          <ActionBadge action={decision.action} />
+          <ActionBadge
+            action={decision.action}
+            outcome={deriveOrderOutcome(decision.action, trades)}
+          />
           <span className="font-mono text-[10.5px] text-dim">
             {new Date(decision.created_at).toLocaleString()}
           </span>

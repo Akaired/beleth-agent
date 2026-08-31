@@ -91,7 +91,9 @@ export function Hero({
               <span className="flex items-center gap-1.5">
                 <span
                   className={`inline-block h-1.5 w-1.5 rounded-full ${
-                    latestDecision.action === "trade"
+                    latestDecision.action === "trade" &&
+                    latestDecision.orderOutcome !== "not_sent" &&
+                    latestDecision.orderOutcome !== "submit_failed"
                       ? "bg-[#1e9e6a]"
                       : "bg-[#9aa0a6]"
                   }`}
@@ -99,7 +101,13 @@ export function Hero({
                 LATEST CYCLE
               </span>
               <span className="font-medium text-[#0b0e11]">
-                {latestDecision.action.replace("_", " ").toUpperCase()}
+                {latestDecision.action === "trade" &&
+                latestDecision.orderOutcome === "not_sent"
+                  ? "TRADE · NOT SENT"
+                  : latestDecision.action === "trade" &&
+                      latestDecision.orderOutcome === "submit_failed"
+                    ? "TRADE · FAILED"
+                    : latestDecision.action.replace("_", " ").toUpperCase()}
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <TickerBadge symbol={latestDecision.symbol} size={14} />

@@ -66,17 +66,41 @@ export function RoleChip({ role }: { role: Role }) {
   );
 }
 
-export function ActionBadge({ action }: { action: "trade" | "no_trade" }) {
-  const isTrade = action === "trade";
-  const Icon = isTrade ? IconCheckCircle : IconProhibit;
+/**
+ * The decision's `action` says what the layer *chose*; `outcome` (derived from the
+ * `trades` rows the same cycle wrote, see `deriveOrderOutcome`) says what actually
+ * happened to the order. A `trade` decision can still be stood down after the fact
+ * by the marketability/slippage gate, so a bare "TRADE" badge overstates it.
+ */
+export function ActionBadge({
+  action,
+  outcome,
+}: {
+  action: "trade" | "no_trade";
+  outcome?: "submitted" | "submit_failed" | "not_sent" | null;
+}) {
+  if (action !== "trade") {
+    return (
+      <span className="inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.08em] uppercase rounded px-1.5 py-0.5 bg-chipbg text-sec">
+        <IconProhibit size={11} weight="bold" />
+        NO TRADE
+      </span>
+    );
+  }
+
+  const variant =
+    outcome === "not_sent"
+      ? { cls: "bg-acc/15 text-acc", Icon: IconWarning, label: "TRADE · NOT SENT" }
+      : outcome === "submit_failed"
+        ? { cls: "bg-down/15 text-down", Icon: IconXCircle, label: "TRADE · FAILED" }
+        : { cls: "bg-up/15 text-up", Icon: IconCheckCircle, label: "TRADE" };
+
   return (
     <span
-      className={`inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.08em] uppercase rounded px-1.5 py-0.5 ${
-        isTrade ? "bg-up/15 text-up" : "bg-chipbg text-sec"
-      }`}
+      className={`inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.08em] uppercase rounded px-1.5 py-0.5 ${variant.cls}`}
     >
-      <Icon size={11} weight="bold" />
-      {isTrade ? "TRADE" : "NO TRADE"}
+      <variant.Icon size={11} weight="bold" />
+      {variant.label}
     </span>
   );
 }

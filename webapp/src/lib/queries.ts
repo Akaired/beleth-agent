@@ -18,7 +18,35 @@ export type DecisionRow = {
   decision_source: "risk_engine" | "llm";
   llm_model: string | null;
   evidence: EvidencePackage | null;
+  /**
+   * Derived, not a column: what happened to the order (see `deriveOrderOutcome`).
+   * Populated by the dashboard queries that also load the matching `trades` rows;
+   * `undefined` when a caller hasn't resolved it.
+   */
+  orderOutcome?: OrderOutcome | null;
 };
+
+/**
+ * What actually happened to a `trade` decision's order. The decision's `action`
+ * only records the *choice*; the agent's marketability/slippage gate can still
+ * stand the order down after that, so `action: "trade"` alone overstates it.
+ * Derived from the `trades` rows the same cycle wrote:
+ *   - `submitted`     — at least one leg order reached Alpaca (has an order id)
+ *   - `submit_failed` — trade rows exist but none reached Alpaca (e.g. wash-trade reject)
+ *   - `not_sent`      — no order was built at all (blocked before submission)
+ * `null` for `no_trade` decisions.
+ */
+export type OrderOutcome = "submitted" | "submit_failed" | "not_sent";
+
+export function deriveOrderOutcome(
+  action: "trade" | "no_trade",
+  trades: ReadonlyArray<{ alpaca_order_id?: string | null; status?: string | null }>,
+): OrderOutcome | null {
+  if (action !== "trade") return null;
+  if (trades.some((t) => t.alpaca_order_id != null)) return "submitted";
+  if (trades.length > 0) return "submit_failed";
+  return "not_sent";
+}
 
 /** Shape produced by app/evidence.py build_evidence_package (subset we read). */
 export type EvidencePackage = {
@@ -105,8 +133,24 @@ export async function fetchHomepageData(): Promise<HomepageData> {
     restCount("positions", { side: "eq.short" }).catch(() => 0),
   ]);
 
+  // A `trade` decision can still be stood down by the marketability gate after
+  // it records the choice; resolve what actually happened to the order so the
+  // homepage doesn't announce a live trade that never left the building. Only
+  // the latest decision is shown, and only `trade` decisions need the lookup.
+  const latestDecision = latest[0] ?? null;
+  if (latestDecision && latestDecision.action === "trade") {
+    const orderRows = await restGet<{
+      alpaca_order_id: string | null;
+      status: string | null;
+    }>("trades", {
+      select: "alpaca_order_id,status",
+      decision_id: `eq.${latestDecision.id}`,
+    }).catch(() => [] as { alpaca_order_id: string | null; status: string | null }[]);
+    latestDecision.orderOutcome = deriveOrderOutcome("trade", orderRows);
+  }
+
   return {
-    latestDecision: latest[0] ?? null,
+    latestDecision,
     cyclesRun: counts[0],
     tradesSubmitted: counts[1],
     refused: counts[2],
