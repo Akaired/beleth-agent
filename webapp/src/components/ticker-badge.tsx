@@ -1,8 +1,9 @@
 /**
  * Small square logo for an underlying. The agent's universe is SPY and QQQ, so
- * their issuer marks are vendored under `public/tickers/` (no runtime fetch,
- * no external dependency for the judge-facing demo). Anything else falls back
- * to a monogram tile so the component never breaks the layout.
+ * a mark for each is vendored under `public/tickers/` (no runtime fetch, no
+ * external dependency for the judge-facing demo): `spy.svg` is the SPDR "S",
+ * `qqq.svg` a plain drawn "Q" on the Invesco blue. Anything else falls back to
+ * a monogram tile so the component never breaks the layout.
  *
  * Client-safe: a plain <img>, no hooks — drops into Server and Client
  * Components alike.
