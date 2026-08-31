@@ -13,3 +13,12 @@ const RANK: Record<Role, number> = {
 export function roleAtLeast(role: Role, min: Role): boolean {
   return RANK[role] >= RANK[min];
 }
+
+/**
+ * The shared read-only judges' account. It sees the whole backoffice but may
+ * not mutate anything — the one exception is posting on the forum under a
+ * per-post "(demo)" alias. Server actions and DB functions both check this.
+ */
+export function isDemoAdmin(role: Role): boolean {
+  return role === "demo_admin";
+}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconLock, IconPin } from "@/components/icons";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { fetchForumTopic } from "@/lib/forum/queries";
 import { PostCard } from "@/components/forum/post-card";
 import { ReplyComposer } from "@/components/forum/reply-composer";
@@ -110,7 +110,11 @@ export default async function ForumTopicPage({
           This topic is closed — no new replies.
         </p>
       ) : ctx ? (
-        <ReplyComposer topicId={data.topic.id} slug={data.topic.slug} />
+        <ReplyComposer
+          topicId={data.topic.id}
+          slug={data.topic.slug}
+          isDemo={!!ctx && isDemoAdmin(ctx.role)}
+        />
       ) : (
         <LoginToPost next={`/forum/t/${data.topic.slug}`} />
       )}

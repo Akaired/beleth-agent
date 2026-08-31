@@ -12,7 +12,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
+import type { SessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { htmlToText, sanitizeForumHtml } from "@/lib/forum/sanitize";
 import type { ForumActionState } from "@/lib/forum/types";
@@ -20,6 +21,21 @@ import type { ForumActionState } from "@/lib/forum/types";
 const TITLE_MIN = 3;
 const TITLE_MAX = 120;
 const BODY_MAX = 100000;
+
+/**
+ * The shared demo account posts under a per-post alias typed into a blocking
+ * modal in the composer; the DB then always marks it " (demo)". For every
+ * other account the trigger owns `author_name`, so we send nothing and any
+ * client-supplied value is ignored server-side. Returns the trimmed alias, or
+ * null when it does not apply / is empty.
+ */
+function demoAlias(ctx: SessionContext, formData: FormData): string | null {
+  if (!isDemoAdmin(ctx.role)) return null;
+  const raw = String(formData.get("author_name") ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return raw ? raw.slice(0, 40) : null;
+}
 
 /**
  * Sanitise the editor's HTML and reject a visually empty body. Returns the
@@ -60,10 +76,12 @@ export async function createTopicAction(
     .maybeSingle();
   if (!cat) return { error: "Unknown category." };
 
+  const alias = demoAlias(ctx, formData);
   const { data, error } = await supabase.rpc("beleth_forum_create_topic", {
     p_category_id: (cat as { id: string }).id,
     p_title: title,
     p_body: cleaned.html,
+    ...(alias ? { p_author_name: alias } : {}),
   });
   if (error || !data) {
     return { error: error?.message ?? "Could not create the topic." };
@@ -99,9 +117,12 @@ export async function createReplyAction(
     return { error: "This topic is closed." };
   }
 
-  const { error } = await supabase
-    .from("forum_posts")
-    .insert({ topic_id: topicId, body: cleaned.html });
+  const alias = demoAlias(ctx, formData);
+  const { error } = await supabase.from("forum_posts").insert({
+    topic_id: topicId,
+    body: cleaned.html,
+    ...(alias ? { author_name: alias } : {}),
+  });
   if (error) return { error: error.message };
 
   revalidatePath(`/forum/t/${topicSlug}`);

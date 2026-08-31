@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { REMEMBER_COOKIE } from "@/lib/supabase/remember";
 import type {
@@ -12,6 +12,9 @@ import type {
   FormState,
   LifecycleResult,
 } from "@/app/dashboard/settings/account/form-state";
+
+/** The shared read-only judges' account may not change its own identity. */
+const DEMO_LOCKED = "The demo account is read-only.";
 
 const AVATAR_BUCKET = "avatars";
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
@@ -44,6 +47,7 @@ export async function updateProfileAction(
 ): Promise<FormState> {
   const ctx = await getSessionContext();
   if (!ctx) return { error: "Not signed in.", notice: null };
+  if (isDemoAdmin(ctx.role)) return { error: DEMO_LOCKED, notice: null };
 
   const displayName = String(formData.get("display_name") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
@@ -72,6 +76,7 @@ export async function uploadAvatarAction(
 ): Promise<AvatarResult> {
   const ctx = await getSessionContext();
   if (!ctx) return { ok: false, error: "Not signed in." };
+  if (isDemoAdmin(ctx.role)) return { ok: false, error: DEMO_LOCKED };
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, error: "No file." };
@@ -118,6 +123,7 @@ export async function uploadAvatarAction(
 export async function removeAvatarAction(): Promise<AvatarResult> {
   const ctx = await getSessionContext();
   if (!ctx) return { ok: false, error: "Not signed in." };
+  if (isDemoAdmin(ctx.role)) return { ok: false, error: DEMO_LOCKED };
 
   const supabase = await createClient();
   const { data: current } = await supabase
@@ -145,6 +151,7 @@ export async function changePasswordAction(
 ): Promise<FormState> {
   const ctx = await getSessionContext();
   if (!ctx || !ctx.email) return { error: "Not signed in.", notice: null };
+  if (isDemoAdmin(ctx.role)) return { error: DEMO_LOCKED, notice: null };
 
   const current = String(formData.get("current_password") ?? "");
   const next = String(formData.get("new_password") ?? "");
@@ -194,6 +201,8 @@ export async function deactivateAccountAction(
   const ctx = await getSessionContext();
   if (!ctx || !ctx.email) return { ok: false, error: "Not signed in." };
 
+  if (isDemoAdmin(ctx.role)) return { ok: false, error: DEMO_LOCKED };
+
   const confirm = String(formData.get("confirm_email") ?? "")
     .trim()
     .toLowerCase();
@@ -221,6 +230,8 @@ export async function deleteAccountAction(
 ): Promise<LifecycleResult> {
   const ctx = await getSessionContext();
   if (!ctx || !ctx.email) return { ok: false, error: "Not signed in." };
+
+  if (isDemoAdmin(ctx.role)) return { ok: false, error: DEMO_LOCKED };
 
   const confirm = String(formData.get("confirm_email") ?? "")
     .trim()

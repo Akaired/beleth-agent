@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { fetchForumCategories } from "@/lib/forum/queries";
 import { NewTopicForm } from "@/components/forum/new-topic-form";
 import { IconForum } from "@/components/icons";
@@ -41,6 +41,7 @@ export default async function NewForumTopicPage({
         <NewTopicForm
           categories={categories.map((c) => ({ slug: c.slug, name: c.name }))}
           defaultCategory={preset}
+          isDemo={isDemoAdmin(ctx.role)}
         />
       )}
     </div>
