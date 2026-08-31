@@ -54,7 +54,7 @@ const GROUPS: Group[] = [
       { href: "/dashboard", label: "Overview", min: "public_user", Icon: IconOverview },
       { href: "/dashboard/positions", label: "Positions", min: "demo_admin", Icon: IconPositions },
       { href: "/dashboard/calendar", label: "Calendar", min: "demo_admin", Icon: IconMarketCalendar },
-      { href: "/dashboard/portfolio", label: "Portfolio", min: "demo_admin", Icon: IconPortfolio, disabled: true },
+      { href: "/dashboard/portfolio", label: "Portfolio", min: "demo_admin", Icon: IconPortfolio },
     ],
   },
   {

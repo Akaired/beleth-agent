@@ -15,6 +15,7 @@
 import "server-only";
 import { DataUnavailableError } from "@/lib/supabase";
 import type { MarketCalendarDay } from "@/lib/market-calendar";
+import type { InstrumentQuote } from "@/lib/portfolio";
 import type { PositionState, SpreadPosition } from "@/lib/positions";
 import {
   DEFAULT_EQUITY_RANGE,
@@ -153,6 +154,88 @@ function alpacaBaseUrl(): string {
     process.env.ALPACA_API_BASE_URL?.replace(/\/+$/, "") ??
     "https://paper-api.alpaca.markets"
   );
+}
+
+function alpacaDataBaseUrl(): string {
+  return (
+    process.env.ALPACA_DATA_BASE_URL?.replace(/\/+$/, "") ??
+    "https://data.alpaca.markets"
+  );
+}
+
+// --- Stock snapshots ----------------------------------------------------------
+
+type RawSnapshotBar = { c?: number | null; t?: string | null };
+type RawStockSnapshot = {
+  latestTrade?: { p?: number | null; t?: string | null } | null;
+  minuteBar?: RawSnapshotBar | null;
+  dailyBar?: RawSnapshotBar | null;
+  prevDailyBar?: RawSnapshotBar | null;
+};
+
+/**
+ * Latest price and day change for each underlying, from the Alpaca Market Data
+ * API (`GET /v2/stocks/snapshots`, free IEX feed). Returns one `InstrumentQuote`
+ * per symbol that resolved; a symbol Alpaca did not return is simply absent.
+ * Throws `DataUnavailableError` on a missing key or non-2xx so the caller can
+ * fail soft.
+ */
+export async function fetchStockSnapshots(
+  symbols: string[],
+): Promise<Record<string, InstrumentQuote>> {
+  const wanted = Array.from(new Set(symbols.map((s) => s.toUpperCase()))).filter(
+    Boolean,
+  );
+  if (wanted.length === 0) return {};
+
+  const { key, secret } = alpacaCreds();
+  const url = new URL(`${alpacaDataBaseUrl()}/v2/stocks/snapshots`);
+  url.searchParams.set("symbols", wanted.join(","));
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
+      next: { revalidate: 60 },
+      signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new DataUnavailableError(
+      `Alpaca stocks/snapshots unreachable: ${(err as Error).message}`,
+    );
+  }
+  if (!res.ok) {
+    throw new DataUnavailableError(`Alpaca stocks/snapshots HTTP ${res.status}`);
+  }
+
+  // Alpaca returns the map either at the top level (`{ "SPY": {…} }`) or nested
+  // under `snapshots` depending on the endpoint; accept both.
+  const raw = (await res.json()) as Record<string, unknown>;
+  const nested = raw.snapshots;
+  const bySymbol = (
+    nested && typeof nested === "object" ? nested : raw
+  ) as Record<string, RawStockSnapshot>;
+
+  const out: Record<string, InstrumentQuote> = {};
+  for (const sym of wanted) {
+    const snap = bySymbol[sym];
+    if (!snap) continue;
+    const price =
+      num(snap.latestTrade?.p) ??
+      num(snap.minuteBar?.c) ??
+      num(snap.dailyBar?.c);
+    const prevClose = num(snap.prevDailyBar?.c);
+    const changeAbs =
+      price != null && prevClose != null ? price - prevClose : null;
+    out[sym] = {
+      price,
+      changeAbs,
+      changePct:
+        changeAbs != null && prevClose ? (changeAbs / prevClose) * 100 : null,
+      asOf: snap.latestTrade?.t ?? snap.dailyBar?.t ?? null,
+    };
+  }
+  return out;
 }
 
 /**

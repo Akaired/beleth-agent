@@ -16,9 +16,21 @@ import {
   fetchMarketCalendar,
   fetchMarketClock,
   fetchSpreadPositions,
+  fetchStockSnapshots,
   fetchTradeMarkers,
   DEFAULT_EQUITY_RANGE,
 } from "@/lib/alpaca";
+import {
+  DEFAULT_LIVE_SYMBOLS,
+  EMPTY_STATS,
+  INSTRUMENTS,
+  INSTRUMENT_BY_SYMBOL,
+  type InstrumentMeta,
+  type InstrumentQuote,
+  type InstrumentStats,
+  type PortfolioInstrument,
+  type PortfolioView,
+} from "@/lib/portfolio";
 import { matrixRange, nyDateKey } from "@/lib/month-grid";
 import type { MarketCalendarDay } from "@/lib/market-calendar";
 import type { MarketClock } from "@/lib/equity";
@@ -687,4 +699,155 @@ export async function fetchOpenSpreadCount(): Promise<number> {
     console.error("positions: open-count fetch failed", err);
     return 0;
   }
+}
+
+// --- Portfolio -------------------------------------------------------------
+
+function numOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function stringList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : [];
+}
+
+function numberList(v: unknown): number[] {
+  return Array.isArray(v)
+    ? v.filter((n): n is number => typeof n === "number" && Number.isFinite(n))
+    : [];
+}
+
+/**
+ * The backoffice "Portfolio" view: the underlyings Beleth trades now (from the
+ * live strategy config) and the documented next candidates, each joined to its
+ * Alpaca quote and to Beleth's own record on that name (open spreads, realized
+ * P&L, decision cycles). Alpaca failures degrade to a config-only render.
+ */
+export async function fetchPortfolioView(): Promise<PortfolioView> {
+  const supabase = await createClient();
+
+  const { config, asOf } = await fetchLatestStrategyConfig();
+  const cfg = (config ?? {}) as Record<string, unknown>;
+  const universe = (cfg.universe ?? {}) as Record<string, unknown>;
+  const structure = (cfg.structure ?? {}) as Record<string, unknown>;
+  const tenor = (cfg.tenor_scan ?? {}) as Record<string, unknown>;
+
+  const configured = stringList(universe.symbols).map((s) => s.toUpperCase());
+  const liveSymbols = configured.length > 0 ? configured : DEFAULT_LIVE_SYMBOLS;
+
+  const dMin = numOrNull(structure.short_leg_delta_min);
+  const dMax = numOrNull(structure.short_leg_delta_max);
+  const wMin = numOrNull(structure.strike_width_usd_min);
+  const wMax = numOrNull(structure.strike_width_usd_max);
+  const ladder = numberList(tenor.dte_ladder);
+
+  const params = {
+    deltaBand: dMin != null && dMax != null ? `${dMin} to ${dMax}` : null,
+    strikeWidth: wMin != null && wMax != null ? `$${wMin} to $${wMax}` : null,
+    dteLadder: ladder.length > 0 ? ladder.join(" / ") : null,
+  };
+
+  const watchSymbols = INSTRUMENTS.map((i) => i.symbol).filter(
+    (s) => !liveSymbols.includes(s),
+  );
+  const allSymbols = [...liveSymbols, ...watchSymbols];
+
+  const [snapRes, posRes, decRes] = await Promise.all([
+    fetchStockSnapshots(allSymbols).then(
+      (rows) => ({ rows, ok: true }),
+      (err) => {
+        console.error("portfolio: alpaca snapshots failed", err);
+        return { rows: {} as Record<string, InstrumentQuote>, ok: false };
+      },
+    ),
+    fetchSpreadPositions().then(
+      (rows) => ({ rows, ok: true }),
+      (err) => {
+        console.error("portfolio: alpaca positions failed", err);
+        return { rows: [] as SpreadPosition[], ok: false };
+      },
+    ),
+    supabase
+      .from("decisions")
+      .select("symbol,action,created_at")
+      .order("created_at", { ascending: false })
+      .limit(6000),
+  ]);
+
+  const statsBySymbol = new Map<string, InstrumentStats>();
+  const statFor = (sym: string): InstrumentStats => {
+    let s = statsBySymbol.get(sym);
+    if (!s) {
+      s = { ...EMPTY_STATS };
+      statsBySymbol.set(sym, s);
+    }
+    return s;
+  };
+
+  for (const p of posRes.rows) {
+    const s = statFor(p.underlying.toUpperCase());
+    if (p.state === "open") {
+      s.openSpreads += 1;
+      if (p.unrealizedPnl != null)
+        s.unrealizedPnl = (s.unrealizedPnl ?? 0) + p.unrealizedPnl;
+    } else if (p.state === "closed") {
+      s.closed += 1;
+      if (p.realizedPnl != null) {
+        s.realizedPnl = (s.realizedPnl ?? 0) + p.realizedPnl;
+        if (p.realizedPnl > 0) s.wins += 1;
+      }
+    } else if (p.state === "canceled") {
+      s.canceled += 1;
+    } else if (p.state === "failed") {
+      s.failed += 1;
+    }
+  }
+
+  const decisions =
+    (decRes.data as
+      | { symbol: string | null; action: string | null; created_at: string }[]
+      | null) ?? [];
+  for (const d of decisions) {
+    if (!d.symbol) continue;
+    const s = statFor(d.symbol.toUpperCase());
+    s.cycles += 1;
+    if (s.lastSeen == null) {
+      s.lastSeen = d.created_at;
+      s.lastAction =
+        d.action === "trade"
+          ? "trade"
+          : d.action === "no_trade"
+            ? "no_trade"
+            : null;
+    }
+  }
+
+  const metaFor = (sym: string): InstrumentMeta =>
+    INSTRUMENT_BY_SYMBOL[sym] ?? {
+      symbol: sym,
+      name: sym,
+      tracks: "",
+      exchange: "",
+      assetClass: "ETF",
+      tvSymbol: sym,
+      note: "",
+    };
+
+  const build = (
+    sym: string,
+    status: PortfolioInstrument["status"],
+  ): PortfolioInstrument => ({
+    ...metaFor(sym),
+    status,
+    quote: snapRes.rows[sym] ?? null,
+    stats: statsBySymbol.get(sym) ?? { ...EMPTY_STATS },
+  });
+
+  return {
+    live: liveSymbols.map((s) => build(s, "live")),
+    watch: watchSymbols.map((s) => build(s, "watch")),
+    params,
+    asOf,
+    alpacaOk: snapRes.ok && posRes.ok,
+  };
 }
