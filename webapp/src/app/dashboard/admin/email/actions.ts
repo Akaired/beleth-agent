@@ -57,7 +57,7 @@ export async function createStarterTemplateAction(alias: string): Promise<Result
   try {
     const existing = await fetchTemplates();
     if (existing.some((t) => t.alias === preset.alias)) {
-      return { ok: false, error: `"${preset.name}" already exists in Resend.` };
+      return { ok: false, error: `"${preset.name}" already exists.` };
     }
     await createTemplate({
       name: preset.name,

@@ -7,6 +7,7 @@ import { roleAtLeast, type Role } from "@/lib/roles";
 import {
   IconEnvelope,
   IconAccount,
+  IconChart,
   IconDocs,
   IconForum,
 } from "@/components/icons";
@@ -29,6 +30,7 @@ type Tab = {
 // Mirrors Sybil's admin shell (src/pages/admin/AdminLayout.tsx) but in the
 // Beleth mono palette. Add a route + drop `disabled` to bring a tab online.
 const TABS: Tab[] = [
+  { href: "/dashboard/admin/overview", label: "Overview", Icon: IconChart, min: "demo_admin" },
   { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope, min: "demo_admin" },
   { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs, min: "demo_admin" },
   { href: "/dashboard/admin/forum", label: "Forum", Icon: IconForum, min: "demo_admin" },

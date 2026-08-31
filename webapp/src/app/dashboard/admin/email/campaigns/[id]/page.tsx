@@ -63,10 +63,10 @@ export default async function CampaignPage({
   return (
     <div className="flex flex-col gap-5">
       <Link
-        href="/dashboard/admin/email/campaigns"
+        href="/dashboard/admin/email"
         className="flex w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.07em] text-sec transition-colors hover:text-txt"
       >
-        <IconArrowLeft size={12} weight="bold" /> Campaigns
+        <IconArrowLeft size={12} weight="bold" /> Email
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -94,7 +94,7 @@ export default async function CampaignPage({
         <Panel title="Engagement">
           {Object.keys(engagement).length === 0 ? (
             <p className="text-[12px] text-sec">
-              No engagement data yet — Resend caches recipient reads for up to 15
+              No engagement data yet — recipient reads are cached for up to 15
               minutes after a send.
             </p>
           ) : (
@@ -115,16 +115,7 @@ export default async function CampaignPage({
           )}
           <p className="mt-3 text-[11px] text-sec">
             Counts are read from the recipients endpoint and capped at 100 per
-            state — see the{" "}
-            <a
-              href={`https://resend.com/broadcasts/${b.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-acc hover:underline"
-            >
-              Resend dashboard
-            </a>{" "}
-            for exact rates.
+            state.
           </p>
         </Panel>
       )}

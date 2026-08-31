@@ -1,6 +1,5 @@
 import { getSessionContext, roleAtLeast } from "@/lib/auth";
 import { Panel } from "@/components/dashboard/ui";
-import { EmailSubnav } from "@/components/dashboard/admin/email-nav";
 import { IconProhibit } from "@/components/icons";
 
 // Sits inside the admin shell. Every admin role may read the Email tab
@@ -21,10 +20,5 @@ export default async function AdminEmailLayout({
     );
   }
 
-  return (
-    <div className="flex flex-col gap-5">
-      <EmailSubnav />
-      {children}
-    </div>
-  );
+  return <div className="flex flex-col gap-5">{children}</div>;
 }

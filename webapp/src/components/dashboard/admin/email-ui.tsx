@@ -3,11 +3,11 @@ import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import { IconEnvelope, IconProhibit } from "@/components/icons";
 
-/** Shown wherever the Resend key is missing or the API call failed. */
+/** Shown wherever the email key is missing or the API call failed. */
 export function ResendUnavailable({ message }: { message: string }) {
   const noKey = message === "not-configured";
   return (
-    <Panel title="Resend not connected">
+    <Panel title="Email not configured">
       <div className="flex items-start gap-2 text-[13px] text-sec leading-relaxed">
         <IconEnvelope size={16} className="mt-0.5 shrink-0 text-dim" />
         {noKey ? (
@@ -19,7 +19,7 @@ export function ResendUnavailable({ message }: { message: string }) {
           </p>
         ) : (
           <p>
-            Resend responded with an error:{" "}
+            The email API returned an error:{" "}
             <span className="font-mono text-down">{message}</span>
           </p>
         )}
@@ -30,7 +30,7 @@ export function ResendUnavailable({ message }: { message: string }) {
 
 /**
  * Shown when a template / campaign is opened by id but its sender is not on
- * the Beleth domain — the shared Resend account holds other projects' items.
+ * the Beleth domain — the shared email account holds other projects' items.
  */
 export function OutOfScope({ kind, backHref }: { kind: string; backHref: string }) {
   return (
@@ -38,7 +38,7 @@ export function OutOfScope({ kind, backHref }: { kind: string; backHref: string 
       <p className="flex items-start gap-2 text-[13px] text-sec leading-relaxed">
         <IconProhibit size={16} className="mt-0.5 shrink-0 text-dim" />
         This {kind} sends from another domain, so it belongs to a different
-        project on the shared Resend account. It is not shown here.
+        project on the shared email account. It is not shown here.
       </p>
       <Link
         href={backHref}

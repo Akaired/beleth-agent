@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
@@ -6,6 +7,7 @@ import {
   Stat,
   formatDateTime,
 } from "@/components/dashboard/admin/email-ui";
+import { StarterTemplates } from "@/components/dashboard/admin/starter-templates";
 import {
   getResendKey,
   tolerant,
@@ -14,9 +16,16 @@ import {
   fetchBelethTemplates,
   fetchBelethBroadcasts,
   tallyEvents,
+  BELETH_MAIL_DOMAIN,
   type ResendDomainStatus,
 } from "@/lib/admin/email";
-import { IconArrowUpRight, IconCheckCircle, IconWarning } from "@/components/icons";
+import { STARTER_TEMPLATES } from "@/lib/admin/email-templates";
+import {
+  IconCaretRight,
+  IconCheckCircle,
+  IconPlus,
+  IconWarning,
+} from "@/components/icons";
 
 export const metadata: Metadata = { title: "Admin · Email — Beleth backoffice" };
 
@@ -31,7 +40,23 @@ function pct(part: number, whole: number): string {
   return `${Math.round((part / whole) * 100)}%`;
 }
 
-export default async function AdminEmailOverviewPage() {
+function whenLabel(b: {
+  status: string;
+  createdAt: string | null;
+  scheduledAt: string | null;
+  sentAt: string | null;
+}): string {
+  if (b.status === "sent" && b.sentAt) return `sent ${formatDateTime(b.sentAt)}`;
+  if (b.scheduledAt) return `scheduled ${formatDateTime(b.scheduledAt)}`;
+  return `created ${formatDateTime(b.createdAt)}`;
+}
+
+/**
+ * The whole Email section on one page — reporting, sending domains, recent
+ * mail, transactional templates (+ the starter set) and marketing campaigns.
+ * No sub-tabs; the template / campaign editors are the only child routes.
+ */
+export default async function AdminEmailPage() {
   if (!getResendKey()) {
     return <ResendUnavailable message="not-configured" />;
   }
@@ -46,9 +71,7 @@ export default async function AdminEmailOverviewPage() {
   const domains = domainsR.ok ? domainsR.data : [];
   const verifiedDomains = domains.filter((d) => d.status === "verified").length;
 
-  const recent = emailsR.ok
-    ? emailsR.data
-    : { emails: [], hasMore: false, scanned: 0 };
+  const recent = emailsR.ok ? emailsR.data : { emails: [], hasMore: false, scanned: 0 };
   const tally = tallyEvents(recent.emails);
   const total = recent.emails.length;
   const delivered =
@@ -56,27 +79,24 @@ export default async function AdminEmailOverviewPage() {
   const opened = (tally.opened ?? 0) + (tally.clicked ?? 0);
   const bounced = (tally.bounced ?? 0) + (tally.complained ?? 0);
 
-  const templateCount = templatesR.ok ? templatesR.data.templates.length : 0;
+  const templates = templatesR.ok ? templatesR.data.templates : [];
+  const hiddenNoSender = templatesR.ok ? templatesR.data.hiddenNoSender : 0;
+  const hiddenForeign = templatesR.ok ? templatesR.data.hiddenForeign : 0;
+  const existingAliases = templates
+    .map((t) => t.alias)
+    .filter((a): a is string => Boolean(a));
+
   const broadcasts = broadcastsR.ok ? broadcastsR.data : [];
-  const sentCampaigns = broadcasts.filter((b) => b.status === "sent").length;
 
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Recent sends" value={total} hint={`of ${recent.scanned} scanned`} />
-        <Stat
-          label="Delivered"
-          value={pct(delivered, total)}
-          hint={`${delivered} of ${total}`}
-        />
-        <Stat label="Opened" value={pct(opened, total)} hint={`${opened} tracked`} />
-        <Stat label="Bounced" value={bounced} hint="+ complaints" />
-        <Stat label="Templates" value={templateCount} />
-        <Stat
-          label="Campaigns"
-          value={broadcasts.length}
-          hint={`${sentCampaigns} sent`}
-        />
+        <Stat label="Recent sends" value={total} />
+        <Stat label="Delivered" value={pct(delivered, total)} />
+        <Stat label="Opened" value={pct(opened, total)} />
+        <Stat label="Bounced" value={bounced} />
+        <Stat label="Templates" value={templates.length} />
+        <Stat label="Campaigns" value={broadcasts.length} />
       </div>
 
       {!emailsR.ok && emailsR.message !== "not-configured" && (
@@ -85,19 +105,7 @@ export default async function AdminEmailOverviewPage() {
         </p>
       )}
 
-      <Panel
-        title="Sending domains"
-        right={
-          <a
-            href="https://resend.com/domains"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.07em] text-acc hover:underline"
-          >
-            Resend <IconArrowUpRight size={11} weight="bold" />
-          </a>
-        }
-      >
+      <Panel title="Sending domains">
         {!domainsR.ok ? (
           <p className="text-[12px] text-down">
             Could not load domains: {domainsR.message}
@@ -180,18 +188,100 @@ export default async function AdminEmailOverviewPage() {
             </table>
           </div>
         )}
-        <p className="mt-4 text-[11px] text-sec">
-          For the full history and deliverability breakdown, open the{" "}
-          <a
-            href="https://resend.com/emails"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-acc hover:underline"
+      </Panel>
+
+      <Panel title="Templates">
+        {templates.length === 0 ? (
+          <p className="text-[13px] text-sec leading-relaxed">
+            No templates sending from{" "}
+            <span className="font-mono text-txt">{BELETH_MAIL_DOMAIN}</span> yet —
+            provision the starter set below.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-line">
+            {templates.map((t) => (
+              <li key={t.id}>
+                <Link
+                  href={`/dashboard/admin/email/templates/${t.id}`}
+                  className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 transition-colors hover:text-txt"
+                >
+                  <span className="flex-1">
+                    <span className="text-[13px] text-txt">{t.name}</span>
+                    {t.alias && (
+                      <span className="ml-2 font-mono text-[11px] text-faint">
+                        {t.alias}
+                      </span>
+                    )}
+                    <span className="mt-0.5 block font-mono text-[10.5px] text-sec">
+                      updated {formatDateTime(t.updatedAt)}
+                    </span>
+                  </span>
+                  <EventPill event={t.status} />
+                  <IconCaretRight size={12} weight="bold" className="text-faint" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+        {(hiddenNoSender > 0 || hiddenForeign > 0) && (
+          <p className="mt-3 font-mono text-[10.5px] text-faint">
+            {hiddenForeign > 0 && `${hiddenForeign} hidden (other project) · `}
+            {hiddenNoSender > 0 &&
+              `${hiddenNoSender} hidden (no sender set — add a from on ${BELETH_MAIL_DOMAIN} to show)`}
+          </p>
+        )}
+      </Panel>
+
+      <Panel title="Starter templates">
+        <StarterTemplates
+          presets={STARTER_TEMPLATES.map((t) => ({
+            alias: t.alias,
+            name: t.name,
+            subject: t.subject,
+            description: t.description,
+            html: t.html,
+          }))}
+          existingAliases={existingAliases}
+        />
+      </Panel>
+
+      <Panel
+        title="Campaigns"
+        right={
+          <Link
+            href="/dashboard/admin/email/campaigns/new"
+            className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.07em] text-acc hover:underline"
           >
-            Resend dashboard
-          </a>
-          .
-        </p>
+            <IconPlus size={11} weight="bold" /> New campaign
+          </Link>
+        }
+      >
+        {broadcasts.length === 0 ? (
+          <p className="text-[13px] text-sec leading-relaxed">
+            No broadcasts yet. A campaign is a one-off marketing email sent to a
+            segment. Create one as a draft, review it, then send.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-line">
+            {broadcasts.map((c) => (
+              <li key={c.id}>
+                <Link
+                  href={`/dashboard/admin/email/campaigns/${c.id}`}
+                  className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 transition-colors hover:text-txt"
+                >
+                  <span className="flex-1">
+                    <span className="text-[13px] text-txt">{c.name}</span>
+                    <span className="mt-0.5 block font-mono text-[10.5px] text-sec">
+                      {whenLabel(c)}
+                    </span>
+                  </span>
+                  <EventPill event={c.status} />
+                  <IconCaretRight size={12} weight="bold" className="text-faint" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
     </div>
   );

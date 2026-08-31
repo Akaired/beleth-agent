@@ -6,7 +6,7 @@ import { updateTemplateAction } from "@/app/dashboard/admin/email/actions";
 import { IconCheckCircle, IconWarning } from "@/components/icons";
 
 /**
- * Edit a Resend template's subject + HTML. Two-step save (an armed confirm),
+ * Edit a template's subject + HTML. Two-step save (an armed confirm),
  * a live sandboxed preview, and a dirty guard so the button only lights up
  * when something actually changed. The write is a server action that
  * re-checks master-admin.
@@ -136,8 +136,8 @@ export function TemplateEditor({
       )}
 
       <p className="text-[11px] text-sec leading-relaxed">
-        Editing the published version directly. Resend variable tags like{" "}
-        <span className="font-mono text-txt">{"{{name}}"}</span> are preserved
+        Editing the published version directly. Variable tags like{" "}
+        <span className="font-mono text-txt">{"{{{name}}}"}</span> are preserved
         verbatim — the preview shows them literally.
       </p>
     </div>

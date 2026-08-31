@@ -150,7 +150,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
     ],
     html: shell({
       preheader: "Your Beleth account is ready.",
-      heading: "Welcome, {{name}}",
+      heading: "Welcome, {{{name}}}",
       blocks: [
         {
           p: "Your account is ready. Beleth is an autonomous agent that trades defined-risk options spreads on a paper account, and logs every decision — including the trades it decides <em>not</em> to take.",
@@ -158,7 +158,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
         {
           p: "The dashboard shows the live decision log, open positions, the strategy notes, and each risk-check result.",
         },
-        { cta: { label: "Open the dashboard", url: "{{dashboard_url}}" } },
+        { cta: { label: "Open the dashboard", url: "{{{dashboard_url}}}" } },
         {
           note: "You're receiving this because you signed up at beleth.davidemaiorana.dev.",
         },
@@ -178,9 +178,9 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
       heading: "Confirm your email",
       blocks: [
         { p: "Tap the button below to confirm this address and activate your Beleth account." },
-        { cta: { label: "Confirm email", url: "{{confirmation_url}}" } },
+        { cta: { label: "Confirm email", url: "{{{confirmation_url}}}" } },
         {
-          p: `If the button doesn't work, copy this link into your browser:<br><span style="font-family:${MONO};font-size:12px;color:${C.sec};word-break:break-all;">{{confirmation_url}}</span>`,
+          p: `If the button doesn't work, copy this link into your browser:<br><span style="font-family:${MONO};font-size:12px;color:${C.sec};word-break:break-all;">{{{confirmation_url}}}</span>`,
         },
         { note: "If you didn't create a Beleth account, you can ignore this email." },
       ],
@@ -199,9 +199,9 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
       heading: "Reset your password",
       blocks: [
         { p: "We got a request to reset the password on your Beleth account. Choose a new one here:" },
-        { cta: { label: "Choose a new password", url: "{{reset_url}}" } },
+        { cta: { label: "Choose a new password", url: "{{{reset_url}}}" } },
         {
-          p: `Link not working? Paste this into your browser:<br><span style="font-family:${MONO};font-size:12px;color:${C.sec};word-break:break-all;">{{reset_url}}</span>`,
+          p: `Link not working? Paste this into your browser:<br><span style="font-family:${MONO};font-size:12px;color:${C.sec};word-break:break-all;">{{{reset_url}}}</span>`,
         },
         {
           note: "This link expires shortly. If you didn't ask for a reset, ignore this email — your password stays the same.",
@@ -226,7 +226,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
       preheader: "Your password was just changed.",
       heading: "Your password was changed",
       blocks: [
-        { p: "Hi {{name}}, this is a confirmation that the password on your Beleth account was just changed." },
+        { p: "Hi {{{name}}}, this is a confirmation that the password on your Beleth account was just changed." },
         {
           note: "If this was you, nothing else to do.",
         },
@@ -234,7 +234,7 @@ export const STARTER_TEMPLATES: StarterTemplate[] = [
           note: "If this <strong>wasn't</strong> you, reset your password immediately and review your account.",
           tone: "warn",
         },
-        { cta: { label: "Review account", url: "{{support_url}}" } },
+        { cta: { label: "Review account", url: "{{{support_url}}}" } },
       ],
     }),
   },

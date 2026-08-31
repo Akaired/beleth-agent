@@ -93,7 +93,9 @@ export async function fetchForumCategories(): Promise<ForumCategoryWithCount[]> 
     const supabase = await createClient();
     const { data } = await supabase
       .from("forum_categories")
-      .select("id,slug,name,description,color,position,forum_topics(count)")
+      .select(
+        "id,slug,name,description,color,position,admin_only_topics,forum_topics(count)",
+      )
       .order("position", { ascending: true });
     return ((data as Row[] | null) ?? []).map((c) => ({
       id: String(c.id),
@@ -102,6 +104,7 @@ export async function fetchForumCategories(): Promise<ForumCategoryWithCount[]> 
       description: (c.description as string | null) ?? null,
       color: String(c.color ?? "#8c959d"),
       position: Number(c.position ?? 0),
+      admin_only_topics: Boolean(c.admin_only_topics ?? false),
       topic_count: Number(
         (Array.isArray(c.forum_topics)
           ? (c.forum_topics[0] as { count?: number } | undefined)?.count
@@ -218,6 +221,7 @@ export type ForumCategoryPage = {
     name: string;
     description: string | null;
     color: string;
+    admin_only_topics: boolean;
   };
   topics: ForumTopicListItem[];
   total: number;
@@ -233,7 +237,7 @@ export async function fetchForumCategory(
     const supabase = await createClient();
     const { data: cat } = await supabase
       .from("forum_categories")
-      .select("id,slug,name,description,color")
+      .select("id,slug,name,description,color,admin_only_topics")
       .eq("slug", slug)
       .maybeSingle();
     if (!cat) return null;
@@ -273,6 +277,7 @@ export async function fetchForumCategory(
         name: String(c.name),
         description: (c.description as string | null) ?? null,
         color: String(c.color ?? "#8c959d"),
+        admin_only_topics: Boolean(c.admin_only_topics ?? false),
       },
       topics,
       total: count ?? 0,

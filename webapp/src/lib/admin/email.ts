@@ -65,7 +65,7 @@ export async function resendRequest<T>(path: string, init: ReqInit = {}): Promis
   if (!res.ok) {
     const msg =
       (json as { message?: string } | null)?.message ??
-      `Resend API responded ${res.status} ${res.statusText}`;
+      `Email API responded ${res.status} ${res.statusText}`;
     throw new ResendApiError(res.status, msg);
   }
   return json as T;
@@ -81,7 +81,7 @@ export async function tolerant<T>(
     if (err instanceof ResendNotConfigured) return { ok: false, message: "not-configured" };
     return {
       ok: false,
-      message: err instanceof Error ? err.message : "Could not reach the Resend API",
+      message: err instanceof Error ? err.message : "Could not reach the email API",
     };
   }
 }

@@ -11,6 +11,8 @@ export type ForumCategory = {
   description: string | null;
   color: string;
   position: number;
+  /** When true, only master_admin may start a topic here (0028). */
+  admin_only_topics: boolean;
 };
 
 export type ForumCategoryWithCount = ForumCategory & {

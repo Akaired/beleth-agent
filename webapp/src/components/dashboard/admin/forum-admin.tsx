@@ -213,6 +213,14 @@ function CategoriesSection({
                   <span className="ml-2 font-mono text-[11px] text-dim">
                     /{c.slug}
                   </span>
+                  {c.admin_only_topics && (
+                    <span
+                      title="Only admins can start a topic here"
+                      className="ml-2 inline-flex items-center gap-1 rounded bg-acc/12 px-1.5 py-0.5 align-middle font-mono text-[9px] uppercase tracking-[0.08em] text-acc"
+                    >
+                      <IconLock size={10} /> admin only
+                    </span>
+                  )}
                   {c.description && (
                     <p className="mt-0.5 truncate text-[11.5px] text-sec">
                       {c.description}

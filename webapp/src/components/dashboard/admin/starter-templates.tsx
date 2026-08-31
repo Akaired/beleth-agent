@@ -65,8 +65,8 @@ export function StarterTemplates({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[12px] text-sec leading-relaxed">
           The classic set, in the Beleth style. Provisioning creates and
-          publishes the template in Resend — edit it afterwards from the list
-          above.
+          publishes the template with the email provider — edit it afterwards
+          from the list above.
         </p>
         {missing.length > 0 && (
           <button
@@ -93,7 +93,7 @@ export function StarterTemplates({
                     <span className="font-mono text-[10.5px] text-faint">{p.alias}</span>
                     {exists && (
                       <span className="inline-flex items-center gap-1 rounded bg-up/15 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-[0.08em] text-up">
-                        <IconCheckCircle size={10} weight="bold" /> in Resend
+                        <IconCheckCircle size={10} weight="bold" /> provisioned
                       </span>
                     )}
                   </div>

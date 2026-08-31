@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, roleAtLeast } from "@/lib/auth";
 import { FORUM_PAGE_SIZE, fetchForumCategory } from "@/lib/forum/queries";
 import { TopicListTable } from "@/components/forum/topic-list-table";
 import { NewTopicButton } from "@/components/forum/new-topic-button";
@@ -27,6 +27,10 @@ export default async function ForumCategoryPage({
   ]);
   if (!data) notFound();
 
+  const canStartTopic =
+    !data.category.admin_only_topics ||
+    (!!ctx && roleAtLeast(ctx.role, "master_admin"));
+
   const pages = Math.max(1, Math.ceil(data.total / FORUM_PAGE_SIZE));
   const clamped = Math.min(page, pages);
   const qs = (p: number) => (p <= 1 ? `/forum/c/${slug}` : `/forum/c/${slug}?page=${p}`);
@@ -48,7 +52,7 @@ export default async function ForumCategoryPage({
             />
             {data.category.name}
           </h1>
-          {ctx && <NewTopicButton categorySlug={slug} />}
+          {ctx && canStartTopic && <NewTopicButton categorySlug={slug} />}
         </div>
         {data.category.description && (
           <p className="text-[12.5px] leading-relaxed text-sec">

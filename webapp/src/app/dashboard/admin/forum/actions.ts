@@ -36,6 +36,7 @@ export async function saveCategoryAction(input: {
   description: string;
   color: string;
   position: number;
+  adminOnlyTopics: boolean;
 }): Promise<Result> {
   const denied = await assertMasterAdmin();
   if (denied) return denied;
@@ -48,6 +49,7 @@ export async function saveCategoryAction(input: {
     p_description: input.description,
     p_color: input.color,
     p_position: input.position,
+    p_admin_only_topics: input.adminOnlyTopics,
   });
   if (error) return { ok: false, error: error.message };
   bump();

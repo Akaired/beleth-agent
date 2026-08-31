@@ -54,16 +54,8 @@ export function CampaignForm({
   if (segments.length === 0) {
     return (
       <p className="text-[13px] text-sec leading-relaxed">
-        No Resend segments to send to. Create one in the{" "}
-        <a
-          href="https://resend.com/audiences"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-acc hover:underline"
-        >
-          Resend dashboard
-        </a>{" "}
-        first, then reload this page.
+        No segments to send to. Create one with the email provider first, then
+        reload this page.
       </p>
     );
   }

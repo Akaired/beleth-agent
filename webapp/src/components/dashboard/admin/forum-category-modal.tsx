@@ -63,6 +63,9 @@ function ModalBody({
   const [color, setColor] = useState<string>(
     category?.color ?? forumCategoryColor(categoryCount, categoryCount + 1),
   );
+  const [adminOnly, setAdminOnly] = useState<boolean>(
+    category?.admin_only_topics ?? false,
+  );
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,7 +82,8 @@ function ModalBody({
     name.trim().length >= 2 &&
     (name.trim() !== (category?.name ?? "") ||
       description.trim() !== (category?.description ?? "") ||
-      color !== (category?.color ?? ""));
+      color !== (category?.color ?? "") ||
+      adminOnly !== (category?.admin_only_topics ?? false));
 
   function save() {
     setError(null);
@@ -91,6 +95,7 @@ function ModalBody({
         description: description.trim(),
         color,
         position: category?.position ?? nextPosition,
+        adminOnlyTopics: adminOnly,
       });
       if (!res.ok) {
         setError(res.error);
@@ -177,6 +182,24 @@ function ModalBody({
               ))}
             </div>
           </div>
+
+          <label className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={adminOnly}
+              onChange={(e) => setAdminOnly(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-acc"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-dim">
+                Admin-only topics
+              </span>
+              <span className="text-[11.5px] leading-relaxed text-sec">
+                Only admins can start a topic here. Anyone can still read and
+                reply.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="flex justify-end gap-2 border-t border-rowline px-4 py-3">

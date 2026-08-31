@@ -39,10 +39,10 @@ export default async function EmailTemplatePage({
   return (
     <div className="flex flex-col gap-5">
       <Link
-        href="/dashboard/admin/email/templates"
+        href="/dashboard/admin/email"
         className="flex w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.07em] text-sec transition-colors hover:text-txt"
       >
-        <IconArrowLeft size={12} weight="bold" /> Templates
+        <IconArrowLeft size={12} weight="bold" /> Email
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -82,7 +82,7 @@ export default async function EmailTemplatePage({
                 className="rounded border border-line px-2 py-1 font-mono text-[11px] text-sec"
                 title={v.fallback ? `fallback: ${v.fallback}` : undefined}
               >
-                {`{{${v.key}}}`}
+                {`{{{${v.key}}}}`}
                 {v.type && <span className="ml-1 text-faint">{v.type}</span>}
               </li>
             ))}
