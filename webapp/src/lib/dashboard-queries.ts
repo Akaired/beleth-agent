@@ -110,6 +110,28 @@ export type DashboardOverview = {
 const DECISION_COLS =
   "id,created_at,as_of,symbol,action,summary,market_open,equity,day_pnl,decision_source,llm_model,evidence";
 
+/**
+ * Soft deadline for a best-effort dependency of the overview.
+ *
+ * The authenticated dashboard is server-rendered *inline in the response to the
+ * sign-in Server Action* (`redirect("/dashboard")`), so the login button's
+ * pending spinner stays up until `fetchDashboardOverview` resolves. The
+ * Alpaca-derived panels (equity curve, paper-account box, MARKET chip, order
+ * markers) are all refreshed on the client right after mount — `<EquityCurve>`
+ * hits `/api/equity`, `<LiveRefresh>` re-runs the page — so when Alpaca is slow
+ * we render the shell now with `fallback` and let the client fill in, rather
+ * than making the operator watch a spinner for the full 8 s per-call ceiling.
+ */
+const OVERVIEW_ALPACA_DEADLINE_MS = 3_000;
+
+function withDeadline<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+}
+
 const DETAIL_COLS =
   DECISION_COLS + ",agent_version,llm_reasoning,llm_usage,strategy_config";
 
@@ -143,15 +165,19 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .select(DECISION_COLS)
       .order("created_at", { ascending: false })
       .limit(12),
-    fetchTradeMarkers()
-      .then((m) => {
-        markersLive = true;
-        return m;
-      })
-      .catch((err) => {
-        console.error("dashboard trade markers fetch failed", err);
-        return [] as TradeMarker[];
-      }),
+    withDeadline(
+      fetchTradeMarkers()
+        .then((m) => {
+          markersLive = true;
+          return m;
+        })
+        .catch((err) => {
+          console.error("dashboard trade markers fetch failed", err);
+          return [] as TradeMarker[];
+        }),
+      OVERVIEW_ALPACA_DEADLINE_MS,
+      [] as TradeMarker[],
+    ),
     supabase
       .from("decisions")
       .select("created_at")
@@ -183,19 +209,32 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .from("positions")
       .select("symbol", { count: "exact", head: true })
       .eq("side", "short"),
-    // Alpaca is a separate dependency — a failure just drops the chart.
-    fetchEquityHistory(DEFAULT_EQUITY_RANGE).catch((err) => {
-      console.error("dashboard equity history fetch failed", err);
-      return null;
-    }),
-    fetchMarketClock().catch((err) => {
-      console.error("dashboard market clock fetch failed", err);
-      return null;
-    }),
-    fetchAccountSnapshot().catch((err) => {
-      console.error("dashboard account snapshot fetch failed", err);
-      return null;
-    }),
+    // Alpaca is a separate dependency — a failure (or a slow call past the
+    // soft deadline) just drops the panel; the client refreshes it after mount.
+    withDeadline(
+      fetchEquityHistory(DEFAULT_EQUITY_RANGE).catch((err) => {
+        console.error("dashboard equity history fetch failed", err);
+        return null;
+      }),
+      OVERVIEW_ALPACA_DEADLINE_MS,
+      null,
+    ),
+    withDeadline(
+      fetchMarketClock().catch((err) => {
+        console.error("dashboard market clock fetch failed", err);
+        return null;
+      }),
+      OVERVIEW_ALPACA_DEADLINE_MS,
+      null,
+    ),
+    withDeadline(
+      fetchAccountSnapshot().catch((err) => {
+        console.error("dashboard account snapshot fetch failed", err);
+        return null;
+      }),
+      OVERVIEW_ALPACA_DEADLINE_MS,
+      null,
+    ),
   ]);
 
   const refused = new Set(

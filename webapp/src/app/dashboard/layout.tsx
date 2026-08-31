@@ -21,9 +21,16 @@ export default async function DashboardLayout({
   // Grant the daily-login XP (idempotent per UTC day; safe on every load).
   // The RPC returns the up-to-date user_progress row, so it doubles as the
   // read for the sidebar "lvl N" chip.
-  const dailyLogin = createClient()
-    .then((s) => s.rpc("beleth_touch_daily_login"))
-    .catch(() => null);
+  // Best-effort and time-boxed: this whole layout is server-rendered inline in
+  // the sign-in Server Action's response, so anything awaited here keeps the
+  // login spinner up. A slow RPC just costs the level chip a stale value until
+  // the next navigation.
+  const dailyLogin = Promise.race([
+    createClient()
+      .then((s) => s.rpc("beleth_touch_daily_login"))
+      .catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), 2_500)),
+  ]);
 
   // The Positions view (and its sidebar badge) is demo_admin and up.
   const [openSpreads, recentChats, recentForumTopics, progress] =
