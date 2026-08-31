@@ -182,6 +182,16 @@ export async function fetchForumCategory(
       }),
     );
 
+    // Pinned topics keep a stable order — oldest first, i.e. the order they
+    // were created/pinned — so a fresh reply on one can't jump it above the
+    // others. Everything unpinned stays newest-active first.
+    topics.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return a.pinned
+        ? a.created_at.localeCompare(b.created_at)
+        : b.last_posted_at.localeCompare(a.last_posted_at);
+    });
+
     return {
       category: {
         slug: String(c.slug),
