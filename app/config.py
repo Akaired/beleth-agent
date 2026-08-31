@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "nvidia/nemotron-3-super-120b-a12b:free"
 
+    # Secondary OpenAI-compatible provider for the LLM decision layer. Used only when the
+    # primary (OpenRouter) fails outright — a rate-limit that survives one retry, or any
+    # transport error. Off unless LLM_FALLBACK_KEY is set; base_url/model default to AI/ML
+    # API's free tier (the same provider the webapp chat uses). See app/decision.py.
+    llm_fallback_key: str | None = None
+    llm_fallback_base_url: str = "https://api.aimlapi.com/v1"
+    llm_fallback_model: str = "openai/gpt-oss-20b"
+
     # Optional: persistence is off until these are set — read-only scripts still run without
     # them. app/persistence.py raises PersistenceConfigError if it is used unconfigured.
     supabase_url: str | None = None

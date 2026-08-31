@@ -19,6 +19,7 @@ lives in the trades log the same cycle writes, so the summary never pre-claims a
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -81,6 +82,10 @@ SUBMIT_DECISION_TOOL = {
 
 _MAX_LLM_TURNS = 4
 _LLM_TIMEOUT_SECONDS = 120.0
+# A rate-limited primary provider gets exactly one paced retry after this pause before the
+# cycle moves on to the fallback provider (free-tier limits are shared upstream pools that
+# clear on their own — a short wait often gets a slot back).
+_RATE_LIMIT_RETRY_SECONDS = 60.0
 
 _SYSTEM_PROMPT_HEAD = """You are Beleth, a conservative, cautious options-trading agent. You trade
 defined-risk vertical credit spreads on U.S. index ETFs, on a paper-trading account, only when a
@@ -383,18 +388,21 @@ def decide_from_llm(
     verdicts: Sequence[RiskVerdict],
     settings: Any,
     complete_fn: Callable[..., Any] | None = None,
+    sleep_fn: Callable[[float], Any] | None = None,
     strategy: str | None = None,
 ) -> DecisionDraft:
     """One LLM decision: the model weighs the evidence and records a structured choice.
 
     Guardrails, in order: the model only ever sees risk-approved candidates; an unusable
-    answer is corrected and retried within a bounded turn budget; if the layer fails outright
+    answer is corrected and retried within a bounded turn budget; a rate-limited primary
+    provider gets one paced retry (``_RATE_LIMIT_RETRY_SECONDS``) and then the cycle tries the
+    configured fallback provider (``LLM_FALLBACK_*``); if every provider fails outright
     (transport error, malformed output, budget exhausted) the cycle falls back to
     ``decide_from_risk_engine`` — which never trades on its own — with the failure recorded in
     ``llm_reasoning``. An absent or misbehaving LLM can therefore never cause a trade.
 
     ``complete_fn`` injects the transport (tests pass a fake; production uses
-    ``app.llm.client.complete``).
+    ``app.llm.client.complete``); ``sleep_fn`` injects the rate-limit pause.
     """
     approved = [v for v in verdicts if v.approved]
     if not approved:
@@ -412,13 +420,152 @@ def decide_from_llm(
 
     if complete_fn is None:
         complete_fn = _default_complete
+    if sleep_fn is None:
+        sleep_fn = time.sleep
 
-    messages = build_decision_messages(
+    base_messages = build_decision_messages(
         evidence=evidence, approved=approved, strategy=strategy
     )
+    total_usage: dict[str, int] = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+    }
+    all_texts: list[str] = []
+    failure: str | None = None
+
+    for index, (model_label, provider_kwargs) in enumerate(_provider_attempts(settings)):
+        # The primary gets one extra try, taken only after a rate-limit pause; the fallback
+        # provider gets a single shot.
+        max_tries = 2 if index == 0 else 1
+        for attempt_no in range(max_tries):
+            result = _run_llm_turns(
+                complete_fn=complete_fn,
+                settings=settings,
+                base_messages=base_messages,
+                approved=approved,
+                provider_kwargs=provider_kwargs,
+            )
+            total_usage = _merge_usage(total_usage, result.usage)
+            all_texts.extend(result.texts)
+
+            if result.args is not None:
+                args = result.args
+                return DecisionDraft(
+                    as_of=as_of,
+                    symbol=symbol,
+                    action=args["action"],
+                    decision_source="llm",
+                    summary=(
+                        _trade_summary(
+                            approved[args["candidate_index"]], args["reasoning"]
+                        )
+                        if args["action"] == "trade"
+                        else _decline_summary(args["reasoning"], len(approved))
+                    ),
+                    market_open=market_open,
+                    equity=equity,
+                    day_pnl=day_pnl,
+                    evidence=evidence,
+                    strategy_config=strategy_config,
+                    llm_model=model_label,
+                    llm_reasoning=_reasoning_trail(all_texts, args),
+                    llm_usage={**total_usage, "model": model_label},
+                    chosen_candidate=(
+                        approved[args["candidate_index"]].candidate
+                        if args["action"] == "trade"
+                        else None
+                    ),
+                )
+
+            failure = result.failure
+            if result.rate_limited and attempt_no + 1 < max_tries:
+                sleep_fn(_RATE_LIMIT_RETRY_SECONDS)
+                continue
+            break  # this provider is spent — move on to the next one
+
+    return _llm_fallback(
+        as_of=as_of,
+        symbol=symbol,
+        market_open=market_open,
+        equity=equity,
+        day_pnl=day_pnl,
+        evidence=evidence,
+        strategy_config=strategy_config,
+        verdicts=verdicts,
+        settings=settings,
+        usage=total_usage,
+        texts=all_texts,
+        failure=failure or f"no valid submit_decision within {_MAX_LLM_TURNS} turns",
+    )
+
+
+@dataclass
+class _LlmTurnResult:
+    """Outcome of spending one provider's turn budget: either parsed ``submit_decision``
+    ``args``, or a ``failure`` string — ``rate_limited`` is set when that failure was an
+    HTTP 429 / ``RateLimitError`` so the caller can pace a retry."""
+
+    args: dict[str, Any] | None
+    texts: list[str]
+    usage: dict[str, int]
+    failure: str | None
+    rate_limited: bool
+
+
+def _provider_attempts(settings: Any) -> list[tuple[str, dict[str, Any]]]:
+    """Providers to try, in order: the primary (OpenRouter) always, then the fallback
+    (AI/ML API by default) when ``LLM_FALLBACK_KEY`` is set. Each entry is
+    ``(model_label, complete_kwargs)`` — the label is stamped onto the persisted decision."""
+    attempts: list[tuple[str, dict[str, Any]]] = [(settings.openrouter_model, {})]
+    fallback_key = getattr(settings, "llm_fallback_key", None)
+    if fallback_key:
+        model = getattr(settings, "llm_fallback_model", None) or "fallback"
+        attempts.append(
+            (
+                model,
+                {
+                    "base_url": getattr(settings, "llm_fallback_base_url", None),
+                    "api_key": fallback_key,
+                    "model": model,
+                },
+            )
+        )
+    return attempts
+
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """True for an HTTP 429 from any OpenAI-compatible provider, without importing `openai`
+    (so the module and its tests stay SDK-free)."""
+    if type(exc).__name__ == "RateLimitError":
+        return True
+    status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if status in (429, "429"):
+        return True
+    text = str(exc).lower()
+    return "429" in text or "rate limit" in text or "rate_limit" in text
+
+
+def _merge_usage(a: dict[str, int], b: dict[str, int]) -> dict[str, int]:
+    keys = ("prompt_tokens", "completion_tokens", "total_tokens")
+    return {k: a.get(k, 0) + b.get(k, 0) for k in keys}
+
+
+def _run_llm_turns(
+    *,
+    complete_fn: Callable[..., Any],
+    settings: Any,
+    base_messages: list[dict[str, Any]],
+    approved: Sequence[Any],
+    provider_kwargs: dict[str, Any],
+) -> _LlmTurnResult:
+    """Chase a valid ``submit_decision`` call within the turn budget against one provider.
+    Free of the cycle's context — the caller turns ``args`` into a ``DecisionDraft``. Starts
+    from a fresh copy of ``base_messages`` so a retry never inherits a half-built exchange."""
+    messages = list(base_messages)
     usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     texts: list[str] = []
-    failure: str | None = None
+    call_kwargs = {k: v for k, v in provider_kwargs.items() if v is not None}
 
     for _turn in range(_MAX_LLM_TURNS):
         try:
@@ -428,13 +575,19 @@ def decide_from_llm(
                 tools=[SUBMIT_DECISION_TOOL],
                 tool_choice="auto",
                 timeout=_LLM_TIMEOUT_SECONDS,
+                **call_kwargs,
             )
             if not getattr(response, "choices", None):
                 raise ValueError("response carries no choices")
             message = response.choices[0].message
         except Exception as exc:  # noqa: BLE001 — any transport failure degrades, never trades
-            failure = f"{type(exc).__name__}: {exc}"[:300]
-            break
+            return _LlmTurnResult(
+                args=None,
+                texts=texts,
+                usage=usage,
+                failure=f"{type(exc).__name__}: {exc}"[:300],
+                rate_limited=_is_rate_limit(exc),
+            )
         usage = _accumulate_usage(usage, response)
         if message.content:
             texts.append(message.content)
@@ -489,44 +642,16 @@ def decide_from_llm(
             )
             continue
 
-        return DecisionDraft(
-            as_of=as_of,
-            symbol=symbol,
-            action=args["action"],
-            decision_source="llm",
-            summary=(
-                _trade_summary(approved[args["candidate_index"]], args["reasoning"])
-                if args["action"] == "trade"
-                else _decline_summary(args["reasoning"], len(approved))
-            ),
-            market_open=market_open,
-            equity=equity,
-            day_pnl=day_pnl,
-            evidence=evidence,
-            strategy_config=strategy_config,
-            llm_model=settings.openrouter_model,
-            llm_reasoning=_reasoning_trail(texts, args),
-            llm_usage={**usage, "model": settings.openrouter_model},
-            chosen_candidate=(
-                approved[args["candidate_index"]].candidate
-                if args["action"] == "trade"
-                else None
-            ),
+        return _LlmTurnResult(
+            args=args, texts=texts, usage=usage, failure=None, rate_limited=False
         )
 
-    return _llm_fallback(
-        as_of=as_of,
-        symbol=symbol,
-        market_open=market_open,
-        equity=equity,
-        day_pnl=day_pnl,
-        evidence=evidence,
-        strategy_config=strategy_config,
-        verdicts=verdicts,
-        settings=settings,
-        usage=usage,
+    return _LlmTurnResult(
+        args=None,
         texts=texts,
-        failure=failure or f"no valid submit_decision within {_MAX_LLM_TURNS} turns",
+        usage=usage,
+        failure=f"no valid submit_decision within {_MAX_LLM_TURNS} turns",
+        rate_limited=False,
     )
 
 

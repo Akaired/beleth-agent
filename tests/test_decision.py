@@ -400,6 +400,129 @@ def test_usage_accumulates_across_turns():
     assert draft.llm_usage["total_tokens"] == 385
 
 
+# --- rate-limit retry + fallback provider -------------------------------------------------
+
+
+class _RateLimitError(Exception):
+    """Stand-in for openai.RateLimitError — `_is_rate_limit` matches it by class name."""
+
+
+class _RoutingLLM:
+    """Fake transport that tells the two providers apart by the `api_key` kwarg (only the
+    fallback provider passes one) and replays a per-provider queue of exceptions/responses."""
+
+    def __init__(self, *, primary=(), fallback=()):
+        self.primary = list(primary)
+        self.fallback = list(fallback)
+        self.calls: list[str] = []
+
+    def __call__(self, settings, messages, **kwargs):
+        which = "fallback" if kwargs.get("api_key") else "primary"
+        self.calls.append(which)
+        item = (self.fallback if which == "fallback" else self.primary).pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+_SETTINGS_FB = SimpleNamespace(
+    openrouter_model="primary-model",
+    llm_fallback_key="fb-key",
+    llm_fallback_base_url="https://fb.example/v1",
+    llm_fallback_model="fallback-model",
+)
+
+
+def _decide_llm(fake, *, settings=_SETTINGS, sleep_fn=None):
+    return decide_from_llm(
+        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        symbol="SPY",
+        market_open=True,
+        equity=100000.0,
+        day_pnl=0.0,
+        evidence=_evidence(),
+        strategy_config=_STRATEGY,
+        verdicts=_APPROVED,
+        settings=settings,
+        complete_fn=fake,
+        sleep_fn=sleep_fn if sleep_fn is not None else (lambda _s: None),
+        strategy="STRATEGY",
+    )
+
+
+def test_rate_limited_primary_is_retried_once_after_a_pause():
+    fake = _RoutingLLM(
+        primary=[
+            _RateLimitError("429 too many requests"),
+            _response(tool_args={"action": "no_trade", "reasoning": "declined on retry"}),
+        ]
+    )
+    waits: list[float] = []
+    draft = _decide_llm(fake, sleep_fn=waits.append)
+    assert draft.decision_source == "llm"
+    assert draft.action == "no_trade"
+    assert draft.llm_model == "fake-model"  # _SETTINGS.openrouter_model
+    assert fake.calls == ["primary", "primary"]
+    assert waits == [60.0]
+
+
+def test_persistent_rate_limit_falls_through_to_the_fallback_provider():
+    fake = _RoutingLLM(
+        primary=[_RateLimitError("429"), _RateLimitError("429 again")],
+        fallback=[
+            _response(tool_args={"action": "no_trade", "reasoning": "fallback declined"})
+        ],
+    )
+    waits: list[float] = []
+    draft = _decide_llm(fake, settings=_SETTINGS_FB, sleep_fn=waits.append)
+    assert draft.decision_source == "llm"
+    assert draft.llm_model == "fallback-model"
+    assert draft.llm_usage["model"] == "fallback-model"
+    assert fake.calls == ["primary", "primary", "fallback"]
+    assert waits == [60.0]  # paused once between the two primary tries, not before fallback
+
+
+def test_non_rate_limit_error_skips_straight_to_the_fallback_provider():
+    fake = _RoutingLLM(
+        primary=[RuntimeError("connection refused")],
+        fallback=[
+            _response(
+                tool_args={
+                    "action": "trade",
+                    "candidate_index": 0,
+                    "reasoning": "fallback took the trade",
+                }
+            )
+        ],
+    )
+    waits: list[float] = []
+    draft = _decide_llm(fake, settings=_SETTINGS_FB, sleep_fn=waits.append)
+    assert draft.decision_source == "llm"
+    assert draft.action == "trade"
+    assert draft.llm_model == "fallback-model"
+    assert fake.calls == ["primary", "fallback"]
+    assert waits == []  # no pause for a non-429 failure
+
+
+def test_every_provider_failing_degrades_to_a_deterministic_no_trade():
+    fake = _RoutingLLM(
+        primary=[RuntimeError("boom"), RuntimeError("boom")],
+        fallback=[RuntimeError("also boom")],
+    )
+    draft = _decide_llm(fake, settings=_SETTINGS_FB)
+    assert draft.action == "no_trade"
+    assert draft.decision_source == "risk_engine"
+    assert "also boom" in draft.llm_reasoning
+    assert fake.calls == ["primary", "fallback"]
+
+
+def test_no_fallback_configured_means_no_second_provider():
+    fake = _RoutingLLM(primary=[RuntimeError("boom")])
+    draft = _decide_llm(fake)  # _SETTINGS has no llm_fallback_key
+    assert draft.decision_source == "risk_engine"
+    assert fake.calls == ["primary"]
+
+
 def test_prompt_strips_pregate_candidates_and_injects_the_strategy():
     evidence = _evidence(per_tenor=[_tenor(30, 4.6, True)])
     evidence["candidates"] = [{"symbol": "SPY", "note": "pre-gate structure"}]
