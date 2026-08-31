@@ -276,6 +276,7 @@ function CategoriesSection({
         onClose={() => setModalFor(null)}
         category={modalFor === "new" || modalFor === null ? null : modalFor}
         nextPosition={ordered.length + 1}
+        categoryCount={ordered.length}
       />
     </section>
   );

@@ -5,30 +5,26 @@ import { useRouter } from "next/navigation";
 import type { ForumCategoryWithCount } from "@/lib/forum/types";
 import { saveCategoryAction } from "@/app/dashboard/admin/forum/actions";
 import { IconClose, IconWarning } from "@/components/icons";
-
-/** The swatches offered in the editor; a category colour is one of these. */
-export const FORUM_CATEGORY_COLORS = [
-  "#d9a03c",
-  "#35a67c",
-  "#5b8fb0",
-  "#8c959d",
-  "#c2544d",
-  "#9b6bd8",
-  "#4c8f6b",
-  "#c98a4b",
-] as const;
+import {
+  FORUM_PALETTE_ANCHORS,
+  forumCategoryColor,
+  forumPalette,
+} from "@/lib/forum/palette";
 
 export function ForumCategoryModal({
   open,
   onClose,
   category,
   nextPosition,
+  categoryCount,
 }: {
   open: boolean;
   onClose: () => void;
   /** null → create; a row → edit. */
   category: ForumCategoryWithCount | null;
   nextPosition: number;
+  /** How many categories exist now — drives how many swatches the palette shows. */
+  categoryCount: number;
 }) {
   if (!open) return null;
   // Unmounted while closed, so the inner form's state always starts fresh from
@@ -39,6 +35,7 @@ export function ForumCategoryModal({
       onClose={onClose}
       category={category}
       nextPosition={nextPosition}
+      categoryCount={categoryCount}
     />
   );
 }
@@ -47,18 +44,24 @@ function ModalBody({
   onClose,
   category,
   nextPosition,
+  categoryCount,
 }: {
   onClose: () => void;
   category: ForumCategoryWithCount | null;
   nextPosition: number;
+  categoryCount: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(category?.name ?? "");
   const [description, setDescription] = useState(category?.description ?? "");
+  // Swatches: 4 anchors by default, more in-between shades as categories grow.
+  const swatches = forumPalette(
+    Math.max(FORUM_PALETTE_ANCHORS.length, categoryCount + 1),
+  );
   const [color, setColor] = useState<string>(
-    category?.color ?? FORUM_CATEGORY_COLORS[0],
+    category?.color ?? forumCategoryColor(categoryCount, categoryCount + 1),
   );
   const firstFieldRef = useRef<HTMLInputElement>(null);
 
@@ -158,15 +161,15 @@ function ModalBody({
               Colour
             </span>
             <div className="flex flex-wrap gap-2">
-              {FORUM_CATEGORY_COLORS.map((c) => (
+              {swatches.map((c, i) => (
                 <button
-                  key={c}
+                  key={`${c}-${i}`}
                   type="button"
                   aria-label={c}
                   onClick={() => setColor(c)}
                   style={{ background: c }}
                   className={`h-6 w-6 rounded-[3px] transition-transform ${
-                    color.toLowerCase() === c
+                    color.toLowerCase() === c.toLowerCase()
                       ? "ring-2 ring-txt ring-offset-2 ring-offset-panel"
                       : "hover:scale-110"
                   }`}
