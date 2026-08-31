@@ -2,6 +2,7 @@ import Link from "next/link";
 import { timeAgo } from "@/lib/forum/format";
 import type { ForumTopicListItem } from "@/lib/forum/types";
 import { AuthorAvatar } from "@/components/forum/author-avatar";
+import { IconLock, IconPin } from "@/components/icons";
 
 /**
  * Discourse topic list: title (+ author, + category badge on the Latest view) |
@@ -42,8 +43,18 @@ export function TopicListTable({
                 >
                   <AuthorAvatar name={t.author_name} size={30} />
                   <span className="min-w-0">
-                    <span className="block text-[13.5px] text-txt transition-colors hover:text-acc">
-                      {t.title}
+                    <span className="flex items-center gap-1.5 text-[13.5px] text-txt transition-colors hover:text-acc">
+                      {t.pinned && (
+                        <IconPin
+                          size={12}
+                          weight="fill"
+                          className="shrink-0 text-acc"
+                        />
+                      )}
+                      {t.closed && (
+                        <IconLock size={12} className="shrink-0 text-dim" />
+                      )}
+                      <span>{t.title}</span>
                     </span>
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-dim">
                       {showCategory && (

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { timeAgo, wasEdited } from "@/lib/forum/format";
 import type { ForumPost } from "@/lib/forum/types";
 import { deletePostAction, editPostAction } from "@/lib/forum/actions";
+import { deletePostAction as adminDeletePostAction } from "@/app/dashboard/admin/forum/actions";
 import { AuthorAvatar } from "@/components/forum/author-avatar";
 import { RichEditor } from "@/components/forum/rich-editor";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
@@ -16,11 +17,14 @@ export function PostCard({
   post,
   original = false,
   mine = false,
+  canModerate = false,
   topicSlug,
 }: {
   post: ForumPost;
   original?: boolean;
   mine?: boolean;
+  /** Master-admin: may delete this reply even when it is not their own. */
+  canModerate?: boolean;
   topicSlug: string;
 }) {
   const [editing, setEditing] = useState(false);
@@ -43,12 +47,18 @@ export function PostCard({
     });
   }
 
+  const showAdminDelete = canModerate && !mine && !original;
+
   function doDelete() {
-    const fd = new FormData();
-    fd.set("post_id", post.id);
-    fd.set("slug", topicSlug);
     startDelete(async () => {
-      await deletePostAction(fd);
+      if (mine) {
+        const fd = new FormData();
+        fd.set("post_id", post.id);
+        fd.set("slug", topicSlug);
+        await deletePostAction(fd);
+      } else {
+        await adminDeletePostAction(post.id, topicSlug);
+      }
       setConfirmOpen(false);
     });
   }
@@ -94,6 +104,20 @@ export function PostCard({
                   Delete
                 </button>
               )}
+            </span>
+          )}
+          {showAdminDelete && !editing && (
+            <span className="ml-auto flex items-center gap-2">
+              <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-faint">
+                mod
+              </span>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                className="text-[11px] text-dim transition-colors hover:text-down"
+              >
+                Delete
+              </button>
             </span>
           )}
         </div>

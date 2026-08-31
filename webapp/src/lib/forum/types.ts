@@ -30,6 +30,9 @@ export type ForumTopicListItem = {
   last_posted_at: string;
   reply_count: number;
   view_count: number;
+  pinned: boolean;
+  closed: boolean;
+  category_id: string;
   category_slug: string;
   category_name: string;
   category_color: string;
@@ -56,6 +59,8 @@ export type ForumTopicDetail = {
     last_posted_at: string;
     reply_count: number;
     view_count: number;
+    pinned: boolean;
+    closed: boolean;
   };
   category: { slug: string; name: string; color: string };
   posts: ForumPost[];

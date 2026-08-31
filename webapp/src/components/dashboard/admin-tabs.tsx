@@ -3,13 +3,23 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconEnvelope, IconAccount, IconDocs } from "@/components/icons";
+import { roleAtLeast, type Role } from "@/lib/roles";
+import {
+  IconEnvelope,
+  IconAccount,
+  IconDocs,
+  IconForum,
+} from "@/components/icons";
 
 type IconProps = { size?: number; weight?: "regular" | "bold" | "fill"; className?: string };
 type Tab = {
   href: string;
   label: string;
   Icon: ComponentType<IconProps>;
+  // Lowest role that may see the tab. Email / Documentation / Users are
+  // master-admin only; Forum administration is visible (read-only) to the
+  // demo-admin account the judges use.
+  min: Role;
   // Shown in the bar but not wired to a route yet — Davide fills these in later.
   disabled?: boolean;
 };
@@ -18,17 +28,19 @@ type Tab = {
 // Mirrors Sybil's admin shell (src/pages/admin/AdminLayout.tsx) but in the
 // Beleth mono palette. Add a route + drop `disabled` to bring a tab online.
 const TABS: Tab[] = [
-  { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope },
-  { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs },
-  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount },
+  { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope, min: "master_admin" },
+  { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs, min: "master_admin" },
+  { href: "/dashboard/admin/forum", label: "Forum", Icon: IconForum, min: "demo_admin" },
+  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount, min: "master_admin" },
 ];
 
-export function AdminTabs() {
+export function AdminTabs({ role }: { role: Role }) {
   const pathname = usePathname();
+  const tabs = TABS.filter((t) => roleAtLeast(role, t.min));
 
   return (
     <nav className="flex gap-1 overflow-x-auto rounded-md border border-line bg-panel p-1">
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
         const cls =
           "flex items-center gap-1.5 whitespace-nowrap rounded px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors";

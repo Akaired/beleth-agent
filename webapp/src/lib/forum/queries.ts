@@ -19,7 +19,7 @@ import type {
 export const FORUM_PAGE_SIZE = 20;
 
 const TOPIC_LIST_COLS =
-  "id,slug,title,author_name,created_at,last_posted_at,reply_count,view_count";
+  "id,slug,title,author_name,created_at,last_posted_at,reply_count,view_count,pinned,closed,category_id";
 
 type Row = Record<string, unknown>;
 type CatEmbed = { slug?: string; name?: string; color?: string };
@@ -35,6 +35,9 @@ function flattenTopic(row: Row): ForumTopicListItem {
     last_posted_at: String(row.last_posted_at),
     reply_count: Number(row.reply_count ?? 0),
     view_count: Number(row.view_count ?? 0),
+    pinned: Boolean(row.pinned ?? false),
+    closed: Boolean(row.closed ?? false),
+    category_id: String(row.category_id ?? ""),
     category_slug: cat.slug ?? "",
     category_name: cat.name ?? "",
     category_color: cat.color ?? "#8c959d",
@@ -104,11 +107,34 @@ export async function fetchForumLatest(limit = 40): Promise<ForumTopicListItem[]
     const { data } = await supabase
       .from("forum_topics")
       .select(`${TOPIC_LIST_COLS},forum_categories!inner(slug,name,color)`)
+      .order("pinned", { ascending: false })
       .order("last_posted_at", { ascending: false })
       .limit(limit);
     return ((data as Row[] | null) ?? []).map(flattenTopic);
   } catch (err) {
     console.error("fetchForumLatest failed", err);
+    return [];
+  }
+}
+
+/**
+ * Every topic with its category flattened in, newest activity first — the
+ * source for the admin moderation table. Reads through the same anon/SSR
+ * client (RLS opens `select` to everyone); the writes are master-admin only.
+ */
+export async function fetchAllForumTopics(
+  limit = 500,
+): Promise<ForumTopicListItem[]> {
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("forum_topics")
+      .select(`${TOPIC_LIST_COLS},forum_categories!inner(slug,name,color)`)
+      .order("last_posted_at", { ascending: false })
+      .limit(limit);
+    return ((data as Row[] | null) ?? []).map(flattenTopic);
+  } catch (err) {
+    console.error("fetchAllForumTopics failed", err);
     return [];
   }
 }
@@ -145,6 +171,7 @@ export async function fetchForumCategory(
       .from("forum_topics")
       .select(TOPIC_LIST_COLS, { count: "exact" })
       .eq("category_id", c.id as string)
+      .order("pinned", { ascending: false })
       .order("last_posted_at", { ascending: false })
       .range(from, from + FORUM_PAGE_SIZE - 1);
 
@@ -204,6 +231,8 @@ export async function fetchForumTopic(
         last_posted_at: String(t.last_posted_at),
         reply_count: Number(t.reply_count ?? 0),
         view_count: Number(t.view_count ?? 0),
+        pinned: Boolean(t.pinned ?? false),
+        closed: Boolean(t.closed ?? false),
       },
       category: {
         slug: cat.slug ?? "",

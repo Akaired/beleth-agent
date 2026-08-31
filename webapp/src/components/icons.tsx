@@ -85,6 +85,10 @@ export {
   PaperPlaneTilt as IconPublish,
   ArrowUUpLeft as IconUnpublish,
   TextT as IconHeading,
+  PushPin as IconPin,
+  PushPinSlash as IconUnpin,
+  LockSimpleOpen as IconLockOpen,
+  FolderSimple as IconFolder,
 } from "@phosphor-icons/react/dist/ssr";
 
 /**

@@ -90,6 +90,15 @@ export async function createReplyAction(
   if ("error" in cleaned) return { error: cleaned.error };
 
   const supabase = await createClient();
+  const { data: topic } = await supabase
+    .from("forum_topics")
+    .select("closed")
+    .eq("id", topicId)
+    .maybeSingle();
+  if ((topic as { closed?: boolean } | null)?.closed) {
+    return { error: "This topic is closed." };
+  }
+
   const { error } = await supabase
     .from("forum_posts")
     .insert({ topic_id: topicId, body: cleaned.html });
