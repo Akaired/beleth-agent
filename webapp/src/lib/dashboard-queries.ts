@@ -164,7 +164,13 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .select("decision_id,candidate_index")
       .eq("approved", false)
       .neq("rule", "R5"),
-    supabase.from("positions").select("symbol", { count: "exact", head: true }),
+    // Count spreads, not legs: `positions` mirrors every option leg (a vertical is
+    // two rows), and each defined-risk vertical has exactly one short leg — the same
+    // definition the homepage stat and the sidebar badge use.
+    supabase
+      .from("positions")
+      .select("symbol", { count: "exact", head: true })
+      .eq("side", "short"),
     // Alpaca is a separate dependency — a failure just drops the chart.
     fetchEquityHistory(DEFAULT_EQUITY_RANGE).catch((err) => {
       console.error("dashboard equity history fetch failed", err);
