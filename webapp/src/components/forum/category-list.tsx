@@ -61,7 +61,11 @@ export function CategoryList({
                     href={`/forum/t/${latest.slug}`}
                     className="flex items-center gap-2"
                   >
-                    <AuthorAvatar name={latest.author_name} size={28} />
+                    <AuthorAvatar
+                      name={latest.author_name}
+                      avatarUrl={latest.author_avatar_url}
+                      size={28}
+                    />
                     <span className="min-w-0">
                       <span className="block truncate text-[12.5px] text-txt transition-colors hover:text-acc">
                         {latest.title}

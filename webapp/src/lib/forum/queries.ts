@@ -24,6 +24,47 @@ const TOPIC_LIST_COLS =
 type Row = Record<string, unknown>;
 type CatEmbed = { slug?: string; name?: string; color?: string };
 
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * The forum denormalises `author_name` but not the author's avatar, so a disc
+ * on a topic row / post only ever showed initials. This fills an
+ * `author_avatar_url` onto each row in one round trip through the
+ * `beleth_public_avatars` RPC (SECURITY DEFINER — the anon client cannot read
+ * another user's `profiles` row directly). Best-effort: on any failure the rows
+ * keep `author_avatar_url = null` and the disc falls back to initials.
+ */
+async function attachAuthorAvatars(
+  supabase: SupabaseClient,
+  rows: Row[],
+): Promise<void> {
+  const ids = [
+    ...new Set(
+      rows
+        .map((r) => String(r.author_id ?? ""))
+        .filter((id) => id.length > 0),
+    ),
+  ];
+  if (ids.length === 0) return;
+  try {
+    const { data, error } = await supabase.rpc("beleth_public_avatars", {
+      p_user_ids: ids,
+    });
+    if (error || !data) return;
+    const byId = new Map<string, string | null>(
+      (data as Row[]).map((d) => [
+        String(d.user_id),
+        (d.avatar_url as string | null) ?? null,
+      ]),
+    );
+    for (const r of rows) {
+      r.author_avatar_url = byId.get(String(r.author_id ?? "")) ?? null;
+    }
+  } catch (err) {
+    console.error("attachAuthorAvatars failed", err);
+  }
+}
+
 function flattenTopic(row: Row): ForumTopicListItem {
   const cat = (row.forum_categories ?? {}) as CatEmbed;
   return {
@@ -32,6 +73,7 @@ function flattenTopic(row: Row): ForumTopicListItem {
     title: String(row.title),
     author_id: String(row.author_id ?? ""),
     author_name: String(row.author_name ?? ""),
+    author_avatar_url: (row.author_avatar_url as string | null) ?? null,
     created_at: String(row.created_at),
     last_posted_at: String(row.last_posted_at),
     reply_count: Number(row.reply_count ?? 0),
@@ -118,7 +160,9 @@ export async function fetchForumTopicsByAuthor(
       .eq("author_id", authorId)
       .order("created_at", { ascending: false })
       .limit(limit);
-    return ((data as Row[] | null) ?? []).map(flattenTopic);
+    const rows = (data as Row[] | null) ?? [];
+    await attachAuthorAvatars(supabase, rows);
+    return rows.map(flattenTopic);
   } catch (err) {
     console.error("fetchForumTopicsByAuthor failed", err);
     return [];
@@ -135,7 +179,9 @@ export async function fetchForumLatest(limit = 40): Promise<ForumTopicListItem[]
       .order("pinned", { ascending: false })
       .order("last_posted_at", { ascending: false })
       .limit(limit);
-    return ((data as Row[] | null) ?? []).map(flattenTopic);
+    const rows = (data as Row[] | null) ?? [];
+    await attachAuthorAvatars(supabase, rows);
+    return rows.map(flattenTopic);
   } catch (err) {
     console.error("fetchForumLatest failed", err);
     return [];
@@ -157,7 +203,9 @@ export async function fetchAllForumTopics(
       .select(`${TOPIC_LIST_COLS},forum_categories!inner(slug,name,color)`)
       .order("last_posted_at", { ascending: false })
       .limit(limit);
-    return ((data as Row[] | null) ?? []).map(flattenTopic);
+    const rows = (data as Row[] | null) ?? [];
+    await attachAuthorAvatars(supabase, rows);
+    return rows.map(flattenTopic);
   } catch (err) {
     console.error("fetchAllForumTopics failed", err);
     return [];
@@ -200,7 +248,9 @@ export async function fetchForumCategory(
       .order("last_posted_at", { ascending: false })
       .range(from, from + FORUM_PAGE_SIZE - 1);
 
-    const topics = ((data as Row[] | null) ?? []).map((r) =>
+    const rows = (data as Row[] | null) ?? [];
+    await attachAuthorAvatars(supabase, rows);
+    const topics = rows.map((r) =>
       flattenTopic({
         ...r,
         forum_categories: { slug: c.slug, name: c.name, color: c.color },
@@ -255,6 +305,9 @@ export async function fetchForumTopic(
       .eq("topic_id", t.id as string)
       .order("post_number", { ascending: true });
 
+    const postRows = (posts as Row[] | null) ?? [];
+    await attachAuthorAvatars(supabase, [t, ...postRows]);
+
     return {
       topic: {
         id: String(t.id),
@@ -262,6 +315,7 @@ export async function fetchForumTopic(
         title: String(t.title),
         author_id: String(t.author_id ?? ""),
         author_name: String(t.author_name ?? ""),
+        author_avatar_url: (t.author_avatar_url as string | null) ?? null,
         created_at: String(t.created_at),
         last_posted_at: String(t.last_posted_at),
         reply_count: Number(t.reply_count ?? 0),
@@ -274,10 +328,11 @@ export async function fetchForumTopic(
         name: cat.name ?? "",
         color: cat.color ?? "#8c959d",
       },
-      posts: ((posts as Row[] | null) ?? []).map<ForumPost>((p) => ({
+      posts: postRows.map<ForumPost>((p) => ({
         id: String(p.id),
         author_id: String(p.author_id ?? ""),
         author_name: String(p.author_name ?? ""),
+        author_avatar_url: (p.author_avatar_url as string | null) ?? null,
         body: sanitizeForumHtml(String(p.body ?? "")),
         post_number: Number(p.post_number ?? 1),
         created_at: String(p.created_at),

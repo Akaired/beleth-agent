@@ -43,6 +43,7 @@ export function TopicListTable({
                   <AuthorLink
                     authorId={t.author_id}
                     name={t.author_name}
+                    avatarUrl={t.author_avatar_url}
                     size={30}
                   />
                   <span className="min-w-0">

@@ -72,7 +72,12 @@ export function PostCard({
         original ? "border-emphline" : "border-line"
       }`}
     >
-      <AuthorLink authorId={post.author_id} name={post.author_name} size={40} />
+      <AuthorLink
+        authorId={post.author_id}
+        name={post.author_name}
+        avatarUrl={post.author_avatar_url}
+        size={40}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <Link

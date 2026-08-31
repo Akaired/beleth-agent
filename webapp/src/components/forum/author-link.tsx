@@ -10,12 +10,14 @@ import { AuthorAvatar } from "@/components/forum/author-avatar";
 export function AuthorLink({
   authorId,
   name,
+  avatarUrl = null,
   size = 32,
   showName = false,
   className = "",
 }: {
   authorId: string | null | undefined;
   name: string;
+  avatarUrl?: string | null;
   size?: number;
   showName?: boolean;
   className?: string;
@@ -24,7 +26,7 @@ export function AuthorLink({
 
   const inner = (
     <>
-      <AuthorAvatar name={label} size={size} />
+      <AuthorAvatar name={label} avatarUrl={avatarUrl} size={size} />
       {showName && <span>{label}</span>}
     </>
   );
@@ -35,7 +37,7 @@ export function AuthorLink({
         {inner}
       </span>
     ) : (
-      <AuthorAvatar name={label} size={size} />
+      <AuthorAvatar name={label} avatarUrl={avatarUrl} size={size} />
     );
   }
 

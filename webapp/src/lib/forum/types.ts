@@ -27,6 +27,7 @@ export type ForumTopicListItem = {
   title: string;
   author_id: string;
   author_name: string;
+  author_avatar_url: string | null;
   created_at: string;
   last_posted_at: string;
   reply_count: number;
@@ -43,6 +44,7 @@ export type ForumPost = {
   id: string;
   author_id: string;
   author_name: string;
+  author_avatar_url: string | null;
   body: string;
   post_number: number;
   created_at: string;
@@ -56,6 +58,7 @@ export type ForumTopicDetail = {
     title: string;
     author_id: string;
     author_name: string;
+    author_avatar_url: string | null;
     created_at: string;
     last_posted_at: string;
     reply_count: number;
