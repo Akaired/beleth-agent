@@ -9,6 +9,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles";
 
+export type AccountStatus = "active" | "deactivated";
+
 export { roleAtLeast } from "@/lib/roles";
 export type { Role } from "@/lib/roles";
 
@@ -20,6 +22,8 @@ export type SessionContext = {
   displayName: string | null;
   /** Public URL of the user's avatar image, or null for the initials disc. */
   avatarUrl: string | null;
+  /** 'deactivated' users are bounced to the terminal /account-deactivated screen. */
+  status: AccountStatus;
 };
 
 /**
@@ -38,7 +42,7 @@ export const getSessionContext = cache(
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, display_name, avatar_url")
+      .select("role, display_name, avatar_url, status")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -49,13 +53,22 @@ export const getSessionContext = cache(
       role,
       displayName: (profile?.display_name as string | null) ?? null,
       avatarUrl: (profile?.avatar_url as string | null) ?? null,
+      status:
+        (profile?.status as AccountStatus | undefined) === "deactivated"
+          ? "deactivated"
+          : "active",
     };
   },
 );
 
-/** Redirects to /login when signed out. Use in the dashboard layout. */
+/**
+ * Redirects to /login when signed out. A deactivated account is sent to the
+ * terminal /account-deactivated screen — it holds a valid session but may not
+ * use the dashboard until it reactivates.
+ */
 export async function requireSession(): Promise<SessionContext> {
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
+  if (ctx.status === "deactivated") redirect("/account-deactivated");
   return ctx;
 }

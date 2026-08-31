@@ -6,6 +6,7 @@
 import "server-only";
 import { redirect } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
+import type { AccountStatus } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles";
 import type { ProgressRow } from "@/lib/progress";
@@ -14,11 +15,24 @@ export type AccountProfile = {
   userId: string;
   email: string | null;
   role: Role;
+  status: AccountStatus;
   displayName: string | null;
   avatarUrl: string | null;
   bio: string | null;
   createdAt: string | null;
   progress: ProgressRow;
+};
+
+/** The safe, public-facing view of any user's profile (see /u/[id]). */
+export type PublicProfile = {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  createdAt: string | null;
+  xp: number;
+  streakDays: number;
+  isDeactivated: boolean;
 };
 
 const EMPTY_PROGRESS: ProgressRow = {
@@ -37,7 +51,7 @@ export async function fetchAccountProfile(): Promise<AccountProfile> {
   const [{ data: profile }, { data: progress }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("email, role, display_name, avatar_url, bio, created_at")
+      .select("email, role, status, display_name, avatar_url, bio, created_at")
       .eq("user_id", ctx.userId)
       .maybeSingle(),
     supabase
@@ -51,6 +65,10 @@ export async function fetchAccountProfile(): Promise<AccountProfile> {
     userId: ctx.userId,
     email: (profile?.email as string | null) ?? ctx.email,
     role: (profile?.role as Role | undefined) ?? ctx.role,
+    status:
+      (profile?.status as AccountStatus | undefined) === "deactivated"
+        ? "deactivated"
+        : "active",
     displayName: (profile?.display_name as string | null) ?? null,
     avatarUrl: (profile?.avatar_url as string | null) ?? null,
     bio: (profile?.bio as string | null) ?? null,
@@ -64,5 +82,46 @@ export async function fetchAccountProfile(): Promise<AccountProfile> {
           chat_msgs_today: Number(progress.chat_msgs_today ?? 0),
         }
       : EMPTY_PROGRESS,
+  };
+}
+
+/**
+ * Any user's public profile, by id — the data behind /u/[id]. Goes through the
+ * `beleth_public_profile` RPC (SECURITY DEFINER) which hand-picks a safe subset
+ * of columns: nickname, avatar, bio, member-since, XP, streak. Never the email
+ * or role. Returns null for an unknown id.
+ */
+export async function fetchPublicProfile(
+  userId: string,
+): Promise<PublicProfile | null> {
+  if (!userId) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("beleth_public_profile", { p_user_id: userId })
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as {
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    bio: string | null;
+    created_at: string | null;
+    xp: number | null;
+    streak_days: number | null;
+    is_deactivated: boolean | null;
+  };
+
+  return {
+    userId: row.user_id,
+    displayName: row.display_name ?? "someone",
+    avatarUrl: row.avatar_url ?? null,
+    bio: row.bio ?? null,
+    createdAt: row.created_at ?? null,
+    xp: Number(row.xp ?? 0),
+    streakDays: Number(row.streak_days ?? 0),
+    isDeactivated: Boolean(row.is_deactivated),
   };
 }
