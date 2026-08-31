@@ -87,16 +87,42 @@ function flattenTopic(row: Row): ForumTopicListItem {
   };
 }
 
+/**
+ * `admin_only_topics` (0028) may not be live in every environment yet, and
+ * naming an unknown column in a `select` fails the *whole* query. So it is
+ * never part of a base select — this reads it on its own and folds any
+ * failure (column missing) into "no category is locked".
+ */
+async function fetchAdminOnlyFlags(
+  supabase: SupabaseClient,
+): Promise<Map<string, boolean>> {
+  try {
+    const { data, error } = await supabase
+      .from("forum_categories")
+      .select("id,admin_only_topics");
+    if (error || !data) return new Map();
+    return new Map(
+      (data as Row[]).map((r) => [
+        String(r.id),
+        Boolean(r.admin_only_topics ?? false),
+      ]),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 /** All categories, ordered, each with its topic count — the landing page. */
 export async function fetchForumCategories(): Promise<ForumCategoryWithCount[]> {
   try {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from("forum_categories")
-      .select(
-        "id,slug,name,description,color,position,admin_only_topics,forum_topics(count)",
-      )
-      .order("position", { ascending: true });
+    const [{ data }, lockedBy] = await Promise.all([
+      supabase
+        .from("forum_categories")
+        .select("id,slug,name,description,color,position,forum_topics(count)")
+        .order("position", { ascending: true }),
+      fetchAdminOnlyFlags(supabase),
+    ]);
     return ((data as Row[] | null) ?? []).map((c) => ({
       id: String(c.id),
       slug: String(c.slug),
@@ -104,7 +130,7 @@ export async function fetchForumCategories(): Promise<ForumCategoryWithCount[]> 
       description: (c.description as string | null) ?? null,
       color: String(c.color ?? "#8c959d"),
       position: Number(c.position ?? 0),
-      admin_only_topics: Boolean(c.admin_only_topics ?? false),
+      admin_only_topics: lockedBy.get(String(c.id)) ?? false,
       topic_count: Number(
         (Array.isArray(c.forum_topics)
           ? (c.forum_topics[0] as { count?: number } | undefined)?.count
@@ -237,11 +263,12 @@ export async function fetchForumCategory(
     const supabase = await createClient();
     const { data: cat } = await supabase
       .from("forum_categories")
-      .select("id,slug,name,description,color,admin_only_topics")
+      .select("id,slug,name,description,color")
       .eq("slug", slug)
       .maybeSingle();
     if (!cat) return null;
     const c = cat as Row;
+    const lockedBy = await fetchAdminOnlyFlags(supabase);
 
     const from = (page - 1) * FORUM_PAGE_SIZE;
     const { data, count } = await supabase
@@ -277,7 +304,7 @@ export async function fetchForumCategory(
         name: String(c.name),
         description: (c.description as string | null) ?? null,
         color: String(c.color ?? "#8c959d"),
-        admin_only_topics: Boolean(c.admin_only_topics ?? false),
+        admin_only_topics: lockedBy.get(String(c.id)) ?? false,
       },
       topics,
       total: count ?? 0,

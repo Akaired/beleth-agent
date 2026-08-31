@@ -42,15 +42,24 @@ export async function saveCategoryAction(input: {
   if (denied) return denied;
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("beleth_forum_category_upsert", {
+  const base = {
     p_id: input.id,
     p_name: input.name,
     p_slug: input.slug,
     p_description: input.description,
     p_color: input.color,
     p_position: input.position,
+  };
+  let { error } = await supabase.rpc("beleth_forum_category_upsert", {
+    ...base,
     p_admin_only_topics: input.adminOnlyTopics,
   });
+  // 0028 adds the p_admin_only_topics argument. Where the migration is not
+  // applied yet PostgREST can't resolve that overload — fall back to the
+  // 6-arg call so category edits keep working (the lock is simply ignored).
+  if (error && /beleth_forum_category_upsert/.test(error.message)) {
+    ({ error } = await supabase.rpc("beleth_forum_category_upsert", base));
+  }
   if (error) return { ok: false, error: error.message };
   bump();
   return { ok: true };
