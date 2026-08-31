@@ -66,6 +66,7 @@ function toUser(row: Row): AdminUser {
 export async function fetchAdminUsers(): Promise<AdminUser[]> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("beleth_admin_list_users");
+  if (error) console.error("beleth_admin_list_users failed", error);
   if (error || !Array.isArray(data)) return [];
   return (data as Row[]).map(toUser);
 }
