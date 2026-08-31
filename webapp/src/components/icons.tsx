@@ -63,6 +63,7 @@ export {
   BookOpenText as IconStrategy,
   Flask as IconResearch,
   ChartLineUp as IconChart,
+  ChartPieSlice as IconPortfolio,
   ClockCounterClockwise as IconHistory,
   Eye as IconEye,
   MagnifyingGlass as IconSearch,
