@@ -16,9 +16,8 @@ import {
 } from "@/app/dashboard/admin/forum/actions";
 import { ForumCategoryModal } from "@/components/dashboard/admin/forum-category-modal";
 import {
-  IconArrowDown,
-  IconArrowUp,
   IconCheck,
+  IconDragHandle,
   IconEye,
   IconLock,
   IconLockOpen,
@@ -100,13 +99,18 @@ function CategoriesSection({
     ForumCategoryWithCount | null | "new"
   >(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
 
   const ordered = useMemo(
     () => [...categories].sort((a, b) => a.position - b.position),
     [categories],
   );
 
-  /** Drop `fromId` onto `toId`, then renumber the list 1..N and persist. */
+  /** Drop `fromId` onto `toId`, renumber the list 1..N, and persist the rows
+   * whose position actually changed (compared against each row's own original
+   * position — not the value that happened to sit at that slot). */
   function reorder(fromId: string, toId: string) {
     if (fromId === toId) return;
     const from = ordered.findIndex((c) => c.id === fromId);
@@ -115,19 +119,12 @@ function CategoriesSection({
     const next = [...ordered];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
+    const origPos = new Map(ordered.map((c) => [c.id, c.position]));
     const changed = next
       .map((c, i) => ({ id: c.id, position: i + 1 }))
-      .filter((row, i) => row.position !== ordered[i].position);
+      .filter((row) => row.position !== origPos.get(row.id));
     if (changed.length === 0) return;
     run(() => reorderCategoriesAction(changed));
-  }
-
-  /** Swap one category with its neighbour in the given direction and persist. */
-  function move(id: string, dir: -1 | 1) {
-    const i = ordered.findIndex((c) => c.id === id);
-    const j = i + dir;
-    if (i === -1 || j < 0 || j >= ordered.length) return;
-    reorder(id, ordered[j].id);
   }
 
   return (
@@ -156,33 +153,54 @@ function CategoriesSection({
         <p className="px-4 py-3 text-[12px] text-dim">No categories yet.</p>
       ) : (
         <ul className="divide-y divide-rowline">
-          {ordered.map((c, idx) => {
+          {ordered.map((c) => {
+            const isDragging = draggingId === c.id;
+            const isOver = overId === c.id && draggingId !== null && !isDragging;
             return (
               <li
                 key={c.id}
-                className="flex items-center gap-3 px-4 py-2.5 text-[13px]"
+                draggable={armedId === c.id}
+                onDragStart={(e) => {
+                  setDraggingId(c.id);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragEnd={() => {
+                  setArmedId(null);
+                  setDraggingId(null);
+                  setOverId(null);
+                }}
+                onDragOver={(e) => {
+                  if (!draggingId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (overId !== c.id) setOverId(c.id);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggingId) reorder(draggingId, c.id);
+                  setOverId(null);
+                }}
+                className={`flex items-center gap-3 px-4 py-2.5 text-[13px] transition-colors ${
+                  isDragging ? "opacity-40" : ""
+                } ${
+                  isOver
+                    ? "bg-acc/10 shadow-[inset_0_2px_0_0_var(--color-acc)]"
+                    : ""
+                }`}
               >
                 {canWrite && (
-                  <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={pending || idx === 0}
-                      onClick={() => move(c.id, -1)}
-                      className="flex h-3.5 w-5 items-center justify-center text-dim transition-colors hover:text-txt disabled:opacity-25 disabled:hover:text-dim"
-                    >
-                      <IconArrowUp size={12} weight="bold" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={pending || idx === ordered.length - 1}
-                      onClick={() => move(c.id, 1)}
-                      className="flex h-3.5 w-5 items-center justify-center text-dim transition-colors hover:text-txt disabled:opacity-25 disabled:hover:text-dim"
-                    >
-                      <IconArrowDown size={12} weight="bold" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    aria-label="Drag to reorder"
+                    disabled={pending || ordered.length < 2}
+                    onPointerDown={() => setArmedId(c.id)}
+                    onPointerUp={() =>
+                      setArmedId((id) => (id === c.id ? null : id))
+                    }
+                    className="flex shrink-0 cursor-grab touch-none items-center text-dim transition-colors hover:text-txt active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
+                  >
+                    <IconDragHandle size={16} />
+                  </button>
                 )}
 
                 <span
