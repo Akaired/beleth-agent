@@ -7,6 +7,7 @@ import {
   IconRefused,
   IconTrades,
 } from "@/components/icons";
+import { LiveRefresh } from "@/components/live-refresh";
 import { Method } from "@/components/method";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -30,9 +31,12 @@ import {
   type HomepageData,
 } from "@/lib/queries";
 
-// Fresh enough to feel live (the agent cycles every ~5 minutes), cheap enough
-// to sit behind the CDN. See webapp/README.md, "Rendering model".
-export const revalidate = 60;
+// Short ISR window so a cold anonymous hit is never far behind, while still
+// sitting behind the CDN for traffic bursts. Any open tab also drives
+// `router.refresh()` via <LiveRefresh /> (Supabase Realtime + a 30 s poll), so
+// the page tracks the agent within seconds of a real change rather than
+// waiting out this window. See webapp/README.md, "Rendering model".
+export const revalidate = 15;
 
 function emptyData(): HomepageData {
   return {
@@ -126,6 +130,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col flex-1 min-h-screen">
+      <LiveRefresh />
       <SiteHeader agentStatus={data.agentStatus} marketOpen={clock?.isOpen ?? null} />
       {!live && (
         <div className="border-b border-line font-mono text-[10.5px] text-dim">

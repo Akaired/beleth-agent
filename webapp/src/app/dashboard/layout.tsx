@@ -5,6 +5,7 @@ import { fetchRecentForumTopicsByAuthor } from "@/lib/forum/queries";
 import { createClient } from "@/lib/supabase/server";
 import { levelForXp } from "@/lib/progress";
 import { DashboardChrome } from "@/components/dashboard/chrome";
+import { LiveRefresh } from "@/components/live-refresh";
 
 export default async function DashboardLayout({
   children,
@@ -45,6 +46,7 @@ export default async function DashboardLayout({
       recentChats={recentChats}
       recentForumTopics={recentForumTopics}
     >
+      <LiveRefresh />
       {children}
     </DashboardChrome>
   );

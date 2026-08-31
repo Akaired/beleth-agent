@@ -84,11 +84,27 @@ trade, edits config, or pauses the agent.
 
 ## Rendering model
 
-The homepage is a server component with `export const revalidate = 60`: it is
-prerendered, served from the CDN, and rebuilt at most once a minute — fresh
-enough for a 5-minute cycle cadence, and judges always get a fast page. If
-Supabase is unreachable or env is missing, the page renders with placeholder
-counters and a visible `LIVE DATA UNAVAILABLE` note instead of failing.
+The homepage is a server component with `export const revalidate = 15`: it is
+prerendered and served from the CDN, so a cold anonymous hit is fast and never
+far behind. If Supabase is unreachable or env is missing, the page renders with
+placeholder counters and a visible `LIVE DATA UNAVAILABLE` note instead of
+failing.
+
+That ISR window is only a floor. `<LiveRefresh />` (a client component mounted
+on the homepage and the whole `/dashboard` tree) keeps an open tab in sync with
+the agent:
+
+* **Supabase Realtime** — a Postgres change on `decisions`, `risk_checks`,
+  `trades`, `positions`, or `agent_status` (the tables added to the
+  `supabase_realtime` publication in `db/migrations/0027_realtime_publication.sql`)
+  triggers a debounced `router.refresh()`, so the page re-renders within a
+  second of the agent writing. Realtime enforces the same RLS as a read, so it
+  exposes nothing the anon key could not already select.
+* **A 30 s poll** — a fallback for the Alpaca-derived panels below (which never
+  touch Postgres) and for any missed Realtime event or dropped socket.
+
+The effect pauses while the tab is hidden and catches up once on the way back
+to visible.
 
 ### Alpaca-backed pieces (`src/lib/alpaca.ts`, server-only)
 
