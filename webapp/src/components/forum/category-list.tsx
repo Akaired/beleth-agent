@@ -55,11 +55,11 @@ export function CategoryList({
                 </div>
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 sm:self-center">
                 {latest ? (
                   <Link
                     href={`/forum/t/${latest.slug}`}
-                    className="flex items-start gap-2"
+                    className="flex items-center gap-2"
                   >
                     <AuthorAvatar name={latest.author_name} size={28} />
                     <span className="min-w-0">
