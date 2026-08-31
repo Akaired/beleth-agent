@@ -1,5 +1,6 @@
-import { IconGithub } from "@/components/icons";
+import { IconGithub, IconEye } from "@/components/icons";
 import { CtaAuthButton } from "@/components/cta-auth-button";
+import { demoSignInAction } from "@/app/login/actions";
 
 const CTA_BTN =
   "inline-flex items-center justify-center gap-2 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap";
@@ -19,7 +20,15 @@ export function CtaSection() {
           </p>
         </div>
         <div className="flex flex-col gap-2.5 self-start md:self-auto">
-          <CtaAuthButton className={CTA_BTN} />
+          <div className="flex gap-2.5">
+            <form action={demoSignInAction} className="flex-1">
+              <button type="submit" className={`${CTA_BTN} w-full`}>
+                <IconEye size={15} weight="fill" />
+                Demo
+              </button>
+            </form>
+            <CtaAuthButton className={`${CTA_BTN} flex-1`} />
+          </div>
           <a
             href="https://github.com/Akaired/beleth-agent"
             target="_blank"
