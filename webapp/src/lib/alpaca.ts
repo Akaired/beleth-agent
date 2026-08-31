@@ -91,6 +91,14 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
   };
 }
 
+/**
+ * Hard ceiling on any single Alpaca call. Alpaca keys are now set in the
+ * Vercel build env, so the homepage's `revalidate` prerender hits Alpaca at
+ * build time; a slow or hung endpoint there would run out the 60 s build
+ * worker and fail the whole deploy. Every caller fails soft on a throw.
+ */
+const ALPACA_TIMEOUT_MS = 8_000;
+
 function alpacaCreds(): { key: string; secret: string } {
   const key = process.env.ALPACA_API_KEY;
   const secret = process.env.ALPACA_SECRET_KEY;
@@ -109,6 +117,7 @@ async function alpacaGet<T>(path: string): Promise<T> {
     res = await fetch(`${alpacaBaseUrl()}${path}`, {
       headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
     });
   } catch (err) {
     throw new DataUnavailableError(
@@ -170,6 +179,7 @@ export async function fetchEquityHistory(
       // Data-cache the upstream call so a burst of range switches or page
       // renders collapses to one Alpaca hit per minute.
       next: { revalidate: 60 },
+      signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
     });
   } catch (err) {
     throw new DataUnavailableError(

@@ -7,6 +7,12 @@ import { levelForXp } from "@/lib/progress";
 import { DashboardChrome } from "@/components/dashboard/chrome";
 import { LiveRefresh } from "@/components/live-refresh";
 
+// The whole backoffice is auth-gated (`requireSession()` reads cookies), so it
+// can never be statically prerendered. Declaring it dynamic keeps the build
+// from attempting static generation and logging `DYNAMIC_SERVER_USAGE` for
+// each nested route.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: LayoutProps<"/dashboard">) {

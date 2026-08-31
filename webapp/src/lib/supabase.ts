@@ -10,6 +10,14 @@
 
 const REST_PATH = "/rest/v1";
 
+/**
+ * Hard ceiling on any single PostgREST call. Without it a hung upstream
+ * (notably at build time, where Next prerenders the homepage) blocks the
+ * render until Vercel kills the worker at 60 s and the whole build fails.
+ * Every caller already treats a throw as "data unavailable" and fails soft.
+ */
+const REST_TIMEOUT_MS = 8_000;
+
 export class DataUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -44,9 +52,17 @@ export async function restGet<T>(
   params: Record<string, string>,
 ): Promise<T[]> {
   const { key } = restBase();
-  const res = await fetch(restUrl(table, params), {
-    headers: { apikey: key, Authorization: `Bearer ${key}` },
-  });
+  let res: Response;
+  try {
+    res = await fetch(restUrl(table, params), {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(REST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new DataUnavailableError(
+      `${table}: unreachable (${(err as Error).message})`,
+    );
+  }
   if (!res.ok) {
     throw new DataUnavailableError(`${table}: HTTP ${res.status}`);
   }
@@ -62,16 +78,24 @@ export async function restCount(
   params: Record<string, string> = {},
 ): Promise<number> {
   const { key } = restBase();
-  const res = await fetch(restUrl(table, params), {
-    method: "HEAD",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      Prefer: "count=exact",
-      // Range: 0-0 keeps the response tiny; Content-Range still carries the total.
-      Range: "0-0",
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(restUrl(table, params), {
+      method: "HEAD",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: "count=exact",
+        // Range: 0-0 keeps the response tiny; Content-Range still carries the total.
+        Range: "0-0",
+      },
+      signal: AbortSignal.timeout(REST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw new DataUnavailableError(
+      `${table}: unreachable (${(err as Error).message})`,
+    );
+  }
   if (!res.ok) {
     throw new DataUnavailableError(`${table}: HTTP ${res.status}`);
   }
