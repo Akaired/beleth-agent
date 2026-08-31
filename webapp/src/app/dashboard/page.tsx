@@ -36,6 +36,37 @@ type IconType = ComponentType<{
   className?: string;
 }>;
 
+function AcctField({
+  label,
+  value,
+  tone = "txt",
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: "txt" | "sec" | "up" | "down" | "acc";
+}) {
+  const c =
+    tone === "up"
+      ? "text-up"
+      : tone === "down"
+        ? "text-down"
+        : tone === "acc"
+          ? "text-acc"
+          : tone === "sec"
+            ? "text-sec"
+            : "text-txt";
+  return (
+    <div>
+      <div className="text-[10.5px] uppercase tracking-[0.08em] text-dim">
+        {label}
+      </div>
+      <div className={`mt-1 font-mono text-[13px] leading-tight ${c}`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function Stat({
   label,
   value,
@@ -146,6 +177,101 @@ export default async function DashboardOverview() {
           }
         />
       </div>
+
+      {d.account && (
+        <Panel
+          title="Alpaca paper account"
+          right={
+            <span className="flex items-center gap-2 font-mono text-[10px] tracking-[0.08em] text-dim">
+              <span className="rounded border border-acc/40 px-1.5 py-0.5 uppercase text-acc">
+                Paper
+              </span>
+              {d.account.createdAt && (
+                <span className="hidden sm:inline">
+                  active since{" "}
+                  {new Date(d.account.createdAt).toLocaleDateString()}
+                </span>
+              )}
+            </span>
+          }
+        >
+          <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
+            <AcctField
+              label="Account"
+              value={d.account.accountNumber ?? "—"}
+            />
+            <AcctField
+              label="Status"
+              value={(d.account.status ?? "unknown").toLowerCase()}
+              tone={
+                d.account.status === "ACTIVE" &&
+                !d.account.tradingBlocked &&
+                !d.account.accountBlocked
+                  ? "up"
+                  : "down"
+              }
+            />
+            <AcctField
+              label="Options level"
+              value={
+                d.account.optionsTradingLevel != null
+                  ? `L${d.account.optionsTradingLevel}${
+                      d.account.optionsTradingLevel >= 3 ? " · spreads" : ""
+                    }`
+                  : "—"
+              }
+              tone={
+                (d.account.optionsTradingLevel ?? 0) >= 3 ? "txt" : "down"
+              }
+            />
+            <AcctField
+              label="Currency"
+              value={d.account.currency ?? "—"}
+              tone="sec"
+            />
+            <AcctField
+              label="Cash"
+              value={formatUsd(d.account.cash, 0)}
+            />
+            <AcctField
+              label="Portfolio value"
+              value={formatUsd(d.account.portfolioValue, 0)}
+            />
+            <AcctField
+              label="Long market value"
+              value={formatUsd(d.account.longMarketValue, 0)}
+            />
+            <AcctField
+              label="Maintenance margin"
+              value={formatUsd(d.account.maintenanceMargin, 0)}
+            />
+            <AcctField
+              label="Buying power"
+              value={formatUsd(d.account.buyingPower, 0)}
+            />
+            <AcctField
+              label="Options buying power"
+              value={formatUsd(d.account.optionsBuyingPower, 0)}
+            />
+            <AcctField
+              label="Day trades (5d)"
+              value={
+                d.account.daytradeCount != null
+                  ? `${d.account.daytradeCount}${
+                      d.account.patternDayTrader ? " · PDT" : ""
+                    }`
+                  : "—"
+              }
+              tone={d.account.patternDayTrader ? "down" : "txt"}
+            />
+            <AcctField
+              label="Prev close equity"
+              value={formatUsd(d.account.lastEquity, 0)}
+              tone="sec"
+            />
+          </div>
+        </Panel>
+      )}
 
       <Panel title="Equity curve">
         {d.equity && d.equity.points.length >= 2 ? (

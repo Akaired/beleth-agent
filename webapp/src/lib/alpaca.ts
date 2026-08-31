@@ -40,12 +40,28 @@ export {
   type TradeMarker,
 } from "@/lib/equity";
 
-/** Live account balances — see `AccountSnapshot`. */
+/** Live account balances and paper-account metadata — see `AccountSnapshot`. */
 export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
   const raw = await alpacaGet<{
+    account_number?: string | null;
+    status?: string | null;
+    currency?: string | null;
     equity?: string | number | null;
     last_equity?: string | number | null;
+    cash?: string | number | null;
+    portfolio_value?: string | number | null;
+    long_market_value?: string | number | null;
+    buying_power?: string | number | null;
+    options_buying_power?: string | number | null;
+    maintenance_margin?: string | number | null;
+    options_approved_level?: string | number | null;
+    options_trading_level?: string | number | null;
+    daytrade_count?: string | number | null;
+    pattern_day_trader?: boolean | null;
+    trading_blocked?: boolean | null;
+    account_blocked?: boolean | null;
     balance_asof?: string | null;
+    created_at?: string | null;
   }>("/v2/account");
   const equity = Number(raw.equity ?? 0);
   const lastEquity = Number(raw.last_equity ?? 0);
@@ -56,6 +72,22 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
     dayPnl,
     dayPnlPct: lastEquity > 0 ? (dayPnl / lastEquity) * 100 : 0,
     asOf: raw.balance_asof ?? new Date().toISOString(),
+    createdAt: raw.created_at ?? null,
+    accountNumber: raw.account_number ?? null,
+    status: raw.status ?? null,
+    currency: raw.currency ?? null,
+    cash: num(raw.cash),
+    portfolioValue: num(raw.portfolio_value),
+    longMarketValue: num(raw.long_market_value),
+    buyingPower: num(raw.buying_power),
+    optionsBuyingPower: num(raw.options_buying_power),
+    maintenanceMargin: num(raw.maintenance_margin),
+    optionsApprovedLevel: num(raw.options_approved_level),
+    optionsTradingLevel: num(raw.options_trading_level),
+    daytradeCount: num(raw.daytrade_count),
+    patternDayTrader: !!raw.pattern_day_trader,
+    tradingBlocked: !!raw.trading_blocked,
+    accountBlocked: !!raw.account_blocked,
   };
 }
 

@@ -83,6 +83,38 @@ export type AccountSnapshot = {
   dayPnl: number;
   dayPnlPct: number;
   asOf: string;
+  /** Account creation timestamp (Alpaca `created_at`). */
+  createdAt: string | null;
+  /** Alpaca account number (paper). */
+  accountNumber: string | null;
+  /** Account status, e.g. `ACTIVE`. */
+  status: string | null;
+  /** Settlement currency, e.g. `USD`. */
+  currency: string | null;
+  /** Cash balance. */
+  cash: number | null;
+  /** Total value of cash + open positions (`portfolio_value`). */
+  portfolioValue: number | null;
+  /** Real-time MtM value of all long positions. */
+  longMarketValue: number | null;
+  /** Overall buying power. */
+  buyingPower: number | null;
+  /** Buying power available specifically for options. */
+  optionsBuyingPower: number | null;
+  /** Maintenance margin requirement. */
+  maintenanceMargin: number | null;
+  /** Approved options level (0–3). Spreads need level 3. */
+  optionsApprovedLevel: number | null;
+  /** Effective options level (min of approved and the account config cap). */
+  optionsTradingLevel: number | null;
+  /** Day trades used in the last 5 trading days. */
+  daytradeCount: number | null;
+  /** Flagged as a pattern day trader. */
+  patternDayTrader: boolean;
+  /** Alpaca has blocked new orders on the account. */
+  tradingBlocked: boolean;
+  /** Alpaca has blocked the account entirely. */
+  accountBlocked: boolean;
 };
 
 export type EquityHistory = {
