@@ -1,30 +1,22 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireSession } from "@/lib/auth";
+import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchControlPanel } from "@/lib/dashboard-queries";
-import { Panel, timeAgo } from "@/components/dashboard/ui";
+import { ForbiddenPanel, Panel, timeAgo } from "@/components/dashboard/ui";
 import { KillSwitch } from "@/components/dashboard/kill-switch";
 import { HostPanel } from "@/components/dashboard/host-panel";
 import { EventList } from "@/components/dashboard/event-list";
-import { IconArrowRight, IconControls, IconProhibit } from "@/components/icons";
+import { IconArrowRight, IconControls } from "@/components/icons";
 
 export const metadata: Metadata = { title: "Controls — Beleth backoffice" };
 
 export default async function ControlsPage() {
   const ctx = await requireSession();
-  if (ctx.role !== "master_admin") {
-    return (
-      <Panel title="Not available for your account">
-        <p className="flex items-start gap-2 text-[13px] text-sec leading-relaxed">
-          <IconProhibit size={16} className="mt-0.5 shrink-0 text-dim" />
-          Operational controls are the master-admin account only. The
-          demo-admin backoffice is read-only by design — it can see every
-          decision and every risk-check rejection, but it never touches the
-          agent.
-        </p>
-      </Panel>
-    );
-  }
+  if (!roleAtLeast(ctx.role, "demo_admin")) return <ForbiddenPanel />;
+
+  // demo_admin sees the full operator view; only master_admin can flip the
+  // kill switch (the server action and the RPC both re-check this).
+  const canControl = ctx.role === "master_admin";
 
   const { agentStatus, hostHistory, recentEvents } = await fetchControlPanel();
   const paused = agentStatus?.paused ?? false;
@@ -68,7 +60,7 @@ export default async function ControlsPage() {
       />
 
       <Panel title="Kill switch">
-        <KillSwitch paused={paused} />
+        <KillSwitch paused={paused} canControl={canControl} />
       </Panel>
 
       <Panel

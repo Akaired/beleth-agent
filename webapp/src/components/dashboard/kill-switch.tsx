@@ -10,7 +10,14 @@ import { IconPause, IconResume, IconWarning } from "@/components/icons";
  * primary button arms a confirm/cancel pair, so the switch is never one
  * misplaced click away from flipping. Disabled while the server action runs.
  */
-export function KillSwitch({ paused }: { paused: boolean }) {
+export function KillSwitch({
+  paused,
+  canControl = true,
+}: {
+  paused: boolean;
+  /** master_admin only — the demo (judges) account sees the state, no toggle. */
+  canControl?: boolean;
+}) {
   const router = useRouter();
   const [armed, setArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +59,12 @@ export function KillSwitch({ paused }: { paused: boolean }) {
           : "The next cycle resumes normal evaluation."}
       </p>
 
-      {!armed ? (
+      {!canControl ? (
+        <p className="font-mono text-[11px] text-dim leading-relaxed max-w-prose">
+          Read-only — pausing and resuming the agent is the master-admin account
+          only. This view shows the live state.
+        </p>
+      ) : !armed ? (
         <button
           type="button"
           onClick={() => {

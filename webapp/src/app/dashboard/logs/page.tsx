@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireSession } from "@/lib/auth";
+import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchEventLog } from "@/lib/dashboard-queries";
 import { ForbiddenPanel } from "@/components/dashboard/ui";
 import { EventList } from "@/components/dashboard/event-list";
@@ -31,7 +31,7 @@ export default async function LogsPage({
   searchParams,
 }: PageProps<"/dashboard/logs">) {
   const ctx = await requireSession();
-  if (ctx.role !== "master_admin") return <ForbiddenPanel />;
+  if (!roleAtLeast(ctx.role, "demo_admin")) return <ForbiddenPanel />;
 
   const sp = await searchParams;
   const page = Math.max(1, Number(sp?.page) || 1);

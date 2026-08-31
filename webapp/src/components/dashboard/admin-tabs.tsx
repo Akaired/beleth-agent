@@ -16,9 +16,10 @@ type Tab = {
   href: string;
   label: string;
   Icon: ComponentType<IconProps>;
-  // Lowest role that may see the tab. Email / Documentation / Users are
-  // master-admin only; Forum administration is visible (read-only) to the
-  // demo-admin account the judges use.
+  // Lowest role that may see the tab. Every tab is visible (read-only) to the
+  // demo-admin account the judges use; the write controls inside each tab
+  // render disabled below master_admin, and every server action / RPC
+  // re-checks the role.
   min: Role;
   // Shown in the bar but not wired to a route yet — Davide fills these in later.
   disabled?: boolean;
@@ -28,10 +29,10 @@ type Tab = {
 // Mirrors Sybil's admin shell (src/pages/admin/AdminLayout.tsx) but in the
 // Beleth mono palette. Add a route + drop `disabled` to bring a tab online.
 const TABS: Tab[] = [
-  { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope, min: "master_admin" },
-  { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs, min: "master_admin" },
+  { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope, min: "demo_admin" },
+  { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs, min: "demo_admin" },
   { href: "/dashboard/admin/forum", label: "Forum", Icon: IconForum, min: "demo_admin" },
-  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount, min: "master_admin" },
+  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount, min: "demo_admin" },
 ];
 
 export function AdminTabs({ role }: { role: Role }) {

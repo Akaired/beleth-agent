@@ -38,9 +38,12 @@ function StatusPill({ published }: { published: boolean }) {
 export function DocsAdminList({
   pages,
   categories,
+  canWrite = true,
 }: {
   pages: DocPage[];
   categories: DocCategory[];
+  /** false for the read-only demo-admin account — hides every edit control. */
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -90,16 +93,22 @@ export function DocsAdminList({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end gap-3">
-        <button
-          type="button"
-          onClick={() => setCatsOpen(true)}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded border border-line px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-sec transition-colors hover:border-hoverline hover:text-txt"
-        >
-          <IconSettings size={13} />
-          Categories
-        </button>
-      </div>
+      {canWrite ? (
+        <div className="flex items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setCatsOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded border border-line px-2.5 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-sec transition-colors hover:border-hoverline hover:text-txt"
+          >
+            <IconSettings size={13} />
+            Categories
+          </button>
+        </div>
+      ) : (
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-dim">
+          Read-only — drafts included
+        </p>
+      )}
 
       {error && (
         <p className="flex items-center gap-2 font-mono text-[11px] text-down">
@@ -116,13 +125,15 @@ export function DocsAdminList({
             <h2 className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-sec">
               {category.label}
             </h2>
-            <Link
-              href={`/dashboard/admin/docs/new?category=${category.slug}`}
-              className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-sec transition-colors hover:text-acc"
-            >
-              <IconPlus size={13} />
-              Add page
-            </Link>
+            {canWrite && (
+              <Link
+                href={`/dashboard/admin/docs/new?category=${category.slug}`}
+                className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-sec transition-colors hover:text-acc"
+              >
+                <IconPlus size={13} />
+                Add page
+              </Link>
+            )}
           </div>
 
           {groupPages.length === 0 ? (
@@ -136,7 +147,7 @@ export function DocsAdminList({
                 return (
                   <li
                     key={page.id}
-                    draggable={armedId === page.id}
+                    draggable={canWrite && armedId === page.id}
                     onDragStart={(e) => {
                       setDraggingId(page.id);
                       e.dataTransfer.effectAllowed = "move";
@@ -162,39 +173,52 @@ export function DocsAdminList({
                       isDragging ? "opacity-40" : ""
                     } ${isOver ? "bg-acc/10 shadow-[inset_0_2px_0_0_var(--color-acc)]" : ""}`}
                   >
-                    <button
-                      type="button"
-                      aria-label="Drag to reorder"
-                      disabled={pending || groupPages.length < 2}
-                      onPointerDown={() => setArmedId(page.id)}
-                      onPointerUp={() =>
-                        setArmedId((id) => (id === page.id ? null : id))
-                      }
-                      className="flex shrink-0 cursor-grab touch-none items-center text-dim transition-colors hover:text-txt active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
-                    >
-                      <IconDragHandle size={16} />
-                    </button>
+                    {canWrite && (
+                      <button
+                        type="button"
+                        aria-label="Drag to reorder"
+                        disabled={pending || groupPages.length < 2}
+                        onPointerDown={() => setArmedId(page.id)}
+                        onPointerUp={() =>
+                          setArmedId((id) => (id === page.id ? null : id))
+                        }
+                        className="flex shrink-0 cursor-grab touch-none items-center text-dim transition-colors hover:text-txt active:cursor-grabbing disabled:cursor-default disabled:opacity-30"
+                      >
+                        <IconDragHandle size={16} />
+                      </button>
+                    )}
 
-                    <Link
-                      href={`/dashboard/admin/docs/${page.id}`}
-                      className="min-w-0 flex-1 truncate font-medium text-txt transition-colors hover:text-acc"
-                    >
-                      {page.title}
-                      <span className="ml-2 font-mono text-[11px] text-dim">
-                        /{page.slug}
+                    {canWrite ? (
+                      <Link
+                        href={`/dashboard/admin/docs/${page.id}`}
+                        className="min-w-0 flex-1 truncate font-medium text-txt transition-colors hover:text-acc"
+                      >
+                        {page.title}
+                        <span className="ml-2 font-mono text-[11px] text-dim">
+                          /{page.slug}
+                        </span>
+                      </Link>
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate font-medium text-txt">
+                        {page.title}
+                        <span className="ml-2 font-mono text-[11px] text-dim">
+                          /{page.slug}
+                        </span>
                       </span>
-                    </Link>
+                    )}
 
                     <StatusPill published={page.status === "published"} />
 
                     <div className="flex shrink-0 items-center gap-1">
-                      <Link
-                        href={`/dashboard/admin/docs/${page.id}`}
-                        aria-label="Edit"
-                        className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt"
-                      >
-                        <IconPencil size={14} />
-                      </Link>
+                      {canWrite && (
+                        <Link
+                          href={`/dashboard/admin/docs/${page.id}`}
+                          aria-label="Edit"
+                          className="flex h-7 w-7 items-center justify-center rounded text-dim transition-colors hover:bg-hoverbg hover:text-txt"
+                        >
+                          <IconPencil size={14} />
+                        </Link>
+                      )}
                       {page.status === "published" && (
                         <a
                           href={`/docs/${page.slug}`}
@@ -206,6 +230,8 @@ export function DocsAdminList({
                           <IconEye size={14} />
                         </a>
                       )}
+                      {canWrite && (
+                      <>
                       <button
                         type="button"
                         aria-label={
@@ -253,6 +279,8 @@ export function DocsAdminList({
                         >
                           <IconTrash size={14} />
                         </button>
+                      )}
+                      </>
                       )}
                     </div>
                   </li>

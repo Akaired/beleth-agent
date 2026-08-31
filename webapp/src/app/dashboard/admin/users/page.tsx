@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, roleAtLeast } from "@/lib/auth";
 import { ForbiddenPanel } from "@/components/dashboard/ui";
 import { Stat } from "@/components/dashboard/admin/email-ui";
 import { fetchAdminUsers, tallyRoles } from "@/lib/admin/users";
@@ -9,7 +9,10 @@ export const metadata: Metadata = { title: "Admin · Users — Beleth backoffice
 
 export default async function AdminUsersPage() {
   const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "master_admin") return <ForbiddenPanel />;
+  if (!ctx || !roleAtLeast(ctx.role, "demo_admin")) return <ForbiddenPanel />;
+  // demo-admin (judges) reads the roster; role changes / delete / confirm are
+  // master-admin only, re-checked in ./actions.ts and the RPCs.
+  const canWrite = ctx.role === "master_admin";
 
   const users = await fetchAdminUsers();
   const roles = tallyRoles(users);
@@ -25,7 +28,7 @@ export default async function AdminUsersPage() {
         <Stat label="Unconfirmed" value={unconfirmed} />
       </div>
 
-      <UsersList users={users} currentUserId={ctx.userId} />
+      <UsersList users={users} currentUserId={ctx.userId} canWrite={canWrite} />
     </div>
   );
 }

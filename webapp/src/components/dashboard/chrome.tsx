@@ -75,11 +75,13 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    // demo_admin sees every Operator view read-only (the judges' account);
+    // write controls inside each page render disabled below master_admin.
     label: "Operator",
     items: [
-      { href: "/dashboard/admin", label: "Admin", min: "master_admin", Icon: IconAdmin },
-      { href: "/dashboard/controls", label: "Controls", min: "master_admin", Icon: IconControls },
-      { href: "/dashboard/logs", label: "Logs", min: "master_admin", Icon: IconLogs },
+      { href: "/dashboard/admin", label: "Admin", min: "demo_admin", Icon: IconAdmin },
+      { href: "/dashboard/controls", label: "Controls", min: "demo_admin", Icon: IconControls },
+      { href: "/dashboard/logs", label: "Logs", min: "demo_admin", Icon: IconLogs },
       { href: "/dashboard/api", label: "API", min: "master_admin", Icon: IconCode, disabled: true },
     ],
   },

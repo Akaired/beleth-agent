@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Panel } from "@/components/dashboard/ui";
+import { getSessionContext } from "@/lib/auth";
+import { ForbiddenPanel, Panel } from "@/components/dashboard/ui";
 import { fetchAdminDoc, fetchDocCategories } from "@/lib/docs/queries";
 import { DocsEditor } from "@/components/dashboard/admin/docs-editor";
 
@@ -12,6 +13,10 @@ export default async function AdminDocEditPage({
   params,
   searchParams,
 }: PageProps<"/dashboard/admin/docs/[id]">) {
+  // The list is read-only for demo-admin; the editor is a write surface.
+  const ctx = await getSessionContext();
+  if (ctx?.role !== "master_admin") return <ForbiddenPanel />;
+
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const categories = await fetchDocCategories();
 

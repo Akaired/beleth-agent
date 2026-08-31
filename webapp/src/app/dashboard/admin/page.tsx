@@ -1,13 +1,7 @@
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
 
-// The admin panel has no landing of its own — go to the first tab the role can
-// open: master-admin starts on Email, demo-admin on the Forum administration.
+// The admin panel has no landing of its own — every admin role (demo-admin
+// read-only and master-admin) can open Email, so land there.
 export default async function AdminIndexPage() {
-  const ctx = await getSessionContext();
-  redirect(
-    ctx?.role === "master_admin"
-      ? "/dashboard/admin/email"
-      : "/dashboard/admin/forum",
-  );
+  redirect("/dashboard/admin/email");
 }

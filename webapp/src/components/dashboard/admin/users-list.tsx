@@ -66,9 +66,12 @@ function Metric({
 export function UsersList({
   users,
   currentUserId,
+  canWrite = true,
 }: {
   users: AdminUser[];
   currentUserId: string;
+  /** false for the read-only demo-admin account — hides role / delete controls. */
+  canWrite?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -194,6 +197,18 @@ export function UsersList({
                         {u.bio && <Row k="Bio" v={u.bio} />}
                       </dl>
 
+                      {!canWrite ? (
+                        <div className="flex flex-col gap-2">
+                          <p className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
+                            Role
+                          </p>
+                          <RoleChip role={u.role} />
+                          <p className="mt-1 font-mono text-[10px] leading-relaxed text-faint">
+                            Read-only — role changes, email confirmation and
+                            account deletion are the master-admin account only.
+                          </p>
+                        </div>
+                      ) : (
                       <div className="flex flex-col gap-3">
                         <div>
                           <p className="mb-1.5 font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
@@ -288,6 +303,7 @@ export function UsersList({
                           send a new confirmation mail.
                         </p>
                       </div>
+                      )}
                     </div>
                   </div>
                 )}
