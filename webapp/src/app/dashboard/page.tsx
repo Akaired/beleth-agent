@@ -210,6 +210,11 @@ export default async function DashboardOverview() {
                 <span className="shrink-0 pt-0.5">
                   <ActionBadge action={row.action} outcome={row.orderOutcome} />
                 </span>
+                <TickerBadge
+                  symbol={row.symbol}
+                  size={14}
+                  className="mt-0.5 shrink-0"
+                />
                 <span className="text-[12px] text-sec leading-snug line-clamp-2">
                   {row.summary}
                 </span>

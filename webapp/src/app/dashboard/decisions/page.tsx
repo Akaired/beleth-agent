@@ -12,6 +12,7 @@ import {
   IconCaretRight,
   IconDecisions,
 } from "@/components/icons";
+import { TickerBadge } from "@/components/ticker-badge";
 
 export const metadata: Metadata = { title: "Decisions — Beleth backoffice" };
 
@@ -100,7 +101,10 @@ export default async function DecisionsPage({
                     </Link>
                   </td>
                   <td className="px-3 py-2 font-mono text-[10.5px]">
-                    {r.symbol}
+                    <span className="inline-flex items-center gap-1.5">
+                      <TickerBadge symbol={r.symbol} size={14} />
+                      {r.symbol}
+                    </span>
                   </td>
                   <td className="px-3 py-2">
                     <ActionBadge action={r.action} outcome={r.orderOutcome} />
