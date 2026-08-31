@@ -5,7 +5,8 @@ import { timeAgo, wasEdited } from "@/lib/forum/format";
 import type { ForumPost } from "@/lib/forum/types";
 import { deletePostAction, editPostAction } from "@/lib/forum/actions";
 import { deletePostAction as adminDeletePostAction } from "@/app/dashboard/admin/forum/actions";
-import { AuthorAvatar } from "@/components/forum/author-avatar";
+import Link from "next/link";
+import { AuthorLink } from "@/components/forum/author-link";
 import { RichEditor } from "@/components/forum/rich-editor";
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog";
 
@@ -71,12 +72,15 @@ export function PostCard({
         original ? "border-emphline" : "border-line"
       }`}
     >
-      <AuthorAvatar name={post.author_name} size={40} />
+      <AuthorLink authorId={post.author_id} name={post.author_name} size={40} />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-[13px] font-medium text-txt">
+          <Link
+            href={`/u/${post.author_id}`}
+            className="text-[13px] font-medium text-txt transition-colors hover:text-acc"
+          >
             {post.author_name}
-          </span>
+          </Link>
           <span className="font-mono text-[10.5px] text-dim">
             {timeAgo(post.created_at)}
             {edited && " · edited"}

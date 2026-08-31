@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { timeAgo } from "@/lib/forum/format";
 import type { ForumTopicListItem } from "@/lib/forum/types";
-import { AuthorAvatar } from "@/components/forum/author-avatar";
+import { AuthorLink } from "@/components/forum/author-link";
 import { IconLock, IconPin } from "@/components/icons";
 
 /**
  * Discourse topic list: title (+ author, + category badge on the Latest view) |
  * Replies | Views | Activity. Styling in the `.forum-table` block in globals.css.
+ * The avatar and the author name link to the poster's profile; the title links
+ * to the thread — kept as sibling links so no `<a>` nests inside another.
  */
 export function TopicListTable({
   topics,
@@ -37,13 +39,17 @@ export function TopicListTable({
           {topics.map((t) => (
             <tr key={t.id}>
               <td>
-                <Link
-                  href={`/forum/t/${t.slug}`}
-                  className="flex items-center gap-2.5"
-                >
-                  <AuthorAvatar name={t.author_name} size={30} />
+                <div className="flex items-center gap-2.5">
+                  <AuthorLink
+                    authorId={t.author_id}
+                    name={t.author_name}
+                    size={30}
+                  />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-1.5 text-[13.5px] text-txt transition-colors hover:text-acc">
+                    <Link
+                      href={`/forum/t/${t.slug}`}
+                      className="flex items-center gap-1.5 text-[13.5px] text-txt transition-colors hover:text-acc"
+                    >
                       {t.pinned && (
                         <IconPin
                           size={12}
@@ -55,7 +61,7 @@ export function TopicListTable({
                         <IconLock size={12} className="shrink-0 text-dim" />
                       )}
                       <span>{t.title}</span>
-                    </span>
+                    </Link>
                     <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[10px] text-dim">
                       {showCategory && (
                         <span className="inline-flex items-center gap-1">
@@ -66,10 +72,19 @@ export function TopicListTable({
                           {t.category_name}
                         </span>
                       )}
-                      <span>{t.author_name}</span>
+                      {t.author_id ? (
+                        <Link
+                          href={`/u/${t.author_id}`}
+                          className="transition-colors hover:text-acc"
+                        >
+                          {t.author_name}
+                        </Link>
+                      ) : (
+                        <span>{t.author_name}</span>
+                      )}
                     </span>
                   </span>
-                </Link>
+                </div>
               </td>
               <td className="forum-num">{t.reply_count}</td>
               <td className="forum-num">{t.view_count}</td>

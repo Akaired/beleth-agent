@@ -19,7 +19,7 @@ import type {
 export const FORUM_PAGE_SIZE = 20;
 
 const TOPIC_LIST_COLS =
-  "id,slug,title,author_name,created_at,last_posted_at,reply_count,view_count,pinned,closed,category_id";
+  "id,slug,title,author_id,author_name,created_at,last_posted_at,reply_count,view_count,pinned,closed,category_id";
 
 type Row = Record<string, unknown>;
 type CatEmbed = { slug?: string; name?: string; color?: string };
@@ -30,6 +30,7 @@ function flattenTopic(row: Row): ForumTopicListItem {
     id: String(row.id),
     slug: String(row.slug),
     title: String(row.title),
+    author_id: String(row.author_id ?? ""),
     author_name: String(row.author_name ?? ""),
     created_at: String(row.created_at),
     last_posted_at: String(row.last_posted_at),
@@ -96,6 +97,30 @@ export async function fetchRecentForumTopicsByAuthor(
     }));
   } catch (err) {
     console.error("fetchRecentForumTopicsByAuthor failed", err);
+    return [];
+  }
+}
+
+/**
+ * A given user's topics, newest first, with the category flattened in — the
+ * "activity" list on their public profile (/u/[id]).
+ */
+export async function fetchForumTopicsByAuthor(
+  authorId: string,
+  limit = 20,
+): Promise<ForumTopicListItem[]> {
+  if (!authorId) return [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("forum_topics")
+      .select(`${TOPIC_LIST_COLS},forum_categories!inner(slug,name,color)`)
+      .eq("author_id", authorId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    return ((data as Row[] | null) ?? []).map(flattenTopic);
+  } catch (err) {
+    console.error("fetchForumTopicsByAuthor failed", err);
     return [];
   }
 }
@@ -217,7 +242,7 @@ export async function fetchForumTopic(
     const supabase = await createClient();
     const { data: topic } = await supabase
       .from("forum_topics")
-      .select(`${TOPIC_LIST_COLS},author_id,forum_categories!inner(slug,name,color)`)
+      .select(`${TOPIC_LIST_COLS},forum_categories!inner(slug,name,color)`)
       .eq("slug", slug)
       .maybeSingle();
     if (!topic) return null;

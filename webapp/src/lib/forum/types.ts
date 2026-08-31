@@ -25,6 +25,7 @@ export type ForumTopicListItem = {
   id: string;
   slug: string;
   title: string;
+  author_id: string;
   author_name: string;
   created_at: string;
   last_posted_at: string;
