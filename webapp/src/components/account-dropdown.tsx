@@ -12,6 +12,7 @@ import {
   IconCrown,
   IconEye,
   IconHome,
+  IconSettings,
   IconSignOut,
 } from "@/components/icons";
 
@@ -124,7 +125,16 @@ export function AccountDropdown({
               className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-sec transition-colors hover:bg-hoverbg hover:text-txt"
             >
               <IconAccount size={16} />
-              Account
+              Profile
+            </Link>
+            <Link
+              href="/dashboard/settings"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-sec transition-colors hover:bg-hoverbg hover:text-txt"
+            >
+              <IconSettings size={16} />
+              Settings
             </Link>
             <form action={signOutAction}>
               <button

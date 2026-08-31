@@ -58,7 +58,7 @@ const GROUPS: Group[] = [
   {
     label: "User",
     items: [
-      { href: "/dashboard/account", label: "Account", min: "public_user", Icon: IconAccount },
+      { href: "/dashboard/account", label: "Profile", min: "public_user", Icon: IconAccount },
       { href: "/dashboard/beleth", label: "Beleth", min: "public_user", Icon: IconBeleth, disabled: true },
       { href: "/forum", label: "Forum", min: "public_user", Icon: IconForum },
     ],
@@ -175,7 +175,10 @@ function NavGroups({
                 </div>
               );
             }
-            const active = isActive(pathname, it.href);
+            const active =
+              isActive(pathname, it.href) ||
+              // The Profile item redirects to the public /u/<id> page.
+              (it.href === "/dashboard/account" && pathname.startsWith("/u/"));
             const badge = badges?.[it.href] ?? 0;
             return (
               <div key={it.href}>
@@ -235,30 +238,35 @@ function NavGroups({
 function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const docsActive = pathname === "/docs" || pathname.startsWith("/docs/");
+  const settingsActive =
+    pathname === "/dashboard/settings" ||
+    pathname.startsWith("/dashboard/settings/");
+  const footerLink =
+    "flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] transition-colors";
   return (
     <div className="shrink-0 flex flex-col gap-2 border-t border-line px-3 py-2.5">
       <Link
         href="/docs"
         onClick={onNavigate}
         aria-current={docsActive ? "page" : undefined}
-        className={`flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] transition-colors ${
+        className={`${footerLink} ${
           docsActive ? "text-acc" : "text-sec hover:text-txt"
         }`}
       >
         <IconDocs size={13} />
         Docs
       </Link>
-      <div
-        aria-disabled="true"
-        title="Coming soon"
-        className="flex items-center gap-1.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-faint cursor-default select-none"
+      <Link
+        href="/dashboard/settings"
+        onClick={onNavigate}
+        aria-current={settingsActive ? "page" : undefined}
+        className={`${footerLink} ${
+          settingsActive ? "text-acc" : "text-sec hover:text-txt"
+        }`}
       >
         <IconSettings size={13} />
         Settings
-        <span className="ml-auto text-[8.5px] tracking-[0.12em] text-faint/70">
-          soon
-        </span>
-      </div>
+      </Link>
       <SignOutButton />
     </div>
   );

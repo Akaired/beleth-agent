@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   removeAvatarAction,
   uploadAvatarAction,
-} from "@/app/dashboard/account/actions";
+} from "@/app/dashboard/settings/account/actions";
 import { UserAvatar } from "@/components/user-avatar";
 import { IconClose, IconPencil } from "@/components/icons";
 

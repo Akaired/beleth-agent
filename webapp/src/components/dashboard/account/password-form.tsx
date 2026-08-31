@@ -1,11 +1,11 @@
 "use client";
 
 import { useActionState } from "react";
-import { changePasswordAction } from "@/app/dashboard/account/actions";
+import { changePasswordAction } from "@/app/dashboard/settings/account/actions";
 import {
   EMPTY_STATE,
   type FormState,
-} from "@/app/dashboard/account/form-state";
+} from "@/app/dashboard/settings/account/form-state";
 import { IconLock } from "@/components/icons";
 
 const field =
