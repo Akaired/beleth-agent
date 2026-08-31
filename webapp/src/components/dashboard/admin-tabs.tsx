@@ -20,7 +20,7 @@ type Tab = {
 const TABS: Tab[] = [
   { href: "/dashboard/admin/email", label: "Email", Icon: IconEnvelope },
   { href: "/dashboard/admin/docs", label: "Documentation", Icon: IconDocs },
-  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount, disabled: true },
+  { href: "/dashboard/admin/users", label: "Users", Icon: IconAccount },
 ];
 
 export function AdminTabs() {
