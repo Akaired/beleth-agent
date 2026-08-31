@@ -263,6 +263,16 @@ def test_closing_limit_fails_closed_on_an_unmeasured_mark():
     assert closing_limit_price(None, 0.05) is None
 
 
+def test_closing_limit_prefers_the_marketable_debit_over_the_mid():
+    # The mid says 0.08, but crossing the spread costs 0.20 (short ask - long bid). The
+    # order must be priced to fill: 0.20 + 0.05 concession.
+    assert closing_limit_price(0.08, 0.05, marketable_debit=0.20) == 0.25
+
+
+def test_closing_limit_falls_back_to_the_mid_without_a_marketable_price():
+    assert closing_limit_price(0.08, 0.05, marketable_debit=None) == 0.13
+
+
 def test_closing_limit_with_zero_mark_is_a_penny_debit_not_zero():
     # A 0.00 limit on Alpaca is not a fillable debit; the fallback guarantees the exit.
     assert closing_limit_price(0.0, 0.05) == 0.05

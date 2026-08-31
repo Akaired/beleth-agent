@@ -385,32 +385,75 @@ def test_prepare_closings_builds_one_plan_per_triggered_spread():
     from scripts.check_market_data import _prepare_closings
 
     plans, notes = _prepare_closings(
-        [_triggered_exit()], working_leg_sets=set(), strategy_config=_EXIT_STRATEGY
+        [_triggered_exit()], working_exits={}, strategy_config=_EXIT_STRATEGY
     )
     assert len(plans) == 1
     plan = plans[0]
     fields = plan["request"].to_request_fields()
     assert fields["qty"] == 2  # the spread's own remaining quantity, not the risk cap
-    assert fields["limit_price"] == 0.50  # mark 0.45 + 0.05 concession
+    # Priced off the marketable debit (short ask 0.90 - long bid 0.35 = 0.55) + 0.05
+    # concession, not the 0.45 mid: a mid-priced close rests unfilled on a wide book.
+    assert fields["limit_price"] == 0.60
     assert [leg["position_intent"] for leg in fields["legs"]] == [
         "buy_to_close", "sell_to_close"
     ]
     assert plan["exit_reason"] == "profit_target"
     assert plan["client_order_id"].startswith("beleth-exit-")
+    assert plan["replace_order_id"] is None
     assert "closing order" in notes and "is being sent" in notes
 
 
-def test_prepare_closings_skips_a_spread_already_working():
+def test_prepare_closings_skips_a_spread_with_a_good_resting_close():
     from scripts.check_market_data import _prepare_closings
 
     evaluation = _triggered_exit()
     spread = evaluation.spread
-    working = {frozenset({spread.short_symbol, spread.long_symbol})}
+    leg_set = frozenset({spread.short_symbol, spread.long_symbol})
+    # A resting close already priced at/above what a fresh limit would be: leave it.
+    working = {leg_set: {"id": "ord-1", "limit": 0.62}}
     plans, notes = _prepare_closings(
-        [evaluation], working_leg_sets=working, strategy_config=_EXIT_STRATEGY
+        [evaluation], working_exits=working, strategy_config=_EXIT_STRATEGY
     )
     assert plans == []
     assert "already working" in notes and "not duplicated" in notes
+
+
+def test_prepare_closings_reprices_a_stale_resting_close():
+    from scripts.check_market_data import _prepare_closings
+
+    evaluation = _triggered_exit()
+    spread = evaluation.spread
+    leg_set = frozenset({spread.short_symbol, spread.long_symbol})
+    # A resting close stuck at a 0.12 debit the wide book never fills: cancel + replace.
+    working = {leg_set: {"id": "stale-1", "limit": 0.12}}
+    plans, notes = _prepare_closings(
+        [evaluation], working_exits=working, strategy_config=_EXIT_STRATEGY
+    )
+    assert len(plans) == 1
+    assert plans[0]["replace_order_id"] == "stale-1"
+    assert plans[0]["request"].to_request_fields()["limit_price"] == 0.60
+    assert "repriced" in notes
+
+
+def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
+    from scripts.check_market_data import _prepare_closings
+    from app.exits import evaluate_exit
+
+    # A blown-out book: marketable debit would be 2.10, but R5's loss-close price on a
+    # 0.90 credit at 2x is 1.80 — never bid more than the rule's own defined max.
+    evaluation = evaluate_exit(
+        _triggered_exit().spread,
+        short_bid=2.30, short_ask=2.50,
+        long_bid=0.40, long_ask=0.60,
+        underlying_last=450.0,
+        profit_target_pct=50,
+        loss_multiple=2,
+        exit_on_short_itm=True,
+    )
+    plans, _ = _prepare_closings(
+        [evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY
+    )
+    assert plans[0]["request"].to_request_fields()["limit_price"] == 1.80
 
 
 def test_prepare_closings_fails_closed_without_a_measurable_mark():
@@ -431,7 +474,28 @@ def test_prepare_closings_fails_closed_without_a_measurable_mark():
     )
     assert evaluation.triggered is True
     plans, notes = _prepare_closings(
-        [evaluation], working_leg_sets=set(), strategy_config=_EXIT_STRATEGY
+        [evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY
     )
     assert plans == []
     assert "no closing order" in notes and "fail-closed" in notes
+
+
+def test_working_exit_orders_keeps_id_and_limit_for_closing_orders_only():
+    from scripts.check_market_data import working_exit_orders
+
+    class _O:
+        def __init__(self, *legs, cid=None, oid=None, limit=None):
+            self.legs = list(legs)
+            self.client_order_id = cid
+            self.id = oid
+            self.limit_price = limit
+
+    close = _O(*_CLOSE_LEGS, oid="ord-9", limit="-0.12")
+    entry = _O(*_ENTRY_LEGS, oid="ord-8", limit="0.20")
+    out = working_exit_orders([close, entry])
+    assert out == {
+        frozenset({"SPY260918P00440000", "SPY260918P00435000"}): {
+            "id": "ord-9",
+            "limit": 0.12,
+        }
+    }

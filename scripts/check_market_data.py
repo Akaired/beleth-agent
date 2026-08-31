@@ -43,6 +43,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import math
 import sys
 import uuid
 from dataclasses import replace
@@ -202,6 +203,36 @@ def working_exit_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
     return sets
 
 
+# A resting closing order is only cancelled and replaced when a fresh limit would be
+# more aggressive than the resting one by at least this much — enough to matter, not so
+# little that every cycle re-prices the same order (thrash).
+_REPRICE_MIN_STEP = 0.02
+
+
+def working_exit_orders(open_orders: list[Any]) -> dict[frozenset[str], dict[str, Any]]:
+    """Leg-symbol set -> ``{"id", "limit"}`` for every open order that closes a spread.
+
+    Same filter as :func:`working_exit_leg_sets`, but it keeps the order id and its
+    absolute limit price so a triggered close can decide whether to leave the resting
+    order alone or cancel-and-replace it at a price that actually fills. ``limit`` is
+    ``None`` when the broker did not report a readable numeric limit.
+    """
+    out: dict[frozenset[str], dict[str, Any]] = {}
+    for order in open_orders or []:
+        if _classify_open_order(order) != "close":
+            continue
+        symbols = _order_leg_symbols(order)
+        if not symbols:
+            continue
+        raw = getattr(order, "limit_price", None)
+        try:
+            limit = abs(float(raw)) if raw is not None else None
+        except (TypeError, ValueError):
+            limit = None
+        out[frozenset(symbols)] = {"id": getattr(order, "id", None), "limit": limit}
+    return out
+
+
 def resting_entry_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
     """Leg-symbol sets of open orders that OPEN positions — or cannot be ruled out.
 
@@ -254,33 +285,58 @@ def _underlying_prices_for_spreads(
 def _prepare_closings(
     triggered: list[ExitEvaluation],
     *,
-    working_leg_sets: set[frozenset[str]],
+    working_exits: dict[frozenset[str], dict[str, Any]],
     strategy_config: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], str]:
     """Turn triggered exits into the closing orders they may send — or, per spread, the
     fail-closed note that lands in the persisted summary instead of an order.
 
     Plans are *not* submitted here: the caller submits only after the decision row is
-    persisted (no order ever goes out unlogged, constraint #5). A spread whose closing
-    order is already resting is skipped, not duplicated."""
+    persisted (no order ever goes out unlogged, constraint #5).
+
+    The limit is priced to *fill*: off the marketable debit (``short_ask - long_bid``)
+    when available, capped at R5's own loss-close price so a blown-out quote never pays
+    more than the rule's defined max. A spread that already has a resting closing order
+    is left alone — unless a fresh limit would be materially more aggressive, in which
+    case the plan carries ``replace_order_id`` and the caller cancels the stale order
+    before sending the new one. Without that, a close priced too tight on a wide book
+    rests unfilled all session and blocks its own re-pricing."""
     slippage = strategy_config["exit"]["close_slippage_usd"]
     plans: list[dict[str, Any]] = []
     notes: list[str] = []
     for evaluation in triggered:
         spread = evaluation.spread
+        detail = evaluation.detail
         leg_set = frozenset({spread.short_symbol, spread.long_symbol})
-        if leg_set in working_leg_sets:
-            notes.append(
-                f" {spread.short_symbol}: a closing order is already working — not duplicated."
-            )
-            continue
-        limit_price = closing_limit_price(evaluation.detail.get("mark_to_close"), slippage)
+        limit_price = closing_limit_price(
+            detail.get("mark_to_close"),
+            slippage,
+            marketable_debit=detail.get("marketable_close"),
+        )
         if limit_price is None:
             notes.append(
                 f" {spread.short_symbol}: no closing order — the close cannot be priced "
                 "(no usable leg quotes), fail-closed; it re-arms next cycle."
             )
             continue
+        # Never bid more to close than the rule's own loss-close price (a defined max);
+        # only caps a debit, never a credit demand.
+        loss_cap = detail.get("loss_close_price")
+        if loss_cap is not None and limit_price > 0 and limit_price > loss_cap:
+            limit_price = math.floor(loss_cap * 100) / 100
+
+        resting = working_exits.get(leg_set)
+        replace_order_id = None
+        if resting is not None:
+            resting_limit = resting.get("limit")
+            if resting_limit is None or limit_price <= resting_limit + _REPRICE_MIN_STEP:
+                notes.append(
+                    f" {spread.short_symbol}: a closing order is already working — "
+                    "not duplicated."
+                )
+                continue
+            replace_order_id = resting.get("id")
+
         request = build_closing_mleg_order(
             spread,
             spread.qty,
@@ -297,13 +353,22 @@ def _prepare_closings(
                 "exit_reason": evaluation.rule,
                 "spread": spread.as_dict(),
                 "client_order_id": request.client_order_id,
+                "replace_order_id": replace_order_id,
             }
         )
-        note = (
-            f" One closing order for {spread.short_symbol} ({spread.qty} spread(s) at a "
-            f"{abs(limit_price):.2f} {'net-credit' if limit_price < 0 else 'net-debit'} "
-            "limit) is being sent; the trades log carries the outcome."
-        )
+        kind = "net-credit" if limit_price < 0 else "net-debit"
+        if replace_order_id is not None:
+            note = (
+                f" The resting closing order for {spread.short_symbol} is being repriced "
+                f"to a {abs(limit_price):.2f} {kind} limit ({spread.qty} spread(s)) so it "
+                "fills; the trades log carries the outcome."
+            )
+        else:
+            note = (
+                f" One closing order for {spread.short_symbol} ({spread.qty} spread(s) at a "
+                f"{abs(limit_price):.2f} {kind} limit) is being sent; the trades log "
+                "carries the outcome."
+            )
         notes.append(note)
     return plans, ("".join(notes) if notes else "")
 
@@ -739,7 +804,7 @@ def main() -> int:
         else:
             exit_plans, exit_plan_notes = _prepare_closings(
                 triggered_exits,
-                working_leg_sets=working_exit_leg_sets(open_orders),
+                working_exits=working_exit_orders(open_orders),
                 strategy_config=strategy,
             )
 
@@ -854,6 +919,27 @@ def main() -> int:
                 exit_order: dict[str, Any] | None = None
                 exit_failure: str | None = None
                 try:
+                    replace_order_id = exit_plan.get("replace_order_id")
+                    if replace_order_id is not None:
+                        # Cancel the stale resting close first; if it will not cancel, do
+                        # NOT send a second one — a duplicate close would stack against
+                        # the same position. The rule stays triggered and re-arms.
+                        try:
+                            trading.cancel_order_by_id(replace_order_id)
+                        except Exception as exc:  # noqa: BLE001 — a duplicate close is worse
+                            raise OrderSubmissionError(
+                                f"could not cancel stale closing order {replace_order_id}: "
+                                f"{type(exc).__name__}: {exc}"
+                            ) from exc
+                        elog.info(
+                            "exit_repriced",
+                            f"cancelled stale closing order {replace_order_id} for "
+                            f"{exit_plan['spread']['short_symbol']} — resubmitting at "
+                            f"{exit_plan['limit']:.2f}",
+                            symbol=symbol,
+                            exit_reason=exit_plan["exit_reason"],
+                            alpaca_order_id=replace_order_id,
+                        )
                     exit_order = submit_mleg_order(trading, exit_plan["request"])
                     submitted_exits += 1
                     elog.info(

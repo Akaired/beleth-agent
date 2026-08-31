@@ -136,25 +136,38 @@ def slippage_within_credit_cap(
 # --- closing (exit) orders --------------------------------------------------------------------
 
 
-def closing_limit_price(mark_debit: float | None, slippage: float) -> float | None:
+def closing_limit_price(
+    mark_debit: float | None,
+    slippage: float,
+    *,
+    marketable_debit: float | None = None,
+) -> float | None:
     """The limit for the order that closes a short vertical: what we will pay to get out.
 
-    ``mark_debit`` is the measured per-share cost to close (short mid minus long mid,
-    positive = we pay). Closing is risk *reduction*, so the limit is priced to fill, not
-    to haggle: up to the mark plus the configured slippage concession, floored to the
-    cent (Alpaca rejects limit prices beyond 2 decimal places). When the mark is a net
-    *credit* — the market pays us to leave — the limit demands that credit minus the
-    slippage; when that concession would swallow the whole credit, the limit falls back
-    to a 1-cent debit: exiting a position the rules say to close is worth a cent, and a
-    guaranteed fill beats a resting order on a protective exit.
+    ``mark_debit`` is the *mid* per-share cost to close (short mid minus long mid,
+    positive = we pay) — an indication, not a fillable price. ``marketable_debit`` is
+    the price that actually crosses the spread right now: pay the short leg's ask, hit
+    the long leg's bid (``short_ask - long_bid``). When it is given it is the base,
+    because a close priced off the mid rests unfilled whenever the book is wide — the
+    live failure mode on deep-OTM, thin legs. The mid is the fallback only when the
+    marketable price cannot be measured.
+
+    Closing is risk *reduction*, so the limit is priced to fill, not to haggle: the base
+    plus the configured slippage concession, floored to the cent (Alpaca rejects limit
+    prices beyond 2 decimal places). When the base is a net *credit* — the market pays
+    us to leave — the limit demands that credit minus the slippage; when that concession
+    would swallow the whole credit, the limit falls back to a 1-cent debit: exiting a
+    position the rules say to close is worth a cent, and a guaranteed fill beats a
+    resting order on a protective exit.
 
     Returns ``None`` — do not send — when the close cannot be measured at all.
     """
-    if mark_debit is None:
+    base = marketable_debit if marketable_debit is not None else mark_debit
+    if base is None:
         return None
-    if mark_debit >= 0:
-        return math.floor((mark_debit + slippage) * 100) / 100
-    credit_available = -mark_debit
+    if base >= 0:
+        return math.floor((base + slippage) * 100) / 100
+    credit_available = -base
     demand = credit_available - slippage
     if demand <= 0:
         return 0.01  # market would pay us to close; a 1-cent debit still guarantees the exit

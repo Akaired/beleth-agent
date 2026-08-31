@@ -280,11 +280,20 @@ def evaluate_exit(
     long_mid = _mid(long_bid, long_ask)
     credit = spread.entry_credit
     mark = None if (short_mid is None or long_mid is None) else round(short_mid - long_mid, 4)
+    # The debit that actually crosses the spread now: buy the short leg at its ask, sell
+    # the long leg at its bid. The closing order is priced off this, not the mid — a
+    # mid-priced close rests unfilled whenever the book is wide (deep-OTM, thin legs).
+    marketable_close = (
+        None
+        if (short_ask is None or long_bid is None or short_ask <= 0 or long_bid <= 0)
+        else round(short_ask - long_bid, 4)
+    )
 
     detail: dict[str, Any] = {
         "qty": spread.qty,
         "entry_credit": None if credit is None else round(credit, 4),
         "mark_to_close": mark,
+        "marketable_close": marketable_close,
         "short_leg_mid": short_mid,
         "long_leg_mid": long_mid,
         "underlying_last": underlying_last,
