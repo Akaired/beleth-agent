@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { BelethSprite } from "@/components/beleth-sprite";
-import { IconArrowDown, IconChart } from "@/components/icons";
+import { demoSignInAction } from "@/app/login/actions";
+import { IconArrowDown, IconChart, IconEye } from "@/components/icons";
 import { TickerBadge } from "@/components/ticker-badge";
 import type { BelethPnl, BelethScene } from "@/lib/beleth";
 import type { DecisionRow, ThoughtBubble } from "@/lib/queries";
@@ -69,7 +70,16 @@ export function Hero({
           it isn&apos;t, it buys nothing and says why. Every refusal is published next to
           every trade.
         </p>
-        <div className="flex items-center gap-6 mt-8">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-8">
+          <form action={demoSignInAction}>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-1.5 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"
+            >
+              <IconEye size={14} weight="bold" />
+              Demo
+            </button>
+          </form>
           <a
             href="#live"
             className="inline-flex items-center gap-1.5 bg-txt text-bg text-[13px] font-medium px-[18px] py-[10px] rounded-[2px] hover:bg-acc transition-colors whitespace-nowrap"

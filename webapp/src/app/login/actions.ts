@@ -97,6 +97,24 @@ export async function signUpAction(
   redirect(next);
 }
 
+/**
+ * One-click "Demo" button on the public homepage. Signs in with the shared
+ * read-only judges' account (profiles.role = 'demo_admin') using credentials
+ * held server-side only, then drops the visitor into the backoffice. Falls back
+ * to /login when the env vars are not configured.
+ */
+export async function demoSignInAction(): Promise<void> {
+  const email = process.env.DEMO_EMAIL?.trim();
+  const password = process.env.DEMO_PASSWORD ?? "";
+  if (!email || !password) redirect("/login");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) redirect("/login");
+
+  redirect("/dashboard");
+}
+
 export async function resetPasswordAction(
   _prev: AuthState,
   formData: FormData,
