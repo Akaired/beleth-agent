@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resident runner loop for the Beleth agent (milestone 8).
+"""Resident runner loop for the Beleth agent.
 
 Runs one full analysis cycle per configured symbol by invoking the already-tested
 one-shot script (``scripts/check_market_data.py``) as a subprocess: a fresh

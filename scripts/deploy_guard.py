@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Refuse a container rebuild while the market is open (P6 deploy discipline).
+"""Refuse a container rebuild while the market is open.
 
 ``docker compose up --build`` recreates the container: it drops Docker's json-file
 logs and, worse, kills any in-flight cycle and the resting-order guard's live view of
-the account. On day one three rebuilds during market hours cost roughly an hour of
-narrative and fed an entry-order stacking incident. Gate a rebuild on this script:
+the account — which can leave entry orders resting unguarded. Gate a rebuild on this
+script:
 
     python scripts/deploy_guard.py && docker compose up -d --build
 

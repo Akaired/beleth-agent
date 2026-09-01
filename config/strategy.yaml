@@ -1,42 +1,40 @@
 # Short vertical credit spread strategy — starting parameters.
 #
-# Most of these are industry-conventional values for this strategy shape (Strategy level B),
+# Most of these are industry-conventional values for this strategy shape (strategy level B),
 # NOT the result of our own backtesting. They will need tuning once we have real paper-trading
-# data. See docs/strategy.md for the full rationale and its three reliability tiers, and the spec §5
-# for the honest expectation: most trades win, individual losses are structurally larger, and
+# data. See docs/strategy.md for the full rationale and its three reliability tiers, and for
+# the honest expectation: most trades win, individual losses are structurally larger, and
 # losing days are normal, not a bug.
 
 universe:
   # Highly liquid underlyings only — a tight bid/ask spread is what makes fills realistic even
-  # in paper trading. Keep this list short (Strategy C3).
+  # in paper trading. Keep this list short (strategy note C3).
   symbols:
     - SPY
     - QQQ
 
 entry:
   # The primary entry gate is the measured volatility risk premium on the candidate tenor
-  # (see tenor_scan.vrp_threshold_vol_points and Strategy R1), not a fixed IV rank. The VIX
-  # percentile is a *regime* read, not a per-contract signal (Strategy A4).
+  # (see tenor_scan.vrp_threshold_vol_points and rule R1), not a fixed IV rank. The VIX
+  # percentile is a *regime* read, not a per-contract signal (strategy note A4).
   vix_regime:
     # R9 — VIX 1y-percentile size taper (app/risk_check.py: vix_size_multiplier /
-    # apply_vix_regime). Replaces the dead `vix_regime_percentile_min`. A single straight
-    # line: full size at/above taper_upper_pct, linearly down to taper_floor_frac at/below
-    # taper_lower_pct (no flat segment). Strictly below block_below_pct: no new entry at
-    # all (a hard "no", surfaced as an R9 risk-check rejection row). Between the floor
-    # percentile and the block percentile the size just stays at taper_floor_frac — a
-    # smaller trade, never a second no-trade path (that is block_below_pct's job alone).
-    # taper_floor_frac feeds risk.max_risk_per_trade_pct_of_equity in compute_quantity.
+    # apply_vix_regime). A single straight line: full size at/above taper_upper_pct,
+    # linearly down to taper_floor_frac at/below taper_lower_pct (no flat segment).
+    # Strictly below block_below_pct: no new entry at all (a hard "no", surfaced as an
+    # R9 risk-check rejection row). Between the floor percentile and the block percentile
+    # the size just stays at taper_floor_frac — a smaller trade, never a second no-trade
+    # path (that is block_below_pct's job alone). taper_floor_frac feeds
+    # risk.max_risk_per_trade_pct_of_equity in compute_quantity.
     #
-    # ENABLED 2026-08-29 with the calibrated values below (set any to 0 / floor 1.0 to
-    # disable). Historical base rates (VIX close, 1990-2026, 252d lookback) behind the shape:
+    # Set any threshold to 0 / the floor to 1.0 to disable. Historical base rates (VIX
+    # close, 1990-2026, 252d lookback) behind the shape:
     #   percentile < 25 on ~33% of days, usually a multi-week regime (66% of such days in
     #     episodes >= 10 trading days; longest runs 50-78 days: 2003, 2009, 2023) — too
     #     frequent for a hard block, right level to START tapering.
     #   percentile < 3 on ~8% of days, and mostly SHORT episodes (median ~2 trading days)
     #     — a genuine extreme-complacency tail, the right level for the hard block and for
     #     the taper floor.
-    # NOTE: the VIX 1y percentile was 3.97 on 2026-08-27, so at enable time R9 tapers new
-    # entries to ~0.52x and a small further drop hard-blocks them — intended behaviour.
     taper_upper_pct: 25 # at or above this 1y percentile -> full size (1.0)
     taper_lower_pct: 3 # at or below this -> taper_floor_frac (held down to block_below_pct)
     taper_floor_frac: 0.5 # size multiplier at/below taper_lower_pct (e.g. 0.5 = half size)
@@ -45,11 +43,11 @@ entry:
 tenor_scan:
   # The agent has no fixed expiry. It scans this ladder of days-to-expiry, measures the premium
   # available on each, and trades ONLY the tenor whose VRP clears the threshold. If none clears,
-  # it does not trade and says why (Strategy A2 / R1 / R8). 1-7 DTE is deliberately NOT on the
-  # ladder — the VRP there is small and unstable and gamma risk is high (Strategy A3).
+  # it does not trade and says why (strategy notes A2 / R1 / R8). 1-7 DTE is deliberately NOT
+  # on the ladder — the VRP there is small and unstable and gamma risk is high (strategy note A3).
   dte_ladder: [7, 14, 21, 30, 45]
   # Minimum volatility risk premium, in annualized volatility points (e.g. IV 16.2% vs RV 13.4%
-  # => 2.8 points), for a tenor to be tradable. Default 1.5 (Strategy R1).
+  # => 2.8 points), for a tenor to be tradable. Default 1.5 (rule R1).
   vrp_threshold_vol_points: 1.5
   # A contract counts as "at the money" for tenor IV / term-structure purposes if its strike is
   # within this percentage of the underlying's last price.
@@ -57,21 +55,21 @@ tenor_scan:
 
 regime:
   # Term structure is derived from the SPY chain itself (we have no VIX futures): compare ATM IV
-  # at the shortest ladder tenor vs the longest (Strategy A5 / evidence pack).
+  # at the shortest ladder tenor vs the longest (strategy note A5).
   #   short ATM IV < long ATM IV  -> contango (normal)
   #   short ATM IV > long ATM IV  -> backwardation (stress)
   # |short - long| below this band (absolute IV, e.g. 0.005 = half a vol point) -> "flat".
   term_structure_flat_band_iv: 0.005
-  # Backwardation is a statistically significant stress signal; contango is not (Strategy A5).
-  # When true, an inverted term structure blocks all new premium-selling positions (Strategy R2).
+  # Backwardation is a statistically significant stress signal; contango is not (strategy note A5).
+  # When true, an inverted term structure blocks all new premium-selling positions (rule R2).
   block_new_shorts_on_backwardation: true
 
 macro_calendar:
-  # Known macro events, hand-maintained for the hackathon window — no calendar-provider
-  # integration (Strategy C / R3). Times in US Eastern.
+  # Known macro events, hand-maintained for the contest window — no calendar-provider
+  # integration (strategy note C / R3). Times in US Eastern.
   events_file: config/macro_events.yaml
   # Do not open a position whose expiry falls on/after a known macro event if that event is
-  # within this many days (Strategy A4 / R3).
+  # within this many days (strategy notes A4 / R3).
   block_within_days: 2
 
 realized_vol:
@@ -81,8 +79,8 @@ realized_vol:
 
 vix:
   # The VIX does not come from Alpaca — Alpaca does not provide index data and has said it has
-  # no plans to (Strategy A / evidence pack). Source: FRED series VIXCLS, daily history from
-  # 1990, free, no API key required for the CSV endpoint.
+  # no plans to (strategy note A). Source: FRED series VIXCLS, daily history from 1990, free,
+  # no API key required for the CSV endpoint.
   fred_series_id: VIXCLS
   fred_csv_url: "https://fred.stlouisfed.org/graph/fredgraph.csv?id=VIXCLS"
   # CBOE publishes the same history as a fallback if FRED is unreachable — we do NOT substitute
@@ -91,7 +89,7 @@ vix:
   lookback_trading_days: 252
 
 structure:
-  # Always a single defined-risk multi-leg vertical spread order. Never naked legs (Strategy R4).
+  # Always a single defined-risk multi-leg vertical spread order. Never naked legs (rule R4).
   short_leg_delta_min: 0.15
   short_leg_delta_max: 0.25
   strike_width_usd_min: 1
@@ -100,14 +98,13 @@ structure:
   # concession — a mid quote is an indication, not a fillable price. The concession is the
   # LARGER of an absolute floor and a fraction of the candidate's own bid/ask width:
   #   slippage = max(credit_slippage_usd, credit_slippage_frac_of_spread * bid_ask_width)
-  # Fixed 0.02 alone was below the half-spread on 95% of 2026-08-28 candidates, so the one
-  # order sent rested unfilled all day (Strategy level B: industry convention, not backtested).
+  # A fixed 0.02 floor sits below the half-spread on most index-ETF spreads, so an order
+  # priced to the mid rests unfilled (strategy level B: industry convention, not backtested).
   credit_slippage_usd: 0.02 # absolute floor, per share
   credit_slippage_frac_of_spread: 0.5 # 0.5 = walk the limit to the near touch, not just to the mid; 0 disables
   # If being marketable would concede more than this fraction of the MEASURED credit, the
   # cycle does not trade and logs why — an explicit no-trade beats an order that never
-  # fills. Day-1 spread/credit ran to 7.3 in the tail; 0.5 filters that slice by design.
-  # 0 disables the cap.
+  # fills. 0 disables the cap.
   max_slippage_frac_of_credit: 0.5
 
 exit:
@@ -126,16 +123,16 @@ risk:
   daily_drawdown_stop_pct: 3 # stop opening new positions for the day past this drawdown
   # Account-level aggregate cap (R11, apply_aggregate_cap): committed risk across open
   # positions plus a new candidate's max loss must stay within this percent of equity.
-  # 0 = disabled. Set to 6 on 2026-08-29 (day-1 review): 2x the daily drawdown stop, so
-  # R11 bites at ~3 full-size (2%) concurrent positions — before max_concurrent_positions
-  # — while SPY+QQQ at normal load (~4%) still clears it. SPY/QQQ are ~0.95 correlated, so
-  # aggregate exposure is treated as one directional short-vol bet, not diversified.
+  # 0 = disabled. At 6 (2x the daily drawdown stop) R11 bites at ~3 full-size (2%)
+  # concurrent positions — before max_concurrent_positions — while SPY+QQQ at normal load
+  # (~4%) still clears it. SPY/QQQ are ~0.95 correlated, so aggregate exposure is treated
+  # as one directional short-vol bet, not diversified.
   max_aggregate_risk_pct_of_equity: 6
 
 runner:
-  # Resident loop (scripts/run_agent.py, milestone 8). Full cycles run ONLY while the
-  # market is open; outside hours the loop heartbeats agent_status ('idle') on the
-  # slower cadence so the dashboard can tell "alive, market closed" from "agent down".
+  # Resident loop (scripts/run_agent.py). Full cycles run ONLY while the market is open;
+  # outside hours the loop heartbeats agent_status ('idle') on the slower cadence so the
+  # dashboard can tell "alive, market closed" from "agent down".
   open_cycle_interval_minutes: 5
   closed_heartbeat_interval_minutes: 15
   # While the master-admin pause switch (agent_status.paused, which the agent never
@@ -144,9 +141,9 @@ runner:
   # One cycle = one subprocess; anything slower than this is killed and the loop moves
   # on. Generous by design: the cycle makes several outbound API calls.
   cycle_timeout_seconds: 600
-  # P6 — the runner mirrors its own stdout/stderr to a rotating file in this directory
-  # so the diagnostic narrative survives a container recreation (Docker's json-file logs
-  # are dropped on every `up --build`). compose.yaml mounts a named volume at /app/logs.
+  # The runner mirrors its own stdout/stderr to a rotating file in this directory so the
+  # diagnostic narrative survives a container recreation (Docker's json-file logs are
+  # dropped on every `up --build`). compose.yaml mounts a named volume at /app/logs.
   # Fail-open: if the directory is not writable the runner logs a warning and keeps
   # going with console output only. Set enabled=false to disable the on-disk mirror.
   diagnostic_log:

@@ -300,12 +300,12 @@ const TOOLS: ToolDef[] = [
       function: {
         name: "get_methodology",
         description:
-          "The full strategy notes text, organised by reliability tier (Level A research, Level B convention, Level C our choices) plus the operating rules R1-R11 and their sources. Call this when asked to justify or cite the strategy.",
+          "The full strategy text, organised by reliability tier (Level A research, Level B convention, Level C our choices) plus the operating rules R1-R11 and their sources. Call this when asked to justify or cite the strategy.",
         parameters: { type: "object", properties: {}, additionalProperties: false },
       },
     },
     async run() {
-      return { strategy: METHODOLOGY_TEXT };
+      return { methodology: METHODOLOGY_TEXT };
     },
   },
 ];

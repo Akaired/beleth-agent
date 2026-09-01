@@ -4,9 +4,9 @@ Numbers, not prose: the model already knows what theta is; it needs to know what
 today. Every persisted decision must carry the evidence package that produced it, so any
 choice can be reconstructed after the fact.
 
-This module only shapes already-computed inputs into the agreed structure (see the schema in
-the milestone brief / docs/strategy.md "evidence package"). All IO — Alpaca, FRED, the
-calendar file — happens in the caller (see scripts/check_market_data.py).
+This module only shapes already-computed inputs into the agreed structure (see the
+"evidence package" schema in docs/strategy.md). All IO — Alpaca, FRED, the calendar
+file — happens in the caller (see scripts/check_market_data.py).
 """
 
 from __future__ import annotations

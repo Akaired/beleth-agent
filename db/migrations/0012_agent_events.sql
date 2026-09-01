@@ -1,6 +1,6 @@
 -- 0012_agent_events.sql — structured event log for the backoffice "Logs" tab.
 --
--- The runner already narrates to stdout and to a rotating file on the the trading host's logs
+-- The runner already narrates to stdout and to a rotating file on the runner's logs
 -- volume, but neither is reachable from the webapp (the agent is outbound-only and
 -- shares nothing but this database). This table is the webapp-facing event stream: a
 -- curated, filterable line per meaningful thing that happens — a decision, a submitted

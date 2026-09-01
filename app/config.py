@@ -73,7 +73,7 @@ class Settings(BaseSettings):
         if v.rstrip("/") != PAPER_BASE_URL:
             raise ValueError(
                 f"ALPACA_BASE_URL must be exactly {PAPER_BASE_URL!r} (paper trading). "
-                "This project never trades live — see the hard constraint #1."
+                "This project never trades live."
             )
         return v
 

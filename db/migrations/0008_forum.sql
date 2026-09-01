@@ -292,7 +292,7 @@ insert into public.forum_categories (slug, name, description, color, position) v
     ('announcements', 'Announcements',
      'Release notes and status updates from the Beleth team.',            '#d9a03c', 1),
     ('strategy',      'Strategy & Signals',
-     'The volatility-risk-premium strategy, the DTE ladder, the exit rules — discuss how Beleth decides.', '#35a67c', 2),
+     'The volatility-risk-premium approach, the DTE ladder, the exit rules — discuss how Beleth decides.', '#35a67c', 2),
     ('feedback',      'Site Feedback',
      'Bugs, rough edges and ideas for the dashboard and this forum.',     '#5b8fb0', 3),
     ('general',       'General',

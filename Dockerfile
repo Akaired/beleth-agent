@@ -18,14 +18,14 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Strategy code and the config/docs files the runtime reads (strategy.md is injected
+# Strategy code and the config/docs files the runtime reads (docs/strategy.md is injected
 # into the LLM system prompt; strategy.yaml and macro_events.yaml drive every cycle).
 COPY app ./app
 COPY scripts ./scripts
 COPY config ./config
 COPY docs ./docs
 
-# Writable directory for the mirrored diagnostic log (P6). compose.yaml mounts a named
+# Writable directory for the mirrored diagnostic log. compose.yaml mounts a named
 # volume here so the stream survives a container recreation; a bare `docker run` still
 # gets a working (ephemeral) log dir.
 RUN mkdir -p /app/logs

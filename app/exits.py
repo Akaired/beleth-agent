@@ -21,7 +21,7 @@ the account should only ever hold covered structures.
 
 Everything here is pure; IO (positions, quotes) happens in the caller. Closing orders are
 built and submitted by ``app/orders.py`` / the cycle script — always one ``mleg`` order
-per spread closing both legs inside it, never a naked leg (constraint #4).
+per spread closing both legs inside it, never a naked leg.
 """
 
 from __future__ import annotations

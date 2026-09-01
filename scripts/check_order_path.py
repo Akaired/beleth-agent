@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Order-path verification against the real Alpaca paper account (milestone 6).
+"""Order-path verification against the real Alpaca paper account.
 
 Two modes:
 
@@ -9,7 +9,7 @@ Two modes:
   Nothing is submitted, nothing is persisted.
 * ``--probe`` — a controlled LIVE submission that answers the one thing offline tests
   cannot: does Alpaca read a negative mleg ``limit_price`` as a net credit, as the
-  vendored SDK documents? It submits ONE spread (qty=1, smallest approved strike width)
+  alpaca-py SDK documents? It submits ONE spread (qty=1, smallest approved strike width)
   at a deliberately UNFILLABLE credit demand (measured credit + $1.00 — no counterparty
   pays more than market, so under the documented convention the order must rest, never
   fill), then reads the order back, cancels it, and confirms the cancellation. If the
@@ -17,7 +17,7 @@ Two modes:
   script reports that loudly, and the position it opens is a defined-risk vertical.
 
 The probe is an operator diagnostic, not an agent cycle: it runs through the per-candidate
-risk gate (R4/R6/R7 — no order without it, constraint #3) but deliberately skips the
+risk gate (R4/R6/R7 — no order without it) but deliberately skips the
 strategy-entry filters (VRP threshold, macro calendar), which belong to the cycle, and it
 persists nothing — the decision and trades logs stay the agent's own record.
 
@@ -98,7 +98,7 @@ def main() -> int:
     structure = strategy["structure"]
 
     trading = get_trading_client(settings)
-    assert_paper_trading(trading)  # never a live endpoint — constraint #1
+    assert_paper_trading(trading)  # never a live endpoint
     account = trading.get_account()
     equity = float(account.equity)
     positions = trading.get_all_positions()
@@ -191,7 +191,7 @@ def main() -> int:
         print(f"PROBE RESULT: submission REJECTED by Alpaca — {exc}", file=sys.stderr)
         print(
             "If the rejection complains about the negative limit price, the credit "
-            "convention differs from the vendored SDK docstring and app/orders.py must "
+            "convention differs from the alpaca-py SDK docstring and app/orders.py must "
             "be fixed before any real cycle trades.",
             file=sys.stderr,
         )

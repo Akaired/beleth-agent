@@ -54,7 +54,7 @@ def main() -> int:
     today_ordinal = datetime.now().toordinal()
 
     trading = get_trading_client(settings)
-    assert_paper_trading(trading)  # never a live endpoint — constraint #1
+    assert_paper_trading(trading)  # never a live endpoint
     option_client = get_option_data_client(settings)
     stock_client = get_stock_data_client(settings)
     last_price = fetch_last_price(stock_client, symbol)

@@ -21,7 +21,7 @@ pytestmark = pytest.mark.integration
 @pytest.fixture(scope="module")
 def trading_client():
     client = get_trading_client(get_settings())
-    assert_paper_trading(client)  # never a live endpoint — constraint #1
+    assert_paper_trading(client)  # never a live endpoint
     return client
 
 

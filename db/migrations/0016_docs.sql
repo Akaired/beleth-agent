@@ -521,8 +521,8 @@ early on — the premium there is thin and unstable and gamma risk is high.
 
 The strategy, organised by how much confidence each claim deserves — academic
 research, industry convention, or our own choice — lives in the project's
-`docs/strategy.md`, with a source on every line. The dashboard's **Strategy
-strategy** page mirrors it.
+`docs/strategy.md`, with a source on every line. The dashboard's **Strategy**
+page mirrors it.
 $md$
   ),
   (

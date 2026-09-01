@@ -1,8 +1,8 @@
 """IV rank: where current implied volatility sits within its own recent range.
 
 Alpaca's market data API has no historical-IV endpoint (option bars are OHLCV price bars,
-not volatility series — see the local reference index "Known gaps"). A real IV rank needs a
-history of daily IV observations, which this agent builds up itself over time by persisting
+not volatility series). A real IV rank needs a history of daily IV observations, which
+this agent builds up itself over time by persisting
 each cycle's reading. This module is intentionally just the math: it takes whatever history
 is available and is honest when there isn't enough of it yet, rather than fabricating a
 number from a single data point.

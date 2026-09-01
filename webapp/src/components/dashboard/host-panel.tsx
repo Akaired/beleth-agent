@@ -140,7 +140,7 @@ export function HostPanel({
   const title = (
     <span className="flex items-center gap-1.5">
       <IconServer size={13} weight="bold" className="text-acc" />
-      {host?.label ?? "the trading host"}
+      {host?.label ?? "agent host"}
     </span>
   );
 

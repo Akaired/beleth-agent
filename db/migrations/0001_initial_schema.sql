@@ -51,7 +51,7 @@ create table if not exists public.decisions (
     llm_model       text              null,          -- {model id} of the OpenRouter call, when it happens
     llm_reasoning   text              null,          -- raw LLM reasoning for the demo-admin backoffice
     llm_usage       jsonb             null,          -- {prompt_tokens, completion_tokens, total_tokens}
-    evidence        jsonb         not null,          -- full evidence package (constraint #5)
+    evidence        jsonb         not null,          -- full evidence package
     strategy_config jsonb         not null           -- snapshot of config/strategy.yaml at decision time
 );
 create index if not exists idx_decisions_created_at on public.decisions (created_at desc);

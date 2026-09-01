@@ -60,7 +60,7 @@ export {
   Target as IconTarget,
   Door as IconExit,
   Database as IconData,
-  BookOpenText as IconStrategy,
+  BookOpenText as IconStrategyNote,
   Flask as IconResearch,
   ChartLineUp as IconChart,
   ChartPieSlice as IconPortfolio,

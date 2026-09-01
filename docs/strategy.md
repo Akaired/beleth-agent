@@ -1,8 +1,8 @@
 # Beleth Agent — Strategy
 
 This file is the strategy's reasoning, organised by **how much we can trust each claim**. It
-is injected into the agent's system prompt and cited in the dashboard when the agent explains
-a decision. Every claim carries its source.
+is fed verbatim into the agent's system prompt and cited in the dashboard when the agent
+explains a decision. Every claim carries its source.
 
 Three reliability tiers:
 
@@ -135,10 +135,9 @@ These are what the agent runs on. Parameters live in `config/strategy.yaml`, nev
 - **R10.** Entry blocked by account state (`block_entries`). A resting entry order,
   unpaired/naked option legs, an open spread whose entry credit cannot be computed, or an
   unreadable order book each reject every new entry with their own rejection row, tagged
-  by kind (`resting_entry_order` / `position_anomaly` / `open_orders_unreadable`). Split
-  off R6 on 2026-08-28: every "R6" rejection in the first live day was actually this
-  block, never a real sizing failure, so the two were indistinguishable in the dashboard.
-  Exits are never gated by R10. Level C (transparency requirement, constraint #3).
+  by kind (`resting_entry_order` / `position_anomaly` / `open_orders_unreadable`). Kept
+  distinct from R6 (sizing) so the dashboard can tell an account-state block from a real
+  sizing failure. Exits are never gated by R10. Level C (transparency requirement).
 - **R11.** Aggregate risk cap (`apply_aggregate_cap`). Committed risk across open
   positions plus a new candidate's max loss must stay within
   `risk.max_aggregate_risk_pct_of_equity` of equity, else the candidate is rejected with

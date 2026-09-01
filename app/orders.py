@@ -3,11 +3,11 @@
 This module is downstream of the risk gate by construction: the only submission entry
 point is ``submit_mleg_order``, and the caller (``scripts/check_market_data.py``) reaches
 it only with a candidate that already passed R4/R6/R7 and a decision — deterministic or
-LLM — that chose to trade. There is no path from a rejected candidate to an order
-(the hard constraint #3), and every structure is a single ``mleg`` order with both
-legs covered inside it — never two separate orders, never a naked leg (constraint #4).
+LLM — that chose to trade. There is no path from a rejected candidate to an order, and
+every structure is a single ``mleg`` order with both legs covered inside it — never two
+separate orders, never a naked leg.
 
-Conventions verified against the vendored SDK/spec (``the local reference cache``):
+Conventions verified against the alpaca-py SDK and the OCC contract spec:
 
 * ``order_class="mleg"`` requires ``qty`` (number of spreads), 2–4 uniquely-symbol'd legs
   and a limit/market type; options support ``time_in_force="day"`` only.
@@ -99,9 +99,9 @@ def entry_slippage(
     of an absolute floor (``structure.credit_slippage_usd``) and a fraction of the
     candidate's combined leg width (``structure.credit_slippage_frac_of_spread``).
 
-    Day-1 (2026-08-28) live data: the fixed 0.02 floor was below the half-spread on
-    95.3% of candidates, so the one order sent rested unfilled all day. ``frac_of_spread``
-    of 0.5 walks the limit to the near touch (bid or ask), not just halfway.
+    On index-ETF spreads the fixed 0.02 floor sits below the half-spread on most
+    candidates, so an order priced to the mid rests unfilled. ``frac_of_spread`` of 0.5
+    walks the limit to the near touch (bid or ask), not just halfway.
 
     Falls back to the floor alone when the width is unknown/non-positive or the fraction
     is 0 — so the feature ships inert until ``frac_of_spread`` is set.
@@ -122,9 +122,8 @@ def slippage_within_credit_cap(
 
     The measured credit is the strategy's economics; conceding most of it to force a
     fill is an order that either never fills or fills at a price the thesis no longer
-    supports. Better an explicit, logged no-trade. Day-1 data: median spread/credit was
-    0.59 but the tail ran to 7.3, so a 0.5 cap filters a real slice of candidates — by
-    design. ``max_frac_of_credit`` of 0 disables the cap (feature ships inert).
+    supports. Better an explicit, logged no-trade. A 0.5 cap filters the wide-spread
+    tail by design. ``max_frac_of_credit`` of 0 disables the cap (feature ships inert).
     """
     if max_frac_of_credit <= 0:
         return True

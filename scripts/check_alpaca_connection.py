@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Connect to Alpaca paper trading and print account/position state.
 
-Milestone 1, step 3: read-only verification that the Alpaca connection works and that the
-account is genuinely a paper account before anything else gets built on top of it.
+Read-only verification that the Alpaca connection works and that the account is genuinely
+a paper account before anything else gets built on top of it.
 
 Usage:
     python3 scripts/check_alpaca_connection.py

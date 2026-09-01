@@ -1,7 +1,7 @@
 """LLM access via an OpenAI-compatible API, using the OpenAI SDK.
 
-The primary provider is OpenRouter (see the resolved product decisions #2): its
-`https://openrouter.ai/api/v1` endpoint implements the OpenAI API, and the official way to
+The primary provider is OpenRouter: its `https://openrouter.ai/api/v1` endpoint
+implements the OpenAI API, and the official way to
 reach it is the standard `openai` SDK with a custom `base_url` — no provider-specific SDK,
 no routing layer. Swapping model (or moving to another OpenAI-compatible provider) is a
 `.env` change (`OPENROUTER_MODEL`, `OPENROUTER_BASE_URL`); this module never hardcodes one.

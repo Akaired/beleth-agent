@@ -1,7 +1,7 @@
 /**
  * Client-safe types + formatting for the backoffice "Host" panel.
  *
- * The resident runner is a container on a a private host in someone's home. Every
+ * The resident runner is a container on a private host. Every
  * heartbeat/cycle the agent folds a machine snapshot into
  * `agent_status.detail.host` (app/hostinfo.py); a 48 h trail of the same shape is
  * appended to the `host_metrics` table for the sparklines. This module only

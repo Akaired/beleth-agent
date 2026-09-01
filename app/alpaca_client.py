@@ -1,8 +1,7 @@
 """Alpaca client wiring — paper trading only.
 
 `paper=True` is hardcoded below, never read from config or an env var: whether the trading
-client can ever touch a live endpoint must not be a flag anyone can flip. See the project notes hard
-constraint #1.
+client can ever touch a live endpoint must not be a flag anyone can flip.
 """
 
 from __future__ import annotations
@@ -54,7 +53,7 @@ def assert_paper_trading(client: TradingClient) -> None:
     if client._base_url != BaseURL.TRADING_PAPER:
         raise NotPaperAccountError(
             f"Trading client is not pointed at the paper endpoint (got {client._base_url!r}). "
-            "Refusing to proceed — see the hard constraint #1."
+            "Refusing to proceed — this project is paper-trading only."
         )
 
 

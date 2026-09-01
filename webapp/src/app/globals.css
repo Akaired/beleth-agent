@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Beleth design tokens — taken 1:1 from the approved mockup
- * (the design mockup).
+ * Beleth design tokens.
  * Near-black surfaces, one desaturated green / one desaturated red for
  * P&L and pass/fail, one gold accent tied to Beleth and "live" elements,
  * everything else grayscale. The restraint is the point.

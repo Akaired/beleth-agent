@@ -12,8 +12,8 @@ The VIX is model-independent, includes OTM strikes, embeds skew, and runs system
 above ATM IV; for per-contract IV we use the contracts' own IV, which Alpaca does provide.
 See docs/strategy.md A4.
 
-Per the milestone constraints: if the endpoint doesn't respond or would require a key we
-don't have, this raises `VixDataUnavailable` rather than substituting anything.
+If the endpoint doesn't respond or would require a key we don't have, this raises
+`VixDataUnavailable` rather than substituting anything.
 """
 
 from __future__ import annotations

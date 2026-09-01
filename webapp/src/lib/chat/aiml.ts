@@ -3,9 +3,9 @@
  * OpenAI-compatible `/chat/completions` endpoint with a plain `fetch` — no SDK,
  * matching this repo's dependency-light style (see `src/lib/supabase.ts`).
  *
- * This is the ONLY place the webapp calls an LLM. The agent keeps OpenRouter
- * (the project notes resolved decision 2); "Chat with Beleth" is a webapp-only feature
- * and uses AI/ML API on a free model. Provider/model are env-driven:
+ * This is the ONLY place the webapp calls an LLM. The agent keeps OpenRouter;
+ * "Chat with Beleth" is a webapp-only feature and uses AI/ML API on a free
+ * model. Provider/model are env-driven:
  *   AIML_API_KEY   (required, server-only — never NEXT_PUBLIC)
  *   AIML_MODEL     (default below; keep it a free model)
  *   AIML_BASE_URL  (default below)

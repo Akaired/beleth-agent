@@ -1,6 +1,6 @@
 -- 0011_host_metrics.sql — trailing host-telemetry history for the backoffice "Host" panel.
 --
--- The resident runner is a container on a a private host in someone's home. The
+-- The resident runner is a container on a private host. The
 -- Operational-controls page now shows that machine's vitals (RAM against the 512 MiB
 -- container cap, disk, load, CPU temperature, uptime, runner cycles) next to the kill
 -- switch. The *current* reading already rides in `agent_status.detail->'host'`, written

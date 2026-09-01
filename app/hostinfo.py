@@ -1,7 +1,7 @@
 """Host telemetry for the resident-runner dashboard.
 
-The agent runs as a container on a a private host that lives in someone's home; the
-backoffice "Host" panel shows that machine's vital signs next to the kill switch. This
+The agent runs as a container on a private host; the backoffice "Host" panel shows
+that machine's vital signs next to the kill switch. This
 module gathers them and hands back a plain ``dict`` that goes straight into
 ``agent_status.detail['host']`` every heartbeat/cycle and, appended, into the
 ``host_metrics`` history table.
@@ -147,11 +147,11 @@ def _process(runner_stats: Mapping[str, Any] | None) -> dict[str, Any]:
 def collect_host_metrics(
     runner_stats: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Best-effort snapshot of the the trading host. Never raises; a failed probe is omitted or
+    """Best-effort snapshot of the host. Never raises; a failed probe is omitted or
     ``None``. ``runner_stats`` carries values only the long-lived runner knows
     (``started_at``, ``cycles``, ``net`` = ``{"supabase_ms", "alpaca_ms"}``)."""
     metrics: dict[str, Any] = {
-        "label": os.environ.get("BELETH_HOST_LABEL", "the trading host"),
+        "label": os.environ.get("BELETH_HOST_LABEL", "agent-host"),
         "captured_at": datetime.now(timezone.utc).isoformat(),
         "platform": _safe(_platform_info),
         "uptime_seconds": _safe(_uptime_seconds),

@@ -65,7 +65,7 @@ trade, edits config, or pauses the agent.
 - **Provider:** AI/ML API (`aimlapi.com`), an OpenAI-compatible endpoint,
   reached with a plain `fetch` (no SDK) in `src/lib/chat/aiml.ts`. This is the
   webapp's own LLM layer — **separate from the agent, which keeps OpenRouter**
-  (the project notes resolved decision 2). Free model only, tool-calling required;
+  Free model only, tool-calling required;
   default `AIML_MODEL=openai/gpt-oss-20b`, env-swappable.
 - **Persistence:** `db/migrations/0006_chat_sessions.sql` adds `chat_sessions`
   + `chat_messages` with owner-scoped RLS (`user_id = auth.uid()`) — the

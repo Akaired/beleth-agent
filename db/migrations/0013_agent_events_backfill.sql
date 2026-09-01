@@ -5,7 +5,7 @@
 -- after its next redeploy. This migration reconstructs the history that already
 -- exists in the authoritative tables — `decisions`, `trades`,
 -- `agent_control_events`, `risk_checks` — so the Logs tab is not blank for the
--- period the agent has already traded (day one, 2026-08-28, onward). Every
+-- period the agent has already traded (from the first day it traded). Every
 -- reconstructed row carries `context->>'backfill' = 'true'` so it is always
 -- distinguishable from a live emission; `context->>'derived_from'` names the
 -- source table.
@@ -13,7 +13,7 @@
 -- It also:
 --   * removes the six `host_metrics` rows captured from a developer laptop
 --     while the Host panel was being built (`metrics->platform->>system` =
---     'Darwin') — only the the trading host's own readings belong there;
+--     'Darwin') — only the agent host's own readings belong there;
 --   * extends `beleth_set_agent_paused` so a dashboard kill-switch flip also
 --     lands in `agent_events` (event `paused` / `resumed`), which lets the
 --     backoffice drop its separate "Control history" panel and show everything
@@ -65,7 +65,7 @@ from public.decisions d;
 
 -- ── 3. decisions with a rejected risk gate → risk_rejected ─────────────────
 -- One row per decision that had at least one entry-rule (R4/R6/R7) rejection
--- and no fully-approved candidate — this is where day one's anti-stacking
+-- and no fully-approved candidate — this is where the anti-stacking
 -- guard (R6) shows up.
 insert into public.agent_events
     (created_at, level, event, symbol, message, context, decision_id)

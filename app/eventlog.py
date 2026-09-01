@@ -1,6 +1,6 @@
 """Curated, webapp-facing event stream.
 
-The runner narrates to stdout and to the rotating file on the the trading host's logs volume,
+The runner narrates to stdout and to the rotating file on the runner's logs volume,
 but the webapp can only see this database. ``EventLog`` collects a handful of
 meaningful events during a run — a decision, a submitted or failed order, a risk
 rejection, an exit trigger, a position anomaly, a pause/resume, an error — and

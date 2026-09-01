@@ -98,8 +98,7 @@ Strategy parameters live in [`config/strategy.yaml`](config/strategy.yaml), neve
 
 Reducing risk is always allowed — exits (R5) are never blocked by the entry gates.
 
-And the constraints that hold for the entire life of the project (the project notes has
-the full list):
+And the constraints that hold for the entire life of the project:
 
 - **Paper trading only.** There is no live-trading code path. Not behind a flag, not for
   "completeness."
@@ -200,8 +199,6 @@ Both are expanded in [`docs/strategy.md`](docs/strategy.md), notes C2 and C5.
 
 ```
 .
-├── the project notes              # constraints and context for local tooling sessions
-├── TODO.md                # milestone-by-milestone build status
 ├── .env.example           # required environment variables (copy to .env, never commit .env)
 ├── app/                   # agent package
 │   ├── config.py          # settings + config/strategy.yaml loader (hard-enforces paper-only)
@@ -223,8 +220,7 @@ Both are expanded in [`docs/strategy.md`](docs/strategy.md), notes C2 and C5.
 ├── scripts/               # read-only checks, the resident runner, the deploy guard
 ├── tests/                 # unit tests (fast) + integration (`pytest -m integration`)
 ├── webapp/                # the Next.js dashboard (see webapp/README.md)
-├── Dockerfile / compose.yaml
-└── local reference material at               # local-only: vendored Alpaca docs, the project spec, design material (gitignored)
+└── Dockerfile / compose.yaml
 ```
 
 ## Run it yourself
@@ -234,7 +230,7 @@ an OpenRouter key, and a Supabase project.
 
 ```bash
 cp .env.example .env          # fill in Alpaca paper keys, OpenRouter key, Supabase URL + service-role key
-python3 scripts/fetch_docs.py # repopulate the gitignored local Alpaca doc cache
+python3 scripts/fetch_docs.py # vendor the local Alpaca reference cache (gitignored)
 uv sync
 
 # Read-only checks — no orders, no writes unless noted:
@@ -271,12 +267,12 @@ See [`webapp/README.md`](webapp/README.md) for local setup and the Vercel deploy
 
 ## Status
 
-In active development for the contest window. [`TODO.md`](TODO.md) tracks progress
-milestone by milestone. The agent — strategy, risk gate, LLM decision layer, order path, R5
-exits, resident loop, full persistence — is built and running live on the paper account. The
-webapp's public homepage, authenticated dashboard, read-only backoffice, master-admin kill
-switch, and "Chat with Beleth" are built and deployed.
+In active development for the contest window. The agent — strategy, risk gate, LLM decision
+layer, order path, R5 exits, resident loop, full persistence — is built and running live on
+the paper account. The webapp's public homepage, authenticated dashboard, read-only
+backoffice, master-admin kill switch, and "Chat with Beleth" are built and deployed.
 
-## License
+## Author
 
-TBD.
+Davide Maiorana — [davidemaiorana.dev](https://davidemaiorana.dev) ·
+[LinkedIn](https://www.linkedin.com/in/davide-maiorana-58a4161b0/)

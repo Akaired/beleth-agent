@@ -3,8 +3,7 @@
 
 This MUST pass before any real agent logic gets built on top of the LLM layer. OpenRouter
 exposes tool calling on its OpenAI-compatible endpoint, but free models vary in how well
-they honour it — we verify the configured model ourselves. See the project notes "Resolved product
-decisions" #2.
+they honour it — we verify the configured model ourselves.
 
 Three fake trading-shaped tools are offered to the model, structurally similar to what the
 real agent will use (account/chain read, order placement) but entirely fake — nothing here
@@ -14,9 +13,8 @@ touches Alpaca. The test drives a multi-turn tool-calling conversation and check
   2. every tool call's arguments are valid JSON matching the declared schema
   3. the model uses the returned (fake) data rather than ignoring it
 
-If tool calling is unreliable or malformed, this script fails loudly. Per the project notes: if it
-fails, stop and report it — do not work around it with manual text parsing of the model's
-output.
+If tool calling is unreliable or malformed, this script fails loudly. If it fails, stop and
+report it — do not work around it with manual text parsing of the model's output.
 
 Usage:
     python3 scripts/smoke_test_tool_calling.py

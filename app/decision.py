@@ -11,7 +11,7 @@ Two decision sources share one ``DecisionDraft``:
   to the deterministic no-trade — never to a trade.
 
 Summaries are the plain-language verdicts the anonymous homepage renders, so they must stand
-alone and stay honest (constraint #10): they always disclose which layer decided.
+alone and stay honest: they always disclose which layer decided.
 A ``trade`` decision describes the structure and the risk-approved size; the order outcome
 lives in the trades log the same cycle writes, so the summary never pre-claims a fill.
 """

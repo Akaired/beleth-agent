@@ -1,15 +1,14 @@
 """Explicit pre-trade risk check — the gate every order must pass before it can reach Alpaca.
 
-No order path exists yet (that is a later milestone), but the hard constraint #3 is that
-*every* order passes an explicit risk check whose rejections are logged and surfaced with the
-same prominence as executed trades. This module is that gate, built ahead of the order path so
-the order path can only ever be wired *through* it — never around it.
+*Every* order passes an explicit risk check whose rejections are logged and surfaced with the
+same prominence as executed trades. The order path is wired *through* this gate — never around
+it.
 
-Same shape as the milestone-2 rules (R1/R2/R3/R8): each rule produces an explicit pass/fail
-verdict with a human-readable reason that names the rule id and quotes the numbers it used, so
-a dashboard reader can see exactly why a candidate was approved or rejected. The module is
-pure — all IO (reading the account and open positions from Alpaca) happens in the caller, which
-passes the numbers in via ``AccountRiskState`` (see ``scripts/check_risk.py``).
+Each rule produces an explicit pass/fail verdict with a human-readable reason that names the
+rule id and quotes the numbers it used, so a dashboard reader can see exactly why a candidate
+was approved or rejected. The module is pure — all IO (reading the account and open positions
+from Alpaca) happens in the caller, which passes the numbers in via ``AccountRiskState`` (see
+``scripts/check_risk.py``).
 
 Rules implemented here (see ``docs/strategy.md``):
 
@@ -32,13 +31,13 @@ properties of the whole account rather than of one candidate — both emit their
 rejection row and both ship inert until configured:
 
 * **R10 — entry blocked by account state** (``block_entries``): a resting entry order, unpaired
-  legs, an unreadable order book. Split off R6 on 2026-08-28 — day 1 every "R6" rejection was
-  really this, making the two indistinguishable in the dashboard.
+  legs, an unreadable order book. Kept distinct from R6 (sizing) so the dashboard can tell an
+  account-state block from a real sizing failure.
 * **R11 — aggregate risk cap** (``apply_aggregate_cap``): committed risk across open positions
   plus this candidate's max loss must stay within ``risk.max_aggregate_risk_pct_of_equity``.
 
-R5 (exit rules for open positions) is deliberately not here — it has nothing to act on until an
-order path and real positions exist. See TODO.md.
+R5 (exit rules for open positions) lives in ``app/exits.py`` — it manages positions the order
+path has already opened, so it is evaluated in the cycle script, not in this pre-trade gate.
 """
 
 from __future__ import annotations
@@ -54,7 +53,7 @@ class AccountRiskState:
 
     ``day_pnl`` is signed (``equity - last_equity``): negative means down on the day.
     ``capital_at_risk`` is the summed known max loss across open defined-risk positions; it is
-    ``0.0`` until the decision log (Supabase, next milestone) can supply per-spread max loss,
+    ``0.0`` until the decision log (Supabase) can supply per-spread max loss,
     since an Alpaca ``Position`` on its own does not carry it.
     """
 
@@ -297,10 +296,10 @@ def block_entries(
     option legs, open spreads whose risk cannot be computed, an unreadable order book.
     Exits are untouched: closing risk is never gated by this.
 
-    R10 is deliberately its own rule id, split off R6 (sizing) on 2026-08-28: day 1
-    *every* R6 rejection was actually this block ("an entry order is already resting"),
-    never a real sizing or position-count fail, so the two were indistinguishable in the
-    dashboard. Each ``block`` is ``{"kind": ..., "reason": ...}``; ``kind`` is one of
+    R10 is deliberately its own rule id, kept distinct from R6 (sizing) so an
+    account-state block ("an entry order is already resting") reads differently from a
+    real sizing or position-count failure in the dashboard. Each ``block`` is
+    ``{"kind": ..., "reason": ...}``; ``kind`` is one of
     ``resting_entry_order`` / ``position_anomaly`` / ``open_orders_unreadable`` and is
     kept in ``detail["kinds"]`` so a reader can tell them apart.
 
@@ -400,9 +399,9 @@ def apply_aggregate_cap(
 #
 # A *sizing* input, not a per-candidate structural rule: it scales the per-trade risk budget
 # by a 0.0-1.0 multiplier read off the VIX's own 1-year percentile, and hard-blocks new
-# entries only in the extreme-complacency tail. Prefer the taper to a block (Strategy A5: low
-# VIX is a weak timing signal; Strategy C5: on a ~5-day window a hard block can mean zero
-# trades all week). Historical base rates that motivate keeping the block deep and the taper
+# entries only in the extreme-complacency tail. Prefer the taper to a block (strategy note A5:
+# low VIX is a weak timing signal; strategy note C5: on a ~5-day window a hard block can mean
+# zero trades all week). Historical base rates that motivate keeping the block deep and the taper
 # gentle (VIX close, 1990-2026, 252d lookback): percentile < 25 on ~33% of days and usually a
 # multi-week regime (66% of such days sit in episodes >= 10 trading days), < 10 on ~18%,
 # < 3 on ~8%. Everything ships at 0 = inert.

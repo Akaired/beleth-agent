@@ -3,10 +3,10 @@
  * the webapp can hand it to the chat model on Vercel — Next cannot read files
  * outside its own directory at runtime.
  *
- * SOURCE OF TRUTH IS `docs/strategy.md`. Keep this in sync when the strategy
- * changes: `cp ../docs/strategy.md` content into the template literal below.
- * The agent injects the real file into its decision prompt (app/decision.py);
- * this constant is the webapp's read-only mirror for "Chat with Beleth".
+ * SOURCE OF TRUTH IS `docs/strategy.md`. Keep this in sync when that file
+ * changes: copy its content into the template literal below. The agent injects
+ * the real file into its decision prompt (app/decision.py); this constant is
+ * the webapp's read-only mirror for "Chat with Beleth".
  */
 export const METHODOLOGY_TEXT = String.raw`# Beleth Agent — Strategy
 

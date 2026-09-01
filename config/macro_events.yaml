@@ -1,4 +1,4 @@
-# Known macro events — hand-maintained for the hackathon window (2026-08-28 .. 2026-09-04).
+# Known macro events — hand-maintained for the contest window (2026-08-28 .. 2026-09-04).
 #
 # There is no calendar-provider integration for the hackathon: this file is the whole event
 # source (see docs/strategy.md, rule R3 and note C). Keep it small and current.

@@ -25,12 +25,12 @@ import {
   IconExit,
   IconTrades,
   IconData,
-  IconStrategy,
+  IconStrategyNote,
   IconResearch,
 } from "@/components/icons";
 
 export const metadata: Metadata = {
-  title: "Strategy strategy — Beleth backoffice",
+  title: "Strategy — Beleth backoffice",
 };
 
 type IconCmp = typeof IconData;
@@ -129,7 +129,7 @@ export default async function StrategyPage() {
       <div className="flex flex-col gap-4">
         <h1 className="flex items-center gap-2 text-[18px] font-light">
           <IconStrategy size={17} weight="bold" className="text-acc" />
-          Strategy strategy
+          Strategy
         </h1>
         <Panel title="No snapshot">
           <p className="text-[12px] text-dim">
@@ -161,7 +161,7 @@ export default async function StrategyPage() {
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="flex items-center gap-2 text-[18px] font-light">
           <IconStrategy size={17} weight="bold" className="text-acc" />
-          Strategy strategy
+          Strategy
         </h1>
         <span className="font-mono text-[10.5px] text-dim">
           {asOf ? `snapshot ${new Date(asOf).toLocaleString()}` : "no snapshot"}
@@ -266,7 +266,7 @@ export default async function StrategyPage() {
       <Panel
         title={
           <span className="flex items-center gap-1.5">
-            <IconStrategy size={12} weight="bold" className="text-dim" />
+            <IconStrategyNote size={12} weight="bold" className="text-dim" />
             Operating rules &amp; the why
           </span>
         }

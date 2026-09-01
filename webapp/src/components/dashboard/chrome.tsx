@@ -44,9 +44,8 @@ type Item = {
 };
 type Group = { label: string; items: Item[] };
 
-// Sidebar groups, 1:1 with the approved mockup
-// (the design mockup — navDefs). Items whose route
-// does not exist yet (Reasoning, Account detail) are omitted until built.
+// Sidebar groups. Items whose route does not exist yet (Reasoning,
+// Account detail) are omitted until built.
 const GROUPS: Group[] = [
   {
     label: "Live",
@@ -70,7 +69,7 @@ const GROUPS: Group[] = [
     items: [
       { href: "/dashboard/trade-calendar", label: "Trade calendar", min: "demo_admin", Icon: IconTradeCalendar },
       { href: "/dashboard/decisions", label: "Decision history", min: "demo_admin", Icon: IconDecisions },
-      { href: "/dashboard/strategy", label: "Strategy strategy", min: "demo_admin", Icon: IconStrategy },
+      { href: "/dashboard/strategy", label: "Strategy", min: "demo_admin", Icon: IconStrategy },
       { href: "/dashboard/reports", label: "Reports", min: "demo_admin", Icon: IconReports, disabled: true },
     ],
   },

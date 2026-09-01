@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run one full agent cycle: evidence, R5 exits, risk gate, decision, orders.
 
-Builds the evidence package (milestone 2 pipeline), pairs the account's open option legs
+Builds the evidence package, pairs the account's open option legs
 back into spreads and measures each against the R5 exit rules (app/exits.py), runs the
 pre-trade risk gate (R4/R6/R7) over the candidates, then decides. When the market is open
 and at least one candidate survived the gate, the LLM decision layer weighs the evidence
@@ -15,7 +15,7 @@ spread, both legs inside it, never a naked leg), prepared only while the market 
 and only when no closing order for the same spread is already working (dedup against open
 orders carrying ``*_to_close`` intents). Each closing order's pre-trade check is its
 persisted R5 verdict; a failed submission is persisted as a trades row with kind='exit'
-— rejections are first-class (the hard constraint #3). Open anomalies (naked legs,
+— rejections are first-class. Open anomalies (naked legs,
 unparseable positions) and spreads without a computable entry credit reject every new
 entry through the gate until resolved.
 
@@ -26,7 +26,7 @@ never split), the quantity is sized by ``risk.max_risk_per_trade_pct_of_equity``
 limit demands the measured credit minus the configured slippage. Sizing or pricing that
 cannot respect the cap fails closed with the reason in the persisted summary; a submission
 failure is persisted as a trades row with status 'submission_failed' — rejections are
-first-class (the hard constraint #3). Either way the cycle persists the decision
+first-class. Either way the cycle persists the decision
 (full evidence package), one risk_checks row per (candidate, rule) plus one per open
 spread's R5 verdict, the trades rows when orders were attempted, the open-positions
 mirror, and the agent_status heartbeat.
@@ -34,7 +34,7 @@ mirror, and the agent_status heartbeat.
 Persistence is skipped with a stderr warning when Supabase is not configured (read-only
 usage keeps working — and then no order is sent either, because an order must never go out
 unlogged); a persistence *failure* prints the evidence and exits 1 — persisting the
-decision is part of the cycle's contract (the hard constraint #5).
+decision is part of the cycle's contract.
 
 Usage:
     python3 scripts/check_market_data.py [SYMBOL]
@@ -165,9 +165,9 @@ def _classify_open_order(order: Any) -> str:
     """``"entry"`` | ``"close"`` | ``"unknown"`` for a resting order.
 
     Classified from leg position intents when the broker reports them. When the legs
-    carry no readable intent (nested-leg fields proved unreliable on the paper API —
-    the live incident of 2026-08-28 listed resting orders whose intents never reached
-    the cycle), an order the agent created itself is classified by the client order id
+    carry no readable intent (nested-leg fields have proved unreliable on the paper
+    API — resting orders whose leg intents never reach the cycle), an order the agent
+    created itself is classified by the client order id
     it stamps on submission: entries carry ``beleth-``, closings ``beleth-exit-``. A
     foreign order with unreadable intents is ``"unknown"`` — callers treat it as
     opening risk (fail-closed), never as a closing.
@@ -292,7 +292,7 @@ def _prepare_closings(
     fail-closed note that lands in the persisted summary instead of an order.
 
     Plans are *not* submitted here: the caller submits only after the decision row is
-    persisted (no order ever goes out unlogged, constraint #5).
+    persisted (no order ever goes out unlogged).
 
     The limit is priced to *fill*: off the marketable debit (``short_ask - long_bid``)
     when available, capped at R5's own loss-close price so a blown-out quote never pays
@@ -389,7 +389,7 @@ def _prepare_order(
     never reaches here — it has already rejected the candidate at the gate.
 
     The plan is *not* submitted here: the caller submits only after the decision row is
-    persisted, so no order ever goes out unlogged (the hard constraint #5)."""
+    persisted, so no order ever goes out unlogged."""
     candidate = _match_candidate(candidates, chosen)
     if candidate is None:
         return None, (
@@ -406,8 +406,8 @@ def _prepare_order(
     )
     structure = strategy_config["structure"]
     # Dynamic entry slippage: the larger of the fixed floor and a fraction of the
-    # candidate's own bid/ask width. The fixed 0.02 was below the half-spread on 95% of
-    # 2026-08-28 candidates, so the one order sent rested unfilled all day.
+    # candidate's own bid/ask width. A fixed 0.02 floor sits below the half-spread on
+    # most index-ETF spreads, so an order priced to the mid rests unfilled.
     slippage = entry_slippage(
         candidate.net_quote_width,
         floor_usd=structure["credit_slippage_usd"],
@@ -578,7 +578,7 @@ def main() -> int:
 
     # --- R5: open legs paired back into spreads, measured against the exit rules ---------
     # Exits are mechanical risk management, never LLM-gated: the pairing runs every cycle
-    # and each spread's R5 verdict is persisted like any other check (constraint #3).
+    # and each spread's R5 verdict is persisted like any other check.
     # Anomalies — naked legs, unparseable positions — and spreads without a computable
     # entry credit block new entries: the gate must not add risk it cannot size.
     position_dumps = [p.model_dump(mode="json") for p in positions]
@@ -639,8 +639,8 @@ def main() -> int:
                 "(fail-closed).",
                 file=sys.stderr,
             )
-        # Always visible in the logs: the live incident of 2026-08-28 (resting orders the
-        # cycle could not see) was invisible precisely because this count was never printed.
+        # Always visible in the logs: a resting order the cycle cannot see stays invisible
+        # unless this count is printed every fetch.
         print(f"open orders listed: {len(open_orders)}", flush=True)
 
     # The risk gate counts positions in spreads (the strategy's unit), not raw legs.
@@ -810,7 +810,7 @@ def main() -> int:
 
     # --- order path: only a 'trade' decision may become an order, and only through the gate
     # The order is prepared (sized, priced, built) here but submitted only after the
-    # decision row is persisted — no order ever goes out unlogged (constraint #5).
+    # decision row is persisted — no order ever goes out unlogged.
     plan: dict[str, Any] | None = None
     if draft.action == "trade" and draft.chosen_candidate is not None:
         plan, order_note = _prepare_order(
@@ -835,7 +835,7 @@ def main() -> int:
         # an exit-only cycle is action='trade' with no chosen entry candidate.
         draft = replace(draft, action="trade")
 
-    # --- persistence: every decision, risk-check outcome and position state (constraint #5) --
+    # --- persistence: every decision, risk-check outcome and position state --
     decision_id = None
     persisted_checks = 0
     persisted_exit_checks = 0
@@ -904,7 +904,7 @@ def main() -> int:
                     count=len(triggered_exits),
                 )
             # Each open spread's R5 verdict is a persisted check row like any other: for a
-            # triggered close it IS the pre-trade check of the closing order (constraint #3).
+            # triggered close it IS the pre-trade check of the closing order.
             persisted_exit_checks = persist_exit_checks(
                 supabase, decision_id=decision_id, evaluations=exit_evaluations
             )
@@ -991,7 +991,7 @@ def main() -> int:
             if plan is not None:
                 # The decision is persisted; the prepared order may now go out. A
                 # submission failure is persisted as a trades row, not swallowed
-                # (the hard constraint #3 — rejections are first-class).
+                # (rejections are first-class).
                 try:
                     submitted_order = submit_mleg_order(trading, plan["request"])
                     elog.info(

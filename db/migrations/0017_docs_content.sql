@@ -85,7 +85,7 @@ trading machine is switched off — only the production of *new* decisions pause
 
 ## The agent
 
-A Python 3.11 process on a private home server (a a private host), packaged as a
+A Python 3.11 process on a private host, packaged as a
 single Docker service with `restart: unless-stopped`. It is **outbound-only** —
 no inbound ports, no public domain, nothing to reach it from the internet.
 
@@ -124,7 +124,7 @@ RPC that sets `agent_status.paused`, and the runner obeys it on its next loop.
 ## Data flow
 
 ```
-        home server (the trading host) — Docker, outbound-only
+        private host — Docker, outbound-only
         +---------------------------------------------+
         |  run_agent.py  (resident loop)              |
         |    -> check_market_data.py  (one cycle)     |
@@ -354,7 +354,7 @@ those words.
   time. The Basic Alpaca plan does not provide that history. A backtest built on
   synthetic IV, or on the VIX as a stand-in for contract IV, would be *worse*
   than none — it would carry the authority of a backtest with none of the
-  validity, and the strategy explicitly forbids using the VIX that way.
+  validity, and the strategy notes explicitly forbid using the VIX that way.
 - **The edge is documented, not discovered by us.** The volatility risk premium
   is well established in the academic literature. `docs/strategy.md` organises
   every claim behind the strategy by reliability tier — academic research,

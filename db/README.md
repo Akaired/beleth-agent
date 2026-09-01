@@ -1,8 +1,8 @@
 # Database — Supabase Postgres
 
-Supabase is the **single source of truth** shared by the two components (the project notes hard
-constraint #5): the Python agent writes with service-role credentials, the Next.js webapp
-reads the same database. There is no other store — no local SQLite, no JSON files.
+Supabase is the **single source of truth** shared by the two components: the Python agent
+writes with service-role credentials, the Next.js webapp reads the same database. There is
+no other store — no local SQLite, no JSON files.
 
 - The agent talks to PostgREST over HTTPS (`app/persistence.py`): inserts and upserts only.
 - Tables are created **with row level security enabled and zero policies**: anonymous and
@@ -37,7 +37,7 @@ Or by hand from the dashboard:
 
 | Table | Written by | Shape |
 |---|---|---|
-| `decisions` | agent, one row per cycle, append-only | the decision (action, plain-language `summary`), denormalized `equity`/`day_pnl`/`market_open` for the P&L curve, the **full evidence package** and a snapshot of `config/strategy.yaml` as JSONB, nullable `llm_*` columns for the LLM milestone |
+| `decisions` | agent, one row per cycle, append-only | the decision (action, plain-language `summary`), denormalized `equity`/`day_pnl`/`market_open` for the P&L curve, the **full evidence package** and a snapshot of `config/strategy.yaml` as JSONB, nullable `llm_*` columns for the LLM decision layer |
 | `risk_checks` | agent, one row per (decision, candidate, rule) — plus one R5 row per open spread | `rule` (`R4`/`R6`/`R7`/`R5`), `passed`, human-readable `reason`, structured `detail`, the full `candidate` — rejections are first-class rows, queryable independently and shown with the same prominence as fills. On an R5 row, `passed` means the spread is within the exit rules and `approved` means a close is demanded |
 | `trades` | agent, when a cycle submits an order (entry or R5 close) | the Alpaca multileg order: `underlying`, legs, credit, max loss, status, raw payload. `kind` is `entry` (default) or `exit`; on an exit row `exit_reason` carries the fired R5 rule and `credit`/`max_loss` are null (a close has no entry economics of its own) |
 | `positions` | agent, mirrored every cycle (upsert + per-symbol delete of closed ones) | current open positions; `first_seen_at` is derived by trigger, never client-sent |
@@ -46,7 +46,7 @@ Or by hand from the dashboard:
 
 ## Queries the webapp runs
 
-With the service-role key server-side (or RLS policies once that milestone lands):
+With the service-role key server-side (or RLS policies once those are added):
 
 ```bash
 # Latest decision — the anonymous homepage's "what is the agent doing"

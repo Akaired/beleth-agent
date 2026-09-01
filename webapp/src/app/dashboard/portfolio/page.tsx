@@ -236,7 +236,7 @@ export default async function PortfolioPage() {
           href="/dashboard/strategy"
           className="ml-auto flex items-center gap-1 font-mono text-[10.5px] text-acc hover:underline"
         >
-          Strategy strategy
+          Strategy
           <IconArrowRight size={11} weight="bold" />
         </Link>
       </div>

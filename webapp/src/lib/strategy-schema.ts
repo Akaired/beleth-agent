@@ -450,7 +450,7 @@ const SECTION_DEFS: SectionDef[] = [
     title: "Runner & operations",
     icon: "data",
     blurb:
-      "The resident loop on the the trading host. Not strategy — cadence, timeouts and diagnostics.",
+      "The resident loop on the agent host. Not strategy — cadence, timeouts and diagnostics.",
     rules: [],
     secondary: true,
     paths: [

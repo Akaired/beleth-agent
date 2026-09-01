@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Re-download the local Alpaca documentation cache into the local reference cache/.
+"""Re-download the local Alpaca reference cache into .vendor/alpaca-docs/.
 
-local reference material at is gitignored, so a fresh clone of this repo starts without any of the
-vendored reference material the coding assistant uses (see the local reference index). Run
-this script once after cloning to repopulate it.
+.vendor/ is gitignored, so a fresh clone of this repo starts without any of the
+vendored Alpaca reference material (SDK source + the options-trading doc pages).
+Run this script once after cloning to repopulate it.
 
 Usage:
     python3 scripts/fetch_docs.py
@@ -20,8 +20,8 @@ from html import unescape
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS_DIR = ROOT / ".claude" / "docs"
-VENDOR_DIR = DOCS_DIR / "vendor"
+DOCS_DIR = ROOT / ".vendor" / "alpaca-docs"
+VENDOR_DIR = DOCS_DIR / "src"
 
 REPOS = {
     "alpaca-mcp-server": "https://github.com/alpacahq/alpaca-mcp-server",
@@ -109,7 +109,7 @@ def fetch_pages() -> None:
 def main() -> None:
     clone_repos()
     fetch_pages()
-    print("\nDone. See the local reference index for what's here and why.")
+    print(f"\nDone. Vendored Alpaca reference material is in {DOCS_DIR}.")
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Verify the Supabase connection and that the expected tables exist.
 
-Milestone 4: read-only verification that SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY work and
-that the migration (db/migrations/0001_initial_schema.sql) has been applied. With --smoke it
+Read-only verification that SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY work and that the
+migration (db/migrations/0001_initial_schema.sql) has been applied. With --smoke it
 additionally runs the self-cleaning write/read/delete round trip from app/persistence
 (marked rows, agent_version='smoke-test' — a leaked row is identifiable and filterable).
 
