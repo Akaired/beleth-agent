@@ -1,4 +1,8 @@
+# agent instructions / local tooling
 .claude
+the project notes
+AGENTS.md
+.mcp.json
 
 # secrets
 .env
@@ -15,7 +19,8 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# docs drafts staging (canonical copies live in local staging)
+# vendored reference material (regenerate with scripts/fetch_docs.py)
+.vendor/
 docs/articles/
 
 # local data / persistence artifacts
