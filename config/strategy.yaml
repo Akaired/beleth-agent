@@ -129,6 +129,22 @@ risk:
   # as one directional short-vol bet, not diversified.
   max_aggregate_risk_pct_of_equity: 6
 
+llm:
+  # What the decision stage may spend, in wall-clock seconds. The worst path is two
+  # providers x (turns x request timeout), plus one paced retry of the primary; without a
+  # ceiling that runs well past runner.cycle_timeout_seconds and the runner kills the cycle
+  # mid-flight instead of the cycle degrading cleanly to the deterministic fallback.
+  # Keep budget_seconds comfortably under cycle_timeout_seconds: the same cycle also fetches
+  # market data, runs the risk check and submits orders.
+  budget_seconds: 300
+  # Turns the model gets to produce a valid submit_decision call before an attempt is spent.
+  max_turns: 4
+  # Per-request ceiling. Shortened automatically when less budget than this remains.
+  request_timeout_seconds: 120
+  # Pause before the primary provider's one paced retry. Free-tier rate limits are shared
+  # upstream pools that clear on their own. Skipped when it would not fit in the budget.
+  rate_limit_retry_seconds: 60
+
 runner:
   # Resident loop (scripts/run_agent.py). Full cycles run ONLY while the market is open;
   # outside hours the loop heartbeats agent_status ('idle') on the slower cadence so the

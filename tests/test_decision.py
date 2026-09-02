@@ -5,9 +5,11 @@ import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+from app.config import load_strategy_config
 from app.decision import (
     LLM_NOT_CONSULTED_SUFFIX,
     SUBMIT_DECISION_TOOL,
+    LlmBudget,
     build_decision_messages,
     decide_from_llm,
     decide_from_risk_engine,
@@ -426,7 +428,7 @@ _SETTINGS_FB = SimpleNamespace(
 )
 
 
-def _decide_llm(fake, *, settings=_SETTINGS, sleep_fn=None):
+def _decide_llm(fake, *, settings=_SETTINGS, sleep_fn=None, strategy_config=None, clock_fn=None):
     return decide_from_llm(
         as_of=datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         symbol="SPY",
@@ -434,11 +436,12 @@ def _decide_llm(fake, *, settings=_SETTINGS, sleep_fn=None):
         equity=100000.0,
         day_pnl=0.0,
         evidence=_evidence(),
-        strategy_config=_STRATEGY,
+        strategy_config=_STRATEGY if strategy_config is None else strategy_config,
         verdicts=_APPROVED,
         settings=settings,
         complete_fn=fake,
         sleep_fn=sleep_fn if sleep_fn is not None else (lambda _s: None),
+        clock_fn=clock_fn,
         strategy="STRATEGY",
     )
 
@@ -580,3 +583,125 @@ def test_validate_rejects_empty_reasoning():
 def test_validate_rejects_non_object_payloads():
     assert validate_decision_args(["trade"], approved_count=2) is not None
     assert validate_decision_args("trade", approved_count=2) is not None
+
+
+# --- the decision stage's wall-clock budget (llm: in config/strategy.yaml) -------------
+
+
+class _FakeClock:
+    """A monotonic clock the test advances by hand. Every LLM call costs `per_call`
+    seconds, and the rate-limit pause costs whatever the code asks to sleep."""
+
+    def __init__(self, per_call: float = 0.0) -> None:
+        self.now = 0.0
+        self.per_call = per_call
+
+    def __call__(self) -> float:
+        return self.now
+
+    def spend(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def _budgeted(seconds: float, **overrides) -> dict:
+    return {**_STRATEGY, "llm": {"budget_seconds": seconds, **overrides}}
+
+
+def test_budget_defaults_come_from_the_strategy_config():
+    budget = LlmBudget.from_strategy_config(
+        {
+            "llm": {
+                "budget_seconds": 10,
+                "max_turns": 2,
+                "request_timeout_seconds": 5,
+                "rate_limit_retry_seconds": 1,
+            }
+        }
+    )
+    assert (budget.budget_seconds, budget.max_turns) == (10.0, 2)
+    assert (budget.request_timeout_seconds, budget.rate_limit_retry_seconds) == (5.0, 1.0)
+
+
+def test_budget_falls_back_to_the_module_defaults_for_a_config_without_the_block():
+    assert LlmBudget.from_strategy_config({}) == LlmBudget()
+    assert LlmBudget.from_strategy_config(None) == LlmBudget()
+
+
+def test_a_request_timeout_is_shortened_to_the_remaining_budget():
+    clock = _FakeClock()
+    seen: list[float] = []
+
+    def fake(settings, messages, **kwargs):
+        seen.append(kwargs["timeout"])
+        clock.spend(80.0)
+        return _response(tool_args={"action": "no_trade", "reasoning": "ok"})
+
+    _decide_llm(fake, strategy_config=_budgeted(100, request_timeout_seconds=120), clock_fn=clock)
+    assert seen == [100.0]
+
+
+def test_an_exhausted_budget_degrades_to_the_deterministic_fallback_mid_conversation():
+    """The model keeps answering without calling the tool; the budget, not the turn
+    counter, is what stops it."""
+    clock = _FakeClock()
+
+    def fake(settings, messages, **kwargs):
+        clock.spend(60.0)
+        return _response(content="thinking out loud")
+
+    draft = _decide_llm(fake, strategy_config=_budgeted(100), clock_fn=clock)
+    assert draft.decision_source == "risk_engine"
+    assert draft.action == "no_trade"
+    assert "budget exhausted" in (draft.llm_reasoning or "")
+
+
+def test_a_rate_limit_pause_is_skipped_when_it_would_not_fit_the_budget():
+    fake = _RoutingLLM(primary=[_RateLimitError("429")])
+    clock = _FakeClock()
+    waits: list[float] = []
+
+    def spending(settings, messages, **kwargs):
+        clock.spend(50.0)
+        return fake(settings, messages, **kwargs)
+
+    draft = _decide_llm(
+        spending,
+        strategy_config=_budgeted(80, rate_limit_retry_seconds=60),
+        sleep_fn=waits.append,
+        clock_fn=clock,
+    )
+    # 30 s left, a 60 s pause does not fit: no sleep, no second primary call.
+    assert waits == []
+    assert fake.calls == ["primary"]
+    assert draft.decision_source == "risk_engine"
+
+
+def test_the_second_provider_is_not_started_without_time_for_it():
+    fake = _RoutingLLM(primary=[_RateLimitError("429"), _RateLimitError("429")], fallback=[])
+    clock = _FakeClock()
+
+    def spending(settings, messages, **kwargs):
+        clock.spend(55.0)
+        return fake(settings, messages, **kwargs)
+
+    draft = _decide_llm(
+        spending,
+        settings=_SETTINGS_FB,
+        strategy_config=_budgeted(100, rate_limit_retry_seconds=1),
+        clock_fn=clock,
+    )
+    # Two primary attempts spend 110 s of 100; the fallback provider is never dialled.
+    assert fake.calls == ["primary", "primary"]
+    assert draft.decision_source == "risk_engine"
+
+
+def test_the_configured_budget_beats_the_unbounded_worst_case():
+    """The finding this budget exists for: without it, two providers x two attempts x
+    four turns x a 120 s request timeout runs far past the runner's cycle timeout."""
+    strategy = load_strategy_config()
+    budget = LlmBudget.from_strategy_config(strategy)
+    unbounded = 2 * (2 * budget.max_turns * budget.request_timeout_seconds) + (
+        budget.rate_limit_retry_seconds
+    )
+    assert unbounded > strategy["runner"]["cycle_timeout_seconds"]
+    assert budget.budget_seconds < strategy["runner"]["cycle_timeout_seconds"]

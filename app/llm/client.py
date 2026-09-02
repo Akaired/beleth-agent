@@ -40,6 +40,10 @@ def complete(
     client = OpenAI(
         base_url=base_url or settings.openrouter_base_url,
         api_key=api_key or settings.openrouter_key,
+        # The SDK retries twice by default, silently multiplying every timeout by three.
+        # Retry policy belongs to the decision layer, which paces it against a wall-clock
+        # budget and knows when to give up and fall through to the other provider.
+        max_retries=0,
     )
     # The SDK overloads cannot see through **kwargs; every argument below is valid.
     return client.chat.completions.create(  # type: ignore[call-overload]

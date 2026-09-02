@@ -80,12 +80,51 @@ SUBMIT_DECISION_TOOL = {
     },
 }
 
+# Defaults for the `llm:` block of config/strategy.yaml — see `LlmBudget`. They are the
+# values the strategy file ships with, repeated here so the module still works if a config
+# predates the block.
 _MAX_LLM_TURNS = 4
 _LLM_TIMEOUT_SECONDS = 120.0
 # A rate-limited primary provider gets exactly one paced retry after this pause before the
 # cycle moves on to the fallback provider (free-tier limits are shared upstream pools that
 # clear on their own — a short wait often gets a slot back).
 _RATE_LIMIT_RETRY_SECONDS = 60.0
+# The whole decision stage's wall-clock budget. Without one, the worst path — two providers,
+# a paced retry, four turns each, no request finishing early — runs roughly 1500 s against a
+# 600 s cycle timeout, so the runner would kill the cycle mid-flight rather than the cycle
+# degrading cleanly to the deterministic fallback.
+_LLM_BUDGET_SECONDS = 300.0
+
+
+@dataclass(frozen=True)
+class LlmBudget:
+    """What the decision stage is allowed to spend, in wall-clock seconds.
+
+    ``budget_seconds`` is the hard ceiling for the whole stage. Every attempt checks the
+    remaining time before it starts and shortens its own request timeout to fit, so the
+    stage always returns — with the deterministic fallback if it ran out — well inside
+    ``runner.cycle_timeout_seconds``.
+    """
+
+    budget_seconds: float = _LLM_BUDGET_SECONDS
+    max_turns: int = _MAX_LLM_TURNS
+    request_timeout_seconds: float = _LLM_TIMEOUT_SECONDS
+    rate_limit_retry_seconds: float = _RATE_LIMIT_RETRY_SECONDS
+
+    @classmethod
+    def from_strategy_config(cls, strategy_config: dict[str, Any] | None) -> LlmBudget:
+        block = (strategy_config or {}).get("llm") or {}
+        return cls(
+            budget_seconds=float(block.get("budget_seconds", _LLM_BUDGET_SECONDS)),
+            max_turns=int(block.get("max_turns", _MAX_LLM_TURNS)),
+            request_timeout_seconds=float(
+                block.get("request_timeout_seconds", _LLM_TIMEOUT_SECONDS)
+            ),
+            rate_limit_retry_seconds=float(
+                block.get("rate_limit_retry_seconds", _RATE_LIMIT_RETRY_SECONDS)
+            ),
+        )
+
 
 _SYSTEM_PROMPT_HEAD = """You are Beleth, a conservative, cautious options-trading agent. You trade
 defined-risk vertical credit spreads on U.S. index ETFs, on a paper-trading account, only when a
@@ -381,6 +420,7 @@ def decide_from_llm(
     settings: Any,
     complete_fn: Callable[..., Any] | None = None,
     sleep_fn: Callable[[float], Any] | None = None,
+    clock_fn: Callable[[], float] | None = None,
     strategy: str | None = None,
 ) -> DecisionDraft:
     """One LLM decision: the model weighs the evidence and records a structured choice.
@@ -393,8 +433,15 @@ def decide_from_llm(
     ``decide_from_risk_engine`` — which never trades on its own — with the failure recorded in
     ``llm_reasoning``. An absent or misbehaving LLM can therefore never cause a trade.
 
+    The whole stage runs under one wall-clock budget (``llm.budget_seconds``): an attempt
+    that would start with no time left is not started, and each request's timeout is
+    shortened to the time that remains. So the stage always returns inside its budget,
+    degrading to the deterministic fallback, instead of being killed mid-flight by the
+    runner's ``cycle_timeout_seconds``.
+
     ``complete_fn`` injects the transport (tests pass a fake; production uses
-    ``app.llm.client.complete``); ``sleep_fn`` injects the rate-limit pause.
+    ``app.llm.client.complete``); ``sleep_fn`` injects the rate-limit pause and
+    ``clock_fn`` the monotonic clock the budget is measured against.
     """
     approved = [v for v in verdicts if v.approved]
     if not approved:
@@ -414,6 +461,11 @@ def decide_from_llm(
         complete_fn = _default_complete
     if sleep_fn is None:
         sleep_fn = time.sleep
+    if clock_fn is None:
+        clock_fn = time.monotonic
+
+    budget = LlmBudget.from_strategy_config(strategy_config)
+    deadline = clock_fn() + budget.budget_seconds
 
     base_messages = build_decision_messages(evidence=evidence, approved=approved, strategy=strategy)
     total_usage: dict[str, int] = {
@@ -429,12 +481,19 @@ def decide_from_llm(
         # provider gets a single shot.
         max_tries = 2 if index == 0 else 1
         for attempt_no in range(max_tries):
+            remaining = deadline - clock_fn()
+            if remaining <= 0:
+                failure = failure or "LLM budget exhausted before this attempt could start"
+                break
             result = _run_llm_turns(
                 complete_fn=complete_fn,
                 settings=settings,
                 base_messages=base_messages,
                 approved=approved,
                 provider_kwargs=provider_kwargs,
+                budget=budget,
+                deadline=deadline,
+                clock_fn=clock_fn,
             )
             total_usage = _merge_usage(total_usage, result.usage)
             all_texts.extend(result.texts)
@@ -468,8 +527,11 @@ def decide_from_llm(
 
             failure = result.failure
             if result.rate_limited and attempt_no + 1 < max_tries:
-                sleep_fn(_RATE_LIMIT_RETRY_SECONDS)
-                continue
+                # Only pace a retry that can still fit: the pause plus one request.
+                pause = budget.rate_limit_retry_seconds
+                if deadline - clock_fn() > pause:
+                    sleep_fn(pause)
+                    continue
             break  # this provider is spent — move on to the next one
 
     return _llm_fallback(
@@ -546,23 +608,39 @@ def _run_llm_turns(
     base_messages: list[dict[str, Any]],
     approved: Sequence[Any],
     provider_kwargs: dict[str, Any],
+    budget: LlmBudget | None = None,
+    deadline: float | None = None,
+    clock_fn: Callable[[], float] | None = None,
 ) -> _LlmTurnResult:
     """Chase a valid ``submit_decision`` call within the turn budget against one provider.
     Free of the cycle's context — the caller turns ``args`` into a ``DecisionDraft``. Starts
     from a fresh copy of ``base_messages`` so a retry never inherits a half-built exchange."""
+    budget = budget or LlmBudget()
+    clock_fn = clock_fn or time.monotonic
     messages = list(base_messages)
     usage: dict[str, int] = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     texts: list[str] = []
     call_kwargs = {k: v for k, v in provider_kwargs.items() if v is not None}
 
-    for _turn in range(_MAX_LLM_TURNS):
+    for _turn in range(budget.max_turns):
+        timeout = budget.request_timeout_seconds
+        if deadline is not None:
+            timeout = min(timeout, deadline - clock_fn())
+            if timeout <= 0:
+                return _LlmTurnResult(
+                    args=None,
+                    texts=texts,
+                    usage=usage,
+                    failure="LLM budget exhausted mid-conversation",
+                    rate_limited=False,
+                )
         try:
             response = complete_fn(
                 settings,
                 messages,
                 tools=[SUBMIT_DECISION_TOOL],
                 tool_choice="auto",
-                timeout=_LLM_TIMEOUT_SECONDS,
+                timeout=timeout,
                 **call_kwargs,
             )
             if not getattr(response, "choices", None):
