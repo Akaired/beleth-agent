@@ -116,6 +116,11 @@ exit:
   # Wider than the entry concession on purpose: a protective close that rests unfilled is
   # worse than paying for liquidity. Strategy level B: industry convention, not backtested.
   close_slippage_usd: 0.05
+  # A resting closing order is cancelled and replaced only when a fresh limit would be
+  # more aggressive than the resting one by at least this much. Enough to matter, small
+  # enough that a cycle does not re-price the same order every five minutes (thrash).
+  # This is a live trading threshold; it was a constant inside the cycle script.
+  reprice_min_step_usd: 0.02
 
 risk:
   max_risk_per_trade_pct_of_equity: 2 # 1-2% band; this is the upper bound used as the hard cap

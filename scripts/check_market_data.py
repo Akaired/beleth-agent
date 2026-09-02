@@ -208,10 +208,19 @@ def working_exit_leg_sets(open_orders: list[Any]) -> set[frozenset[str]]:
     return sets
 
 
-# A resting closing order is only cancelled and replaced when a fresh limit would be
-# more aggressive than the resting one by at least this much — enough to matter, not so
-# little that every cycle re-prices the same order (thrash).
-_REPRICE_MIN_STEP = 0.02
+# Fallback for a config predating `exit.reprice_min_step_usd`; the live value is read
+# from config/strategy.yaml, where the rest of the trading thresholds live.
+_DEFAULT_REPRICE_MIN_STEP = 0.02
+
+
+def _reprice_min_step(strategy_config: dict[str, Any]) -> float:
+    """Minimum improvement, in dollars, before a resting closing order is replaced.
+
+    Enough to matter, large enough that a cycle does not re-price the same order every
+    five minutes (thrash).
+    """
+    exit_cfg = strategy_config.get("exit") or {}
+    return float(exit_cfg.get("reprice_min_step_usd", _DEFAULT_REPRICE_MIN_STEP))
 
 
 def working_exit_orders(open_orders: list[Any]) -> dict[frozenset[str], dict[str, Any]]:
@@ -307,6 +316,7 @@ def _prepare_closings(
     before sending the new one. Without that, a close priced too tight on a wide book
     rests unfilled all session and blocks its own re-pricing."""
     slippage = strategy_config["exit"]["close_slippage_usd"]
+    reprice_min_step = _reprice_min_step(strategy_config)
     plans: list[dict[str, Any]] = []
     notes: list[str] = []
     for evaluation in triggered:
@@ -334,7 +344,7 @@ def _prepare_closings(
         replace_order_id = None
         if resting is not None:
             resting_limit = resting.get("limit")
-            if resting_limit is None or limit_price <= resting_limit + _REPRICE_MIN_STEP:
+            if resting_limit is None or limit_price <= resting_limit + reprice_min_step:
                 notes.append(
                     f" {spread.short_symbol}: a closing order is already working — not duplicated."
                 )

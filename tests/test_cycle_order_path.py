@@ -429,6 +429,45 @@ def test_prepare_closings_reprices_a_stale_resting_close():
     assert "repriced" in notes
 
 
+def test_prepare_closings_replaces_only_past_the_reprice_step():
+    """The boundary the reprice step exists to draw. A fresh limit of 0.60 against a
+    0.02 step: a resting 0.58 is exactly at the threshold and is left alone, 0.57 is
+    past it and is replaced. Too small a step and every cycle re-prices the same order;
+    too large and a close stays stuck on a wide book."""
+    from scripts.check_market_data import _prepare_closings
+
+    spread = _triggered_exit().spread
+    leg_set = frozenset({spread.short_symbol, spread.long_symbol})
+
+    for resting_limit, expect_replace in ((0.58, False), (0.57, True)):
+        plans, _notes = _prepare_closings(
+            [_triggered_exit()],
+            working_exits={leg_set: {"id": "resting-1", "limit": resting_limit}},
+            strategy_config=_EXIT_STRATEGY,
+        )
+        assert bool(plans) is expect_replace, resting_limit
+
+
+def test_prepare_closings_reads_the_reprice_step_from_the_config():
+    """It was a module constant — a live trading threshold inside a script."""
+    from scripts.check_market_data import _prepare_closings
+
+    spread = _triggered_exit().spread
+    leg_set = frozenset({spread.short_symbol, spread.long_symbol})
+    working = {leg_set: {"id": "resting-1", "limit": 0.50}}
+
+    # A 0.10 step swallows the 0.10 improvement 0.50 -> 0.60: no replacement.
+    wide = {"exit": {**_EXIT_STRATEGY["exit"], "reprice_min_step_usd": 0.10}}
+    plans, _ = _prepare_closings([_triggered_exit()], working_exits=working, strategy_config=wide)
+    assert plans == []
+
+    # The default 0.02 step does not.
+    plans, _ = _prepare_closings(
+        [_triggered_exit()], working_exits=working, strategy_config=_EXIT_STRATEGY
+    )
+    assert len(plans) == 1
+
+
 def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
     from app.exits import evaluate_exit
     from scripts.check_market_data import _prepare_closings
