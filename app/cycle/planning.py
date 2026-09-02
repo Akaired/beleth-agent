@@ -63,6 +63,8 @@ def _reprice_min_step(strategy_config: dict[str, Any]) -> float:
     """
     exit_cfg = strategy_config.get("exit") or {}
     return float(exit_cfg.get("reprice_min_step_usd", _DEFAULT_REPRICE_MIN_STEP))
+
+
 def _prepare_closings(
     triggered: list[ExitEvaluation],
     *,
@@ -152,6 +154,8 @@ def _prepare_closings(
             )
         notes.append(note)
     return plans, ("".join(notes) if notes else "")
+
+
 def _prepare_order(
     chosen: dict[str, Any] | None,
     candidates: list[SpreadCandidate],

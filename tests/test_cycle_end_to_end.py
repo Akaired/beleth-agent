@@ -18,12 +18,14 @@ invariants that must survive any change to the cycle:
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
+import yaml
 
+from app import config as app_config
 from app import persistence
-from app.config import get_settings
+from app.config import STRATEGY_CONFIG_PATH, get_settings
 from tests.cycle_fakes import (
     FakeOptionClient,
     FakeQuote,
@@ -43,12 +45,32 @@ DTES = [7, 14, 21, 30, 45]
 
 
 @pytest.fixture
-def cycle(monkeypatch):
+def strategy_file(tmp_path):
+    """The shipped strategy config, with the macro calendar pointed at an empty file.
+
+    The real `config/macro_events.yaml` is hand-maintained for a date window, so a test
+    that reads it passes or fails depending on the day it runs — and it did, once
+    Nonfarm Payrolls came inside the R3 block window and every tenor went dark. Every
+    other parameter stays as shipped, so these tests exercise the values the agent
+    actually runs on; only the calendar is made deterministic. `calendar_events` puts
+    events back for the test that checks the gate bites.
+    """
+    events = tmp_path / "macro_events.yaml"
+    events.write_text("events: []\n")
+    strategy = yaml.safe_load(STRATEGY_CONFIG_PATH.read_text())
+    strategy["macro_calendar"]["events_file"] = str(events)
+    path = tmp_path / "strategy.yaml"
+    path.write_text(yaml.safe_dump(strategy, sort_keys=False))
+    return path, events
+
+
+@pytest.fixture
+def cycle(monkeypatch, strategy_file):
     """Wire every edge to a fake and hand back a handle for tuning them.
 
-    The seams are attributes of modules the cycle does not own — `app.alpaca_client`,
-    `app.market.vix`, `app.decision`, `app.persistence` — so they keep working when the
-    cycle's own functions move.
+    The seams are attributes of modules the cycle does not own — `app.config`,
+    `app.alpaca_client`, `app.market.vix`, `app.decision`, `app.persistence` — so they
+    keep working when the cycle's own functions move.
     """
     import scripts.check_market_data as cmd
     from app import alpaca_client, decision
@@ -62,7 +84,11 @@ def cycle(monkeypatch):
     monkeypatch.delenv("LLM_FALLBACK_KEY", raising=False)
     get_settings.cache_clear()
 
+    strategy_path, events_path = strategy_file
+    monkeypatch.setattr(app_config, "STRATEGY_CONFIG_PATH", strategy_path)
+
     handle = _Cycle(cmd, monkeypatch)
+    handle.events_path = events_path
     monkeypatch.setattr(alpaca_client, "TradingClient", lambda **_kw: handle.trading)
     monkeypatch.setattr(alpaca_client, "OptionHistoricalDataClient", lambda **_kw: handle.options)
     monkeypatch.setattr(alpaca_client, "StockHistoricalDataClient", lambda **_kw: handle.stocks)
@@ -217,3 +243,27 @@ def test_every_write_the_cycle_makes_lands_in_the_expected_tables(cycle):
     tables = [t for t in cycle.supabase.tables() if t]
     for expected in ("decisions", "risk_checks", "agent_status"):
         assert expected in tables, expected
+
+
+def test_a_macro_event_inside_the_window_blocks_every_tenor(cycle):
+    """R3. The gate is normally made inert for these tests, so this is the one that
+    proves it bites: an event two days out and no candidate is even built."""
+    cycle.events_path.write_text(
+        "events:\n"
+        f"  - name: Test Payrolls\n"
+        f"    datetime_et: '{(TODAY + timedelta(days=2)).isoformat()} 08:30'\n"
+        "    importance: major\n"
+        "    source: test\n"
+    )
+    cycle.set_llm(_never_called)
+
+    assert cycle.run() == 0
+    assert cycle.trading.submitted == []
+    rows = cycle.supabase.rows("decisions")
+    assert rows and rows[0]["action"] == "no_trade"
+    assert "macro calendar blocks" in rows[0]["summary"]
+    assert rows[0]["evidence"]["candidates"] == []
+
+
+def _never_called(*_args, **_kwargs):
+    raise AssertionError("the LLM must not be consulted with no approved candidate")

@@ -64,6 +64,7 @@ from app.alpaca_client import (
     money,
 )
 from app.config import ConfigError, default_symbol, get_settings, load_strategy_config
+from app.cycle.account import _underlying_prices_for_spreads
 from app.cycle.open_orders import (
     resting_entry_leg_sets,
     working_exit_orders,
@@ -117,35 +118,6 @@ from app.risk_check import (
     vix_size_multiplier,
 )
 from app.vrp import best_tradable_tenor, scan_tenors
-
-
-def _underlying_prices_for_spreads(
-    stock_client: Any, spreads: list[Any]
-) -> dict[str, float | None]:
-    """Last price of each spread's OWN underlying, one fetch per distinct symbol.
-
-    The short-leg ITM rule compares a spread's short strike against its own symbol's
-    price — never the cycle's symbol: a QQQ cycle measuring an SPY spread against
-    QQQ's price would misread ITM/OTM and could trigger a spurious close. A failed
-    quote only disables the ITM rule for that symbol (fail-safe, not fail-spurious);
-    the P/L rules keep working off the leg quotes.
-    """
-    prices: dict[str, float | None] = {}
-    for spread in spreads:
-        root = spread.root
-        if root in prices:
-            continue
-        try:
-            prices[root] = fetch_last_price(stock_client, root)
-        except Exception as exc:  # noqa: BLE001 — see docstring: ITM rule off, nothing worse
-            prices[root] = None
-            print(
-                f"WARNING: last price for {root} unavailable "
-                f"({describe_exception(exc)}) — its short-leg ITM exit rule "
-                "cannot fire this cycle.",
-                file=sys.stderr,
-            )
-    return prices
 
 
 def main() -> int:

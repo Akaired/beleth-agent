@@ -321,7 +321,7 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
     # and could trigger a spurious close).
     from datetime import date
 
-    import scripts.check_market_data as cmd
+    from app.cycle import account
     from app.exits import OpenSpread
 
     calls: list[str] = []
@@ -330,7 +330,7 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
         calls.append(symbol)
         return {"SPY": 772.0, "QQQ": 720.0}[symbol]
 
-    monkeypatch.setattr(cmd, "fetch_last_price", fake_fetch_last_price)
+    monkeypatch.setattr(account, "fetch_last_price", fake_fetch_last_price)
 
     def spread(occ):
         return OpenSpread(
@@ -346,7 +346,7 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
         )
 
     spreads = [spread("SPY260918P00440000"), spread("QQQ260918P00440000")]
-    prices = cmd._underlying_prices_for_spreads(object(), spreads)
+    prices = account._underlying_prices_for_spreads(object(), spreads)
     assert prices == {"SPY": 772.0, "QQQ": 720.0}
     assert calls == ["SPY", "QQQ"]  # one call per distinct symbol, not per spread
 
@@ -354,13 +354,13 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
 def test_a_failed_underlying_quote_disables_only_the_itm_rule(monkeypatch):
     from datetime import date
 
-    import scripts.check_market_data as cmd
+    from app.cycle import account
     from app.exits import OpenSpread
 
     def failing_fetch_last_price(client, symbol):
         raise RuntimeError("quote feed down")
 
-    monkeypatch.setattr(cmd, "fetch_last_price", failing_fetch_last_price)
+    monkeypatch.setattr(account, "fetch_last_price", failing_fetch_last_price)
 
     spread = OpenSpread(
         short_symbol="SPY260918P00440000",
@@ -373,7 +373,7 @@ def test_a_failed_underlying_quote_disables_only_the_itm_rule(monkeypatch):
         short_entry_price=1.0,
         long_entry_price=0.1,
     )
-    prices = cmd._underlying_prices_for_spreads(object(), [spread])
+    prices = account._underlying_prices_for_spreads(object(), [spread])
     assert prices == {"SPY": None}  # the P/L rules still fire; only ITM is off
 
 
@@ -469,8 +469,8 @@ def test_prepare_closings_reads_the_reprice_step_from_the_config():
 
 
 def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
-    from app.exits import evaluate_exit
     from app.cycle.planning import _prepare_closings
+    from app.exits import evaluate_exit
 
     # A blown-out book: marketable debit would be 2.10, but R5's loss-close price on a
     # 0.90 credit at 2x is 1.80 — never bid more than the rule's own defined max.
@@ -490,8 +490,8 @@ def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
 
 
 def test_prepare_closings_fails_closed_without_a_measurable_mark():
-    from app.exits import evaluate_exit
     from app.cycle.planning import _prepare_closings
+    from app.exits import evaluate_exit
 
     # The ITM rule fires with no usable leg quotes: the close is triggered but cannot
     # be priced, so no order is built and the fail-closed note lands in the summary.
