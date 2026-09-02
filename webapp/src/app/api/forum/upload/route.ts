@@ -9,10 +9,10 @@ import { NextResponse } from "next/server";
 import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
+import { MEDIA_MAX_BYTES, describeMaxBytes } from "@/lib/limits";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 5 * 1024 * 1024;
 const EXT_BY_TYPE: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Sign in to upload." }, { status: 401 });
   }
   // The demo login is public, so an upload from it is an anonymous upload.
-  // Storage RLS refuses it too (0029); this keeps the 5 MB body off the wire.
+  // Storage RLS refuses it too (0029); this keeps the upload body off the wire.
   if (isDemoAdmin(ctx.role)) {
     return NextResponse.json({ error: DEMO_READ_ONLY }, { status: 403 });
   }
@@ -36,9 +36,9 @@ export async function POST(req: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file." }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
+  if (file.size > MEDIA_MAX_BYTES) {
     return NextResponse.json(
-      { error: "Image must be 5 MB or smaller." },
+      { error: `Image must be ${describeMaxBytes(MEDIA_MAX_BYTES)} or smaller.` },
       { status: 413 },
     );
   }

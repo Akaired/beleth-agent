@@ -7,13 +7,13 @@ import {
   type FormState,
 } from "@/app/dashboard/settings/account/form-state";
 import { IconAccount } from "@/components/icons";
+import { BIO_MAX, NICKNAME_MAX, NICKNAME_MIN } from "@/lib/limits";
 
 const field =
   "w-full rounded bg-inset border border-inputline px-3.5 py-2.5 text-[13px] text-txt outline-none transition-colors placeholder:text-dim focus:border-hoverline";
 const labelRow =
   "flex items-center gap-1.5 font-mono text-[10px] tracking-[0.1em] text-sec";
 
-const BIO_MAX = 280;
 
 export function ProfileForm({
   displayName,
@@ -41,12 +41,13 @@ export function ProfileForm({
           name="display_name"
           defaultValue={displayName ?? ""}
           placeholder="How Beleth should address you"
-          minLength={2}
-          maxLength={40}
+          minLength={NICKNAME_MIN}
+          maxLength={NICKNAME_MAX}
           autoComplete="nickname"
         />
         <span className="font-mono text-[10px] text-dim">
-          2–40 characters. Shown across the dashboard and the forum. Leave empty
+          {NICKNAME_MIN}–{NICKNAME_MAX} characters. Shown across the dashboard and the
+          forum. Leave empty
           to fall back to your email name.
         </span>
       </label>

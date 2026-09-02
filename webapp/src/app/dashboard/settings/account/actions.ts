@@ -8,6 +8,13 @@ import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { REMEMBER_COOKIE } from "@/lib/supabase/remember";
 import { reportError, userFacingAuthError } from "@/lib/errors";
+import {
+  AVATAR_MAX_BYTES,
+  BIO_MAX,
+  NICKNAME_MAX,
+  NICKNAME_MIN,
+  describeMaxBytes,
+} from "@/lib/limits";
 import type {
   AvatarResult,
   FormState,
@@ -18,7 +25,6 @@ import type {
 const DEMO_LOCKED = "The demo account is read-only.";
 
 const AVATAR_BUCKET = "avatars";
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 const EXT_BY_TYPE: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -53,11 +59,17 @@ export async function updateProfileAction(
   const displayName = String(formData.get("display_name") ?? "").trim();
   const bio = String(formData.get("bio") ?? "").trim();
 
-  if (displayName && (displayName.length < 2 || displayName.length > 40)) {
-    return { error: "Nickname must be 2 to 40 characters.", notice: null };
+  if (
+    displayName &&
+    (displayName.length < NICKNAME_MIN || displayName.length > NICKNAME_MAX)
+  ) {
+    return {
+      error: `Nickname must be ${NICKNAME_MIN} to ${NICKNAME_MAX} characters.`,
+      notice: null,
+    };
   }
-  if (bio.length > 280) {
-    return { error: "Bio must be 280 characters or fewer.", notice: null };
+  if (bio.length > BIO_MAX) {
+    return { error: `Bio must be ${BIO_MAX} characters or fewer.`, notice: null };
   }
 
   const supabase = await createClient();
@@ -81,8 +93,11 @@ export async function uploadAvatarAction(
 
   const file = formData.get("file");
   if (!(file instanceof File)) return { ok: false, error: "No file." };
-  if (file.size > MAX_AVATAR_BYTES) {
-    return { ok: false, error: "Image must be 2 MB or smaller." };
+  if (file.size > AVATAR_MAX_BYTES) {
+    return {
+      ok: false,
+      error: `Image must be ${describeMaxBytes(AVATAR_MAX_BYTES)} or smaller.`,
+    };
   }
   const ext = EXT_BY_TYPE[file.type];
   if (!ext) return { ok: false, error: "PNG, JPEG, GIF or WebP only." };

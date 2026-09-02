@@ -8,10 +8,10 @@ import { NextResponse } from "next/server";
 import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
+import { MEDIA_MAX_BYTES, describeMaxBytes } from "@/lib/limits";
 
 export const runtime = "nodejs";
 
-const MAX_BYTES = 5 * 1024 * 1024;
 const EXT_BY_TYPE: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -30,9 +30,9 @@ export async function POST(req: Request) {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file." }, { status: 400 });
   }
-  if (file.size > MAX_BYTES) {
+  if (file.size > MEDIA_MAX_BYTES) {
     return NextResponse.json(
-      { error: "Image must be 5 MB or smaller." },
+      { error: `Image must be ${describeMaxBytes(MEDIA_MAX_BYTES)} or smaller.` },
       { status: 413 },
     );
   }

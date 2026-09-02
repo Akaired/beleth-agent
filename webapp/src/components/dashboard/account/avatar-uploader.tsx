@@ -8,9 +8,9 @@ import {
 } from "@/app/dashboard/settings/account/actions";
 import { UserAvatar } from "@/components/user-avatar";
 import { IconClose, IconPencil } from "@/components/icons";
+import { AVATAR_MAX_BYTES, describeMaxBytes } from "@/lib/limits";
 
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
-const MAX_BYTES = 2 * 1024 * 1024;
 
 export function AvatarUploader({
   name,
@@ -32,8 +32,8 @@ export function AvatarUploader({
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    if (file.size > MAX_BYTES) {
-      setError("Image must be 2 MB or smaller.");
+    if (file.size > AVATAR_MAX_BYTES) {
+      setError(`Image must be ${describeMaxBytes(AVATAR_MAX_BYTES)} or smaller.`);
       return;
     }
     setError(null);
@@ -98,7 +98,7 @@ export function AvatarUploader({
           )}
         </div>
         <p className="font-mono text-[10px] text-dim">
-          PNG, JPEG, GIF or WebP · 2 MB max
+          PNG, JPEG, GIF or WebP · {describeMaxBytes(AVATAR_MAX_BYTES)} max
         </p>
         {error && <p className="text-[11.5px] text-down">{error}</p>}
       </div>
