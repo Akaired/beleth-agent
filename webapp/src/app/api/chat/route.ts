@@ -10,7 +10,7 @@
  * new session id plus the assistant's answer. Any signed-in user may call it.
  */
 import { NextResponse } from "next/server";
-import { getSessionContext } from "@/lib/auth";
+import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ChatModelError, runBelethTurn } from "@/lib/chat/aiml";
 import { fetchBelethChatContext } from "@/lib/chat/context";
@@ -36,6 +36,11 @@ export async function POST(req: Request) {
   const ctx = await getSessionContext();
   if (!ctx) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+  // A turn writes the transcript, which the demo account may not do (0029).
+  // Refuse before spending a call on the model's free quota.
+  if (isDemoAdmin(ctx.role)) {
+    return NextResponse.json({ error: DEMO_READ_ONLY }, { status: 403 });
   }
 
   let body: { sessionId?: unknown; message?: unknown };

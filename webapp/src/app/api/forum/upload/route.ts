@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getSessionContext } from "@/lib/auth";
+import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -23,6 +23,11 @@ export async function POST(req: Request) {
   const ctx = await getSessionContext();
   if (!ctx) {
     return NextResponse.json({ error: "Sign in to upload." }, { status: 401 });
+  }
+  // The demo login is public, so an upload from it is an anonymous upload.
+  // Storage RLS refuses it too (0029); this keeps the 5 MB body off the wire.
+  if (isDemoAdmin(ctx.role)) {
+    return NextResponse.json({ error: DEMO_READ_ONLY }, { status: 403 });
   }
 
   const form = await req.formData();

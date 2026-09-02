@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import {
   deleteChatSession,
   fetchChatSession,
@@ -13,7 +13,8 @@ import type { ChatRating } from "@/lib/chat/types";
 /**
  * Delete one of the caller's own chat sessions (cascades to its messages).
  * RLS already prevents touching another user's row; the ownership check here
- * just turns a silent no-op into a clear refusal.
+ * just turns a silent no-op into a clear refusal. The demo account owns no
+ * sessions it may delete — its login is public and it cannot write (0029).
  */
 export async function deleteChatSessionAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
@@ -21,6 +22,7 @@ export async function deleteChatSessionAction(formData: FormData): Promise<void>
 
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
+  if (isDemoAdmin(ctx.role)) return;
 
   const session = await fetchChatSession(id);
   if (!session || session.user_id !== ctx.userId) return;
@@ -42,6 +44,7 @@ export async function rateChatMessageAction(
   if (!messageId) return { ok: false };
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login");
+  if (isDemoAdmin(ctx.role)) return { ok: false };
 
   try {
     await setChatMessageRating(messageId, rating);

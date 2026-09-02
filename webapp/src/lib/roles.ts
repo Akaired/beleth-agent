@@ -16,9 +16,16 @@ export function roleAtLeast(role: Role, min: Role): boolean {
 
 /**
  * The shared read-only judges' account. It sees the whole backoffice but may
- * not mutate anything — the one exception is posting on the forum under a
- * per-post "(demo)" alias. Server actions and DB functions both check this.
+ * not mutate anything at all: the login is public (one click from the homepage),
+ * so whatever it can write, anyone can write. Server actions, route handlers and
+ * the database all check this — see db/migrations/0029_demo_readonly_enforcement.sql.
  */
 export function isDemoAdmin(role: Role): boolean {
   return role === "demo_admin";
 }
+
+/**
+ * The single refusal shown whenever the demo account attempts a write. The
+ * database raises the same sentence (SQLSTATE 42501) if a path ever reaches it.
+ */
+export const DEMO_READ_ONLY = "The demo account is read-only.";
