@@ -8,11 +8,10 @@ import {
   formatUsd,
 } from "@/components/dashboard/ui";
 import {
-  IconCaretLeft,
-  IconCaretRight,
   IconDecisions,
 } from "@/components/icons";
 import { TickerBadge } from "@/components/ticker-badge";
+import { Pager } from "@/components/pager";
 
 export const metadata: Metadata = { title: "Decisions — Beleth backoffice" };
 
@@ -139,32 +138,7 @@ export default async function DecisionsPage({
         </table>
       </div>
 
-      <div className="flex items-center justify-between font-mono text-[11px]">
-        {page > 1 ? (
-          <Link
-            href={`/dashboard/decisions${qs(page - 1)}`}
-            className="flex items-center gap-1 text-acc hover:underline"
-          >
-            <IconCaretLeft size={12} weight="bold" /> newer
-          </Link>
-        ) : (
-          <span className="flex items-center gap-1 text-faint">
-            <IconCaretLeft size={12} weight="bold" /> newer
-          </span>
-        )}
-        {page < pages ? (
-          <Link
-            href={`/dashboard/decisions${qs(page + 1)}`}
-            className="flex items-center gap-1 text-acc hover:underline"
-          >
-            older <IconCaretRight size={12} weight="bold" />
-          </Link>
-        ) : (
-          <span className="flex items-center gap-1 text-faint">
-            older <IconCaretRight size={12} weight="bold" />
-          </span>
-        )}
-      </div>
+      <Pager page={page} pages={pages} href={(p) => `/dashboard/decisions${qs(p)}`} showCount={false} />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import { FORUM_PAGE_SIZE, fetchForumCategory } from "@/lib/forum/queries";
 import { TopicListTable } from "@/components/forum/topic-list-table";
 import { NewTopicButton } from "@/components/forum/new-topic-button";
 import { LoginToPost } from "@/components/forum/login-to-post";
-import { IconCaretLeft, IconCaretRight } from "@/components/icons";
+
+import { Pager } from "@/components/pager";
 
 export const metadata: Metadata = { title: "Forum — Beleth" };
 
@@ -63,37 +64,7 @@ export default async function ForumCategoryPage({
 
       <TopicListTable topics={data.topics} />
 
-      {pages > 1 && (
-        <div className="flex items-center justify-center gap-4 font-mono text-[11px]">
-          {clamped > 1 ? (
-            <Link
-              href={qs(clamped - 1)}
-              className="flex items-center gap-1 text-acc hover:underline"
-            >
-              <IconCaretLeft size={12} /> newer
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 text-faint">
-              <IconCaretLeft size={12} /> newer
-            </span>
-          )}
-          <span className="text-dim">
-            page {clamped}/{pages}
-          </span>
-          {clamped < pages ? (
-            <Link
-              href={qs(clamped + 1)}
-              className="flex items-center gap-1 text-acc hover:underline"
-            >
-              older <IconCaretRight size={12} />
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 text-faint">
-              older <IconCaretRight size={12} />
-            </span>
-          )}
-        </div>
-      )}
+      <Pager page={clamped} pages={pages} href={qs} />
 
       {!ctx && <LoginToPost next={`/forum/c/${slug}`} />}
     </div>

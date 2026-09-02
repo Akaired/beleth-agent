@@ -3,7 +3,11 @@ import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchPortfolioView } from "@/lib/dashboard-queries";
 import type { InstrumentQuote, PortfolioInstrument } from "@/lib/portfolio";
-import { ForbiddenPanel, timeAgo } from "@/components/dashboard/ui";
+import {
+  ForbiddenPanel,
+  Metric,
+  timeAgo,
+} from "@/components/dashboard/ui";
 import { TickerBadge } from "@/components/ticker-badge";
 import { TvWidget } from "@/components/tv-widget";
 import { formatSignedUsd, formatUsd } from "@/lib/format";
@@ -67,28 +71,6 @@ function Quote({ quote }: { quote: InstrumentQuote | null }) {
           <span className="text-dim"> ({signedPct(quote.changePct)})</span>
         )}
       </div>
-    </div>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  sub,
-  tone = "text-txt",
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
-        {label}
-      </span>
-      <span className={`font-mono text-[13px] ${tone}`}>{value}</span>
-      {sub && <span className="font-mono text-[9.5px] text-dim">{sub}</span>}
     </div>
   );
 }

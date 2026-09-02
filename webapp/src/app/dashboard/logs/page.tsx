@@ -5,6 +5,7 @@ import { fetchEventLog } from "@/lib/dashboard-queries";
 import { ForbiddenPanel } from "@/components/dashboard/ui";
 import { EventList } from "@/components/dashboard/event-list";
 import { LOGS_PAGE_SIZE } from "@/lib/pagination";
+import { Pager } from "@/components/pager";
 import {
   DEFAULT_RANGE,
   EVENT_FILTER_SLUGS,
@@ -13,8 +14,6 @@ import {
   rangeSince,
 } from "@/lib/events";
 import {
-  IconCaretLeft,
-  IconCaretRight,
   IconFilter,
   IconLogs,
 } from "@/components/icons";
@@ -143,32 +142,12 @@ export default async function LogsPage({
         />
       </div>
 
-      <div className="flex items-center justify-between font-mono text-[11px]">
-        {page > 1 ? (
-          <Link
-            href={`/dashboard/logs${qs({ page: page - 1 })}`}
-            className="flex items-center gap-1 text-acc hover:underline"
-          >
-            <IconCaretLeft size={12} weight="bold" /> newer
-          </Link>
-        ) : (
-          <span className="flex items-center gap-1 text-faint">
-            <IconCaretLeft size={12} weight="bold" /> newer
-          </span>
-        )}
-        {page < pages ? (
-          <Link
-            href={`/dashboard/logs${qs({ page: page + 1 })}`}
-            className="flex items-center gap-1 text-acc hover:underline"
-          >
-            older <IconCaretRight size={12} weight="bold" />
-          </Link>
-        ) : (
-          <span className="flex items-center gap-1 text-faint">
-            older <IconCaretRight size={12} weight="bold" />
-          </span>
-        )}
-      </div>
+      <Pager
+        page={page}
+        pages={pages}
+        href={(p) => `/dashboard/logs${qs({ page: p })}`}
+        showCount={false}
+      />
     </div>
   );
 }

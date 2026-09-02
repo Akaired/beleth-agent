@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchTradeCalendar } from "@/lib/dashboard-queries";
-import { ForbiddenPanel, formatUsd } from "@/components/dashboard/ui";
+import {
+  ForbiddenPanel,
+  Metric,
+  formatUsd,
+} from "@/components/dashboard/ui";
 import { MonthNav, WEEKDAY_LABELS } from "@/components/dashboard/month-nav";
 import {
   monthParam,
@@ -32,25 +36,6 @@ function tint(pnl: number, hasTrades: boolean): string {
 function pnlText(pnl: number, hasTrades: boolean): string {
   if (!hasTrades) return "text-faint";
   return pnl > 0 ? "text-up" : pnl < 0 ? "text-down" : "text-sec";
-}
-
-function Stat({
-  label,
-  value,
-  tone = "text-txt",
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
-        {label}
-      </span>
-      <span className={`font-mono text-[14px] ${tone}`}>{value}</span>
-    </div>
-  );
 }
 
 export default async function TradeCalendarPage({
@@ -97,9 +82,9 @@ export default async function TradeCalendarPage({
 
       {/* Month summary + nav */}
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-md border border-line bg-panel px-4 py-3">
-        <Stat label="Trades" value={String(cal.totalTrades)} />
-        <Stat label="Net P&L" value={signedUsd(cal.totalPnl)} tone={netTone} />
-        <Stat
+        <Metric size="md" label="Trades" value={String(cal.totalTrades)} />
+        <Metric size="md" label="Net P&L" value={signedUsd(cal.totalPnl)} tone={netTone} />
+        <Metric size="md"
           label="Days"
           value={`${cal.winningDays}W · ${cal.losingDays}L`}
           tone="text-sec"

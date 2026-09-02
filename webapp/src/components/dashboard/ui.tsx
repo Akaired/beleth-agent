@@ -187,6 +187,39 @@ export function MasterOnlyPanel() {
   );
 }
 
+/**
+ * A small labelled figure: the caption above, the number below. The dense counterpart
+ * to `Stat`, which is a bordered card — this one sits inside another card or a row of
+ * legs. It was declared byte-identically in the positions and portfolio pages, and a
+ * third time in the trade calendar under the name `Stat` with one font size changed.
+ */
+export function Metric({
+  label,
+  value,
+  tone = "text-txt",
+  sub,
+  size = "sm",
+}: {
+  label: string;
+  value: string;
+  /** A text colour class — `text-up` / `text-down` for a P&L figure. */
+  tone?: string;
+  sub?: string;
+  size?: "sm" | "md";
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
+        {label}
+      </span>
+      <span className={`font-mono ${size === "md" ? "text-[14px]" : "text-[13px]"} ${tone}`}>
+        {value}
+      </span>
+      {sub && <span className="font-mono text-[9.5px] text-dim">{sub}</span>}
+    </div>
+  );
+}
+
 export function ForbiddenPanel() {
   return (
     <Panel title="Not available for your account">

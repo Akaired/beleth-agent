@@ -6,6 +6,7 @@ import type { SpreadPosition } from "@/lib/positions";
 import { isPositionState } from "@/lib/positions";
 import {
   ForbiddenPanel,
+  Metric,
   PositionStateBadge,
   SideTag,
   formatUsd,
@@ -13,12 +14,11 @@ import {
 import { TickerBadge } from "@/components/ticker-badge";
 import { POSITIONS_PAGE_SIZE } from "@/lib/pagination";
 import { formatDateTime } from "@/lib/format";
+import { Pager } from "@/components/pager";
 import {
   IconArrowDown,
   IconArrowRight,
   IconArrowUp,
-  IconCaretLeft,
-  IconCaretRight,
   IconPositions,
   IconWarning,
 } from "@/components/icons";
@@ -139,28 +139,6 @@ function DecisionLink({ id }: { id: string | null }) {
         <span className="text-dim">—</span>
       )}
     </span>
-  );
-}
-
-function Metric({
-  label,
-  value,
-  tone = "text-txt",
-  sub,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-faint">
-        {label}
-      </span>
-      <span className={`font-mono text-[13px] ${tone}`}>{value}</span>
-      {sub && <span className="font-mono text-[9.5px] text-dim">{sub}</span>}
-    </div>
   );
 }
 
@@ -398,37 +376,11 @@ export default async function PositionsPage({
           </table>
         </div>
 
-        {pages > 1 && (
-          <div className="flex items-center justify-between font-mono text-[11px]">
-            {clamped > 1 ? (
-              <Link
-                href={`/dashboard/positions${qs(clamped - 1)}`}
-                className="flex items-center gap-1 text-acc hover:underline"
-              >
-                <IconCaretLeft size={12} weight="bold" /> newer
-              </Link>
-            ) : (
-              <span className="flex items-center gap-1 text-faint">
-                <IconCaretLeft size={12} weight="bold" /> newer
-              </span>
-            )}
-            <span className="text-dim">
-              page {clamped}/{pages}
-            </span>
-            {clamped < pages ? (
-              <Link
-                href={`/dashboard/positions${qs(clamped + 1)}`}
-                className="flex items-center gap-1 text-acc hover:underline"
-              >
-                older <IconCaretRight size={12} weight="bold" />
-              </Link>
-            ) : (
-              <span className="flex items-center gap-1 text-faint">
-                older <IconCaretRight size={12} weight="bold" />
-              </span>
-            )}
-          </div>
-        )}
+        <Pager
+          page={clamped}
+          pages={pages}
+          href={(p) => `/dashboard/positions${qs(p)}`}
+        />
       </div>
     </div>
   );
