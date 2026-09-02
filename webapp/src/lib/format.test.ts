@@ -16,11 +16,14 @@ describe("formatUsd", () => {
   it("groups thousands and keeps two decimals", () => {
     expect(formatUsd(1234.5)).toBe("$1,234.50");
     expect(formatUsd(0)).toBe("$0.00");
-    expect(formatUsd(-42)).toBe("$-42.00");
+    // The sign goes outside the symbol. `$-42.00` is what a naive template produces
+    // and it is wrong — it was shipped for an afternoon and caught on screen.
+    expect(formatUsd(-42)).toBe("-$42.00");
   });
 
   it("drops the decimals for axis labels", () => {
     expect(formatUsd(1234.56, 0)).toBe("$1,235");
+    expect(formatUsd(-364, 0)).toBe("-$364");
   });
 
   it("says n/a rather than rendering a non-number", () => {

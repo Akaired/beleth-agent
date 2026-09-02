@@ -234,6 +234,36 @@ const META: Record<string, Meta> = {
     rule: "R5",
     fmt: F.bool,
   },
+  "exit.reprice_min_step_usd": {
+    label: "Reprice step",
+    gloss:
+      "How much more aggressive a fresh limit must be before a resting closing order is cancelled and replaced. Small enough to matter, large enough that a cycle does not re-price the same order every five minutes.",
+    rule: "R5",
+    fmt: F.usd,
+  },
+  "llm.budget_seconds": {
+    label: "Decision budget",
+    gloss:
+      "Wall-clock ceiling for the whole decision stage. An attempt with no time left is not started, and each request's timeout is shortened to what remains — so the stage degrades to the deterministic no-trade instead of being killed mid-flight by the cycle timeout.",
+    fmt: F.seconds,
+  },
+  "llm.max_turns": {
+    label: "Turns per attempt",
+    gloss:
+      "How many turns the model gets to produce a valid decision call before an attempt is spent.",
+    fmt: F.plain,
+  },
+  "llm.request_timeout_seconds": {
+    label: "Request timeout",
+    gloss: "Per-request ceiling. Shortened automatically when less budget than this remains.",
+    fmt: F.seconds,
+  },
+  "llm.rate_limit_retry_seconds": {
+    label: "Rate-limit pause",
+    gloss:
+      "Pause before the primary provider's one paced retry. Free-tier limits are shared upstream pools that clear on their own; the pause is skipped when it would not fit the budget.",
+    fmt: F.seconds,
+  },
   "exit.close_slippage_usd": {
     label: "Exit slippage",
     gloss:
@@ -413,6 +443,7 @@ const SECTION_DEFS: SectionDef[] = [
       "exit.loss_close_credit_multiple",
       "exit.loss_close_on_short_leg_itm",
       "exit.close_slippage_usd",
+      "exit.reprice_min_step_usd",
     ],
   },
   {
@@ -458,6 +489,10 @@ const SECTION_DEFS: SectionDef[] = [
       "runner.closed_heartbeat_interval_minutes",
       "runner.pause_poll_seconds",
       "runner.cycle_timeout_seconds",
+      "llm.budget_seconds",
+      "llm.max_turns",
+      "llm.request_timeout_seconds",
+      "llm.rate_limit_retry_seconds",
       "runner.diagnostic_log.enabled",
       "runner.diagnostic_log.dir",
       "runner.diagnostic_log.filename",

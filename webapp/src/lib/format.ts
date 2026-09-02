@@ -23,13 +23,18 @@ const USD_2 = new Intl.NumberFormat("en-US", {
 /** Nothing to show. One dash, everywhere. */
 export const EM_DASH = "—";
 
-/** `$1,234.56`. `digits: 0` for axis labels and other tight spaces. */
+/**
+ * `$1,234.56`, and `-$364` for a negative — the sign goes outside the symbol, which is
+ * how `Intl` renders currency and how every other figure on the page reads.
+ * `digits: 0` for axis labels and other tight spaces.
+ */
 export function formatUsd(
   n: number | null | undefined,
   digits: 0 | 2 = 2,
 ): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "n/a";
-  return `$${(digits === 0 ? USD_0 : USD_2).format(n)}`;
+  const body = (digits === 0 ? USD_0 : USD_2).format(Math.abs(n));
+  return `${n < 0 ? "-" : ""}$${body}`;
 }
 
 /**

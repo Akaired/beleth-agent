@@ -53,7 +53,11 @@ export default async function ControlsPage() {
         </div>
       </div>
 
-      <HostPanel history={hostHistory} lastCycleAt={agentStatus?.last_cycle_at ?? null} />
+      <HostPanel
+        history={hostHistory}
+        lastCycleAt={agentStatus?.last_cycle_at ?? null}
+        gated={!canControl}
+      />
 
       <Panel title="Kill switch">
         <KillSwitch paused={paused} canControl={canControl} />

@@ -129,9 +129,16 @@ function Spark({
 export function HostPanel({
   history,
   lastCycleAt,
+  gated = false,
 }: {
   history: HostHistoryPoint[];
   lastCycleAt: string | null;
+  /**
+   * True when the caller is below master_admin. `host_metrics` is master-only (0033),
+   * so the panel is empty for a reason that is not "no data yet" — saying otherwise
+   * tells the demo account to wait for something that will never arrive.
+   */
+  gated?: boolean;
 }) {
   // The live snapshot is the newest history row. It used to come from
   // `agent_status.detail.host`, which anonymous readers can read — and it names the
@@ -149,7 +156,9 @@ export function HostPanel({
     return (
       <Panel title={title}>
         <p className="font-mono text-[11px] text-dim">
-          No host telemetry yet — attached to the next heartbeat.
+          {gated
+            ? "Host telemetry is master-admin only — it names the machine the agent runs on."
+            : "No host telemetry yet — attached to the next heartbeat."}
         </p>
       </Panel>
     );
