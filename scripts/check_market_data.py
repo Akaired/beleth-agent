@@ -44,9 +44,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -54,28 +52,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.cycle.account import gather_account_state
 from app.cycle.config import build_clients, load_cycle_config
 from app.cycle.decide import decide
+from app.cycle.execute import execute_and_persist
 from app.cycle.gates import build_package, evaluate_gates
 from app.cycle.gather import gather_market_evidence
 from app.cycle.planning import plan_orders
-from app.eventlog import EventLog
-from app.orders import (
-    OrderSubmissionError,
-    submit_mleg_order,
-)
-from app.persistence import (
-    PersistenceConfigError,
-    PersistenceError,
-    agent_status_row,
-    mirror_positions,
-    persist_agent_status,
-    persist_decision,
-    persist_exit_checks,
-    persist_risk_checks,
-    persist_trade,
-    supabase_config_from_settings,
-    trade_row,
-)
-from app.redact import describe_exception
 from app.vrp import best_tradable_tenor
 
 
@@ -84,23 +64,16 @@ def main() -> int:
     if loaded is None:
         return 1
     settings, cfg = loaded
-    symbol = cfg.symbol
     strategy = cfg.strategy
     clients = build_clients(settings)
-    trading = clients.trading
 
     market = gather_market_evidence(clients, cfg)
     tenor_vrp = market.tenor_vrp
     blocked_dtes = market.blocked_dtes
-    candidates = market.candidates
 
     state = gather_account_state(clients, cfg)
-    clock_is_open = state.market_open
-    positions = state.positions
-    open_spreads = state.open_spreads
     position_anomalies = state.position_anomalies
     exit_evaluations = state.exit_evaluations
-    triggered_exits = state.triggered_exits
 
     package = build_package(cfg, market, state)
     gates = evaluate_gates(cfg, market, state)
@@ -110,248 +83,18 @@ def main() -> int:
 
     plans, draft = plan_orders(cfg, market, state, gates, draft)
     plan = plans.entry
-    exit_plans = plans.exits
 
-    # --- persistence: every decision, risk-check outcome and position state --
-    decision_id = None
-    persisted_checks = 0
-    persisted_exit_checks = 0
-    upserted_positions = 0
-    submitted_order: dict[str, Any] | None = None
-    order_failure: str | None = None
-    submitted_exits = 0
-    failed_exits = 0
-    exit_outcomes: list[dict[str, Any]] = []
-    elog = EventLog()
-    try:
-        supabase = supabase_config_from_settings(settings)
-    except PersistenceConfigError as exc:
-        print(
-            f"WARNING: Supabase not configured — decision not persisted ({exc})",
-            file=sys.stderr,
-        )
-        if plan is not None or exit_plans:
-            # The decision could not be logged, so no order may go out either.
-            print(
-                "ERROR: a trade decision was made but persistence is unavailable — "
-                "no order is sent (orders never go out unlogged).",
-                file=sys.stderr,
-            )
-    else:
-        try:
-            decision_id = persist_decision(supabase, draft=draft)
-            elog.emit(
-                "info",
-                "decision" if draft.action == "trade" else "no_trade",
-                draft.summary[:280],
-                symbol=symbol,
-                action=draft.action,
-                source=draft.decision_source,
-            )
-            persisted_checks = persist_risk_checks(
-                supabase, decision_id=decision_id, verdicts=verdicts
-            )
-            approved_n = sum(1 for v in verdicts if v.approved)
-            if candidates and approved_n < len(candidates):
-                reject_reasons = sorted({r.rule for v in verdicts for r in v.rejections})
-                elog.warn(
-                    "risk_rejected",
-                    f"{approved_n}/{len(candidates)} candidates cleared the risk gate "
-                    f"(rejected by {', '.join(reject_reasons) or 'n/a'})",
-                    symbol=symbol,
-                    approved=approved_n,
-                    candidates=len(candidates),
-                    rules=reject_reasons,
-                )
-            if position_anomalies:
-                elog.warn(
-                    "position_anomaly",
-                    f"{len(position_anomalies)} open leg(s) could not be paired into a spread",
-                    symbol=symbol,
-                    count=len(position_anomalies),
-                )
-            if triggered_exits:
-                elog.warn(
-                    "exit_triggered",
-                    f"{len(triggered_exits)} open spread(s) hit an exit target: "
-                    + "; ".join(e.reason for e in triggered_exits)[:240],
-                    symbol=symbol,
-                    count=len(triggered_exits),
-                )
-            # Each open spread's R5 verdict is a persisted check row like any other: for a
-            # triggered close it IS the pre-trade check of the closing order.
-            persisted_exit_checks = persist_exit_checks(
-                supabase, decision_id=decision_id, evaluations=exit_evaluations
-            )
-            upserted_positions, _ = mirror_positions(
-                supabase, [p.model_dump(mode="json") for p in positions]
-            )
-
-            # Exits first: closing a spread is risk reduction and does not queue behind a
-            # new entry. A failed close is persisted as a first-class trades row; while the
-            # position still exists the rule stays triggered, so the next cycle re-arms it.
-            for exit_plan in exit_plans:
-                exit_order: dict[str, Any] | None = None
-                exit_failure: str | None = None
-                try:
-                    replace_order_id = exit_plan.get("replace_order_id")
-                    if replace_order_id is not None:
-                        # Cancel the stale resting close first; if it will not cancel, do
-                        # NOT send a second one — a duplicate close would stack against
-                        # the same position. The rule stays triggered and re-arms.
-                        try:
-                            trading.cancel_order_by_id(replace_order_id)
-                        except Exception as exc:
-                            raise OrderSubmissionError(
-                                f"could not cancel stale closing order {replace_order_id}: "
-                                f"{describe_exception(exc)}"
-                            ) from exc
-                        elog.info(
-                            "exit_repriced",
-                            f"cancelled stale closing order {replace_order_id} for "
-                            f"{exit_plan['spread']['short_symbol']} — resubmitting at "
-                            f"{exit_plan['limit']:.2f}",
-                            symbol=symbol,
-                            exit_reason=exit_plan["exit_reason"],
-                            alpaca_order_id=replace_order_id,
-                        )
-                    exit_order = submit_mleg_order(trading, exit_plan["request"])
-                    submitted_exits += 1
-                    elog.info(
-                        "exit_submitted",
-                        f"closing {exit_plan['spread']['short_symbol']} "
-                        f"({exit_plan['exit_reason']}) — order {exit_order.get('id')}",
-                        symbol=symbol,
-                        exit_reason=exit_plan["exit_reason"],
-                        alpaca_order_id=exit_order.get("id"),
-                        qty=exit_plan["qty"],
-                    )
-                except OrderSubmissionError as exc:
-                    exit_failure = str(exc)
-                    failed_exits += 1
-                    print(f"ERROR: exit order submission failed: {exit_failure}", file=sys.stderr)
-                    elog.error(
-                        "exit_failed",
-                        f"closing order for {exit_plan['spread']['short_symbol']} "
-                        f"rejected: {exit_failure}",
-                        symbol=symbol,
-                        exit_reason=exit_plan["exit_reason"],
-                    )
-                persist_trade(
-                    supabase,
-                    trade_row(
-                        decision_id=decision_id,
-                        underlying=symbol,
-                        qty=exit_plan["qty"],
-                        credit=None,
-                        max_loss=None,
-                        legs=exit_plan["legs"],
-                        order=exit_order,
-                        failure=exit_failure,
-                        kind="exit",
-                        exit_reason=exit_plan["exit_reason"],
-                    ),
-                )
-                exit_outcomes.append(
-                    {
-                        "short_symbol": exit_plan["spread"]["short_symbol"],
-                        "exit_reason": exit_plan["exit_reason"],
-                        "status": (exit_order or {}).get("status") or "submission_failed",
-                        "alpaca_order_id": (exit_order or {}).get("id"),
-                        "qty": exit_plan["qty"],
-                        "error": exit_failure,
-                    }
-                )
-
-            if plan is not None:
-                # The decision is persisted; the prepared order may now go out. A
-                # submission failure is persisted as a trades row, not swallowed
-                # (rejections are first-class).
-                try:
-                    submitted_order = submit_mleg_order(trading, plan["request"])
-                    elog.info(
-                        "order_submitted",
-                        f"entry order {submitted_order.get('id')} — {plan['qty']}x, "
-                        f"credit {plan['credit']}, max loss {plan['max_loss']}",
-                        symbol=symbol,
-                        alpaca_order_id=submitted_order.get("id"),
-                        status=submitted_order.get("status"),
-                        qty=plan["qty"],
-                        credit=plan["credit"],
-                        max_loss=plan["max_loss"],
-                    )
-                except OrderSubmissionError as exc:
-                    order_failure = str(exc)
-                    print(f"ERROR: order submission failed: {order_failure}", file=sys.stderr)
-                    elog.error(
-                        "order_failed",
-                        f"entry order rejected: {order_failure}",
-                        symbol=symbol,
-                    )
-
-                persist_trade(
-                    supabase,
-                    trade_row(
-                        decision_id=decision_id,
-                        underlying=symbol,
-                        qty=plan["qty"],
-                        credit=plan["credit"],
-                        max_loss=plan["max_loss"],
-                        legs=plan["legs"],
-                        order=submitted_order,
-                        failure=order_failure,
-                    ),
-                )
-
-            status_state = (
-                "trade_executed"
-                if submitted_order is not None or submitted_exits > 0
-                else ("monitoring" if clock_is_open else "idle")
-            )
-            status_detail: dict[str, Any] = {
-                "candidates": len(candidates),
-                "risk_checks": persisted_checks,
-                "approved": sum(1 for v in verdicts if v.approved),
-                "decision_source": draft.decision_source,
-                "exits": {
-                    "open_spreads": len(open_spreads),
-                    "triggered": len(triggered_exits),
-                    "submitted": submitted_exits,
-                    "failed": failed_exits,
-                    "anomalies": len(position_anomalies),
-                },
-            }
-            if plan is not None:
-                status_detail["order"] = (
-                    {
-                        "status": submitted_order.get("status"),
-                        "alpaca_order_id": submitted_order.get("id"),
-                        "qty": plan["qty"],
-                    }
-                    if submitted_order is not None
-                    else {"status": "submission_failed", "error": order_failure}
-                )
-            if exit_outcomes:
-                status_detail["closings"] = exit_outcomes
-            persist_agent_status(
-                supabase,
-                agent_status_row(
-                    state=status_state,
-                    last_cycle_at=datetime.now(UTC),
-                    last_decision_id=decision_id,
-                    detail=status_detail,
-                ),
-            )
-            elog.flush(supabase, decision_id=decision_id)
-        except PersistenceError as exc:
-            print(
-                f"ERROR: persistence failed — cycle not fully logged: {exc}",
-                file=sys.stderr,
-            )
-            elog.error("error", f"cycle persistence failed: {exc}", symbol=symbol)
-            elog.flush(supabase, decision_id=decision_id)
-            print(json.dumps(package, indent=2, default=str))
-            return 1
+    outcome = execute_and_persist(cfg, clients, market, state, gates, plans, draft, settings)
+    decision_id = outcome.decision_id
+    persisted_checks = outcome.persisted_checks
+    persisted_exit_checks = outcome.persisted_exit_checks
+    upserted_positions = outcome.upserted_positions
+    submitted_order = outcome.submitted_order
+    order_failure = outcome.order_failure
+    exit_outcomes = outcome.exit_outcomes
+    if outcome.persistence_failed:
+        print(json.dumps(package, indent=2, default=str))
+        return 1
 
     print(json.dumps(package, indent=2, default=str))
 
@@ -405,16 +148,16 @@ def main() -> int:
         print("No open positions — nothing to manage.", file=sys.stderr)
     for evaluation in exit_evaluations:
         print(f"{'EXIT' if evaluation.triggered else 'hold'}: {evaluation.reason}", file=sys.stderr)
-    for outcome in exit_outcomes:
-        if outcome.get("error"):
+    for closing in exit_outcomes:
+        if closing.get("error"):
             print(
-                f"closing {outcome['short_symbol']}: SUBMISSION FAILED — {outcome['error']}",
+                f"closing {closing['short_symbol']}: SUBMISSION FAILED — {closing['error']}",
                 file=sys.stderr,
             )
         else:
             print(
-                f"closing {outcome['short_symbol']}: id={outcome['alpaca_order_id']} "
-                f"status={outcome['status']} qty={outcome['qty']}",
+                f"closing {closing['short_symbol']}: id={closing['alpaca_order_id']} "
+                f"status={closing['status']} qty={closing['qty']}",
                 file=sys.stderr,
             )
 
