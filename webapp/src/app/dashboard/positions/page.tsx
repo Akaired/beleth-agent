@@ -33,8 +33,6 @@ const FILTERS = [
   { key: "failed", label: "Failed" },
 ] as const;
 
-// --- formatting helpers ---------------------------------------------------
-
 function signedUsd(n: number | null, digits: 0 | 2 = 0): string {
   if (n === null || Number.isNaN(n)) return "—";
   const s = formatUsd(Math.abs(n), digits);
@@ -79,8 +77,6 @@ function totalCredit(p: SpreadPosition): number | null {
     ? p.entryCredit * 100 * p.qty
     : null;
 }
-
-// --- shared bits --------------------------------------------------------
 
 /** The two legs with explicit BUY / SELL, so the operation reads at a glance. */
 function SpreadLegs({
@@ -142,8 +138,6 @@ function DecisionLink({ id }: { id: string | null }) {
   );
 }
 
-// --- open positions ---------------------------------------------------
-
 function OpenCard({ p }: { p: SpreadPosition }) {
   const exp = fmtExpiry(p.expiry);
   const credit = totalCredit(p);
@@ -202,8 +196,6 @@ function OpenCard({ p }: { p: SpreadPosition }) {
     </div>
   );
 }
-
-// --- page --------------------------------------------------------------
 
 export default async function PositionsPage({
   searchParams,

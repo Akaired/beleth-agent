@@ -112,7 +112,6 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* ── agent ─────────────────────────────────────────────────────── */}
       <Panel
         title="Agent"
         right={
@@ -138,8 +137,6 @@ export default async function AdminOverviewPage() {
           <Stat label="Open positions" value={agent?.openPositions ?? "—"} />
         </div>
       </Panel>
-
-      {/* ── community ─────────────────────────────────────────────────── */}
       <Panel
         title="Community"
         right={
@@ -168,8 +165,6 @@ export default async function AdminOverviewPage() {
           </p>
         )}
       </Panel>
-
-      {/* ── content ───────────────────────────────────────────────────── */}
       <Panel
         title="Documentation"
         right={
@@ -196,8 +191,6 @@ export default async function AdminOverviewPage() {
           </p>
         )}
       </Panel>
-
-      {/* ── email ─────────────────────────────────────────────────────── */}
       <Panel
         title="Email"
         right={
@@ -222,8 +215,6 @@ export default async function AdminOverviewPage() {
           </div>
         )}
       </Panel>
-
-      {/* ── environment ──────────────────────────────────────────────── */}
       <Panel title="Environment">
         <ul className="flex flex-col divide-y divide-line">
           <Check

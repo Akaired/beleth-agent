@@ -33,8 +33,6 @@ function pnlTone(n: number | null): string {
   return n > 0 ? "text-up" : n < 0 ? "text-down" : "text-sec";
 }
 
-// --- shared bits ------------------------------------------------------
-
 function StatusPill({ status }: { status: PortfolioInstrument["status"] }) {
   if (status === "live") {
     return (
@@ -74,8 +72,6 @@ function Quote({ quote }: { quote: InstrumentQuote | null }) {
     </div>
   );
 }
-
-// --- cards -----------------------------------------------------------
 
 function LiveCard({ i }: { i: PortfolioInstrument }) {
   const s = i.stats;
@@ -164,8 +160,6 @@ function WatchCard({ i }: { i: PortfolioInstrument }) {
     </article>
   );
 }
-
-// --- page ----------------------------------------------------------
 
 function ParamItem({ label, value }: { label: string; value: string | null }) {
   return (
