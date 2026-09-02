@@ -54,14 +54,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.cycle.account import gather_account_state
 from app.cycle.config import build_clients, load_cycle_config
+from app.cycle.decide import decide
+from app.cycle.gates import build_package, evaluate_gates
 from app.cycle.gather import gather_market_evidence
 from app.cycle.open_orders import (
     working_exit_orders,
 )
 from app.cycle.planning import _prepare_closings, _prepare_order
-from app.decision import decide_from_llm, decide_from_risk_engine
 from app.eventlog import EventLog
-from app.evidence import build_evidence_package
 from app.exits import (
     exit_summary_sentences,
 )
@@ -83,14 +83,6 @@ from app.persistence import (
     trade_row,
 )
 from app.redact import describe_exception
-from app.risk_check import (
-    AccountRiskState,
-    apply_aggregate_cap,
-    apply_vix_regime,
-    block_entries,
-    evaluate_candidates,
-    vix_size_multiplier,
-)
 from app.vrp import best_tradable_tenor
 
 
@@ -105,17 +97,9 @@ def main() -> int:
     trading = clients.trading
 
     market = gather_market_evidence(clients, cfg)
-    last_price = market.underlying_last
-    realized_vols = market.realized_vols
-    vix_regime = market.vix_regime
-    vix_error = market.vix_error
-    term_structure = market.term_structure
     tenor_vrp = market.tenor_vrp
-    next_event = market.next_event
-    blocks = market.blocked_tenors
     blocked_dtes = market.blocked_dtes
     candidates = market.candidates
-    now_et = cfg.now_et
 
     state = gather_account_state(clients, cfg)
     clock_is_open = state.market_open
@@ -126,91 +110,15 @@ def main() -> int:
     triggered_exits = state.triggered_exits
     open_orders = state.open_orders
     open_orders_error = state.open_orders_error
-    open_position_count = state.open_position_count
     equity = state.equity
-    day_pnl = state.day_pnl
-    account_snapshot = state.snapshot
-    risk_state = state.risk_state
-    capital_at_risk = state.capital_at_risk
-    entry_blocks = state.entry_blocks
 
-    package = build_evidence_package(
-        as_of=datetime.now(UTC),
-        market_open=clock_is_open,
-        underlying_symbol=symbol,
-        underlying_last=last_price,
-        realized_vols=realized_vols,
-        vix_regime=vix_regime,
-        vix_error=vix_error,
-        term_structure=term_structure,
-        tenor_vrp=tenor_vrp,
-        next_event=next_event,
-        blocked_tenors=blocks,
-        now_et=now_et,
-        candidates=candidates,
-        open_positions_detail=[e.as_dict() for e in exit_evaluations],
-        account=account_snapshot,
-    )
+    package = build_package(cfg, market, state)
+    gates = evaluate_gates(cfg, market, state)
+    verdicts = gates.verdicts
+    vix_size_mult = gates.vix_size_mult
+    vix_size_reason = gates.vix_size_reason
 
-    # --- risk gate over the candidates the evidence package actually carries -------------
-    risk_state = AccountRiskState(
-        equity=equity,
-        open_positions=open_position_count,
-        day_pnl=round(day_pnl, 2),
-        capital_at_risk=capital_at_risk,  # paired open spreads' known max loss (R5)
-    )
-    verdicts = evaluate_candidates(candidates, risk_state, strategy)
-    # Anomalies and unsizable open spreads reject every new entry (an extra R6 row) —
-    # surfaced in the same risk_checks rows as every other rule, never silent.
-    verdicts = block_entries(verdicts, entry_blocks)
-    # Account-level aggregate cap (R11): committed risk across open positions plus this
-    # candidate's max loss must stay within the configured percent of equity. Inert
-    # (cap 0) until a value is set in config/strategy.yaml.
-    verdicts = apply_aggregate_cap(
-        verdicts,
-        risk_state,
-        max_aggregate_risk_pct=strategy["risk"].get("max_aggregate_risk_pct_of_equity", 0),
-    )
-    # R9 — VIX-regime size taper. Reads the VIX's own 1y percentile: a partial taper
-    # (0 < m < 1) scales the per-trade risk budget in `_prepare_order`; a hard block
-    # (m == 0) rejects every still-approved candidate with a visible R9 row. Inert until
-    # the thresholds are set in config/strategy.yaml `entry.vix_regime`.
-    vix_regime_cfg = strategy.get("entry", {}).get("vix_regime", {})
-    vix_percentile = vix_regime.percentile_1y if vix_regime is not None else None
-    vix_size_mult, vix_size_reason = vix_size_multiplier(
-        vix_percentile,
-        taper_upper_pct=vix_regime_cfg.get("taper_upper_pct", 0),
-        taper_lower_pct=vix_regime_cfg.get("taper_lower_pct", 0),
-        taper_floor_frac=vix_regime_cfg.get("taper_floor_frac", 1.0),
-        block_below_pct=vix_regime_cfg.get("block_below_pct", 0),
-    )
-    verdicts = apply_vix_regime(verdicts, vix_size_mult, vix_size_reason)
-
-    # --- decision: the LLM weighs the evidence only when it has something to weigh ------
-    as_of = datetime.now(UTC)
-    if clock_is_open and any(v.approved for v in verdicts):
-        draft = decide_from_llm(
-            as_of=as_of,
-            symbol=symbol,
-            market_open=clock_is_open,
-            equity=round(equity, 2),
-            day_pnl=round(day_pnl, 2),
-            evidence=package,
-            strategy_config=strategy,
-            verdicts=verdicts,
-            settings=settings,
-        )
-    else:
-        draft = decide_from_risk_engine(
-            as_of=as_of,
-            symbol=symbol,
-            market_open=clock_is_open,
-            equity=round(equity, 2),
-            day_pnl=round(day_pnl, 2),
-            evidence=package,
-            strategy_config=strategy,
-            verdicts=verdicts,
-        )
+    draft = decide(cfg, state, gates, package, settings)
 
     # --- exit path: a triggered close may itself become the cycle's order -----------------
     # Closings are prepared only while the market is open, and only against the open
