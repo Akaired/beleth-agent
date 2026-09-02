@@ -13,7 +13,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { levelForXp } from "@/lib/progress";
-import type { Role } from "@/lib/roles";
+import { toRole, type Role } from "@/lib/roles";
 
 export type AdminUser = {
   userId: string;
@@ -36,12 +36,6 @@ export type AdminUser = {
 };
 
 type Row = Record<string, unknown>;
-
-const ROLES: Role[] = ["public_user", "demo_admin", "master_admin"];
-
-function toRole(v: unknown): Role {
-  return ROLES.includes(v as Role) ? (v as Role) : "public_user";
-}
 
 function toUser(row: Row): AdminUser {
   const xp = Number(row.xp ?? 0);

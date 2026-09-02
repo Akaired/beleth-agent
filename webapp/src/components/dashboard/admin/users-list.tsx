@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/admin/users";
-import type { Role } from "@/lib/roles";
+import { ROLES, isMasterAdmin, type Role } from "@/lib/roles";
 import { RoleChip, timeAgo } from "@/components/dashboard/ui";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -23,7 +23,6 @@ import {
   IconWarning,
 } from "@/components/icons";
 
-const ROLE_ORDER: Role[] = ["public_user", "demo_admin", "master_admin"];
 const ROLE_LABEL: Record<Role, string> = {
   public_user: "Public",
   demo_admin: "Demo admin",
@@ -220,7 +219,7 @@ export function UsersList({
                             Role
                           </p>
                           <div className="flex gap-1">
-                            {ROLE_ORDER.map((r) => {
+                            {ROLES.map((r) => {
                               const active = u.role === r;
                               const lockSelf =
                                 isSelf && r !== "master_admin";
@@ -265,7 +264,7 @@ export function UsersList({
                             </button>
                           )}
 
-                          {!isSelf && u.role !== "master_admin" && (
+                          {!isSelf && !isMasterAdmin(u.role) && (
                             confirmDeleteId === u.userId ? (
                               <span className="inline-flex items-center gap-1.5">
                                 <button

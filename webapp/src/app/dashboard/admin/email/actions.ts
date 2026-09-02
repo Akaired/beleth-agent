@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireSession } from "@/lib/auth";
+import { requireSession, isMasterAdmin } from "@/lib/auth";
 import {
   createBroadcast,
   createTemplate,
@@ -26,7 +26,7 @@ type CreateResult = { ok: true; id: string } | { ok: false; error: string };
 
 async function assertMasterAdmin(): Promise<{ ok: false; error: string } | null> {
   const ctx = await requireSession();
-  if (ctx.role !== "master_admin") {
+  if (!isMasterAdmin(ctx.role)) {
     return { ok: false, error: "Master-admin only." };
   }
   return null;

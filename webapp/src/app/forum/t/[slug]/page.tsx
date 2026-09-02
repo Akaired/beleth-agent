@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { IconLock, IconPin } from "@/components/icons";
-import { getSessionContext, isDemoAdmin } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin, isMasterAdmin } from "@/lib/auth";
 import { fetchForumTopic } from "@/lib/forum/queries";
 import { PostCard } from "@/components/forum/post-card";
 import { ReplyComposer } from "@/components/forum/reply-composer";
@@ -32,7 +32,7 @@ export default async function ForumTopicPage({
   // or delete — so it is never shown the controls (0030 refuses them anyway).
   const isDemo = !!ctx && isDemoAdmin(ctx.role);
   const ownsTopic = !!ctx && !isDemo && ctx.userId === data.topic.author_id;
-  const canModerate = ctx?.role === "master_admin";
+  const canModerate = !!ctx && isMasterAdmin(ctx.role);
 
   return (
     <div className="forum-root flex flex-col gap-5">

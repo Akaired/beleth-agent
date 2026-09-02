@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { fetchAdminDocList, fetchDocCategories } from "@/lib/docs/queries";
 import { DocsAdminList } from "@/components/dashboard/admin/docs-admin-list";
 
@@ -18,7 +18,7 @@ export default async function AdminDocsPage() {
     <DocsAdminList
       pages={pages}
       categories={categories}
-      canWrite={ctx?.role === "master_admin"}
+      canWrite={!!ctx && isMasterAdmin(ctx.role)}
     />
   );
 }

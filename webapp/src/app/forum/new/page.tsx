@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionContext, isDemoAdmin, roleAtLeast } from "@/lib/auth";
+import {getSessionContext, isDemoAdmin, isMasterAdmin} from "@/lib/auth";
 import { fetchForumCategories } from "@/lib/forum/queries";
 import { NewTopicForm } from "@/components/forum/new-topic-form";
 import { IconForum } from "@/components/icons";
@@ -19,7 +19,7 @@ export default async function NewForumTopicPage({
   const allCategories = await fetchForumCategories();
   // A locked category (0028) only takes topics from master_admin; hide it from
   // everyone else so the picker never offers a choice the DB will reject.
-  const canPostLocked = roleAtLeast(ctx.role, "master_admin");
+  const canPostLocked = isMasterAdmin(ctx.role);
   const categories = allCategories.filter(
     (c) => canPostLocked || !c.admin_only_topics,
   );

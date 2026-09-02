@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireSession, roleAtLeast } from "@/lib/auth";
+import { requireSession, roleAtLeast, isMasterAdmin } from "@/lib/auth";
 import { fetchDashboardOverview } from "@/lib/dashboard-queries";
 import { daysLive } from "@/lib/queries";
 import { EquityCurve } from "@/components/equity-curve";
@@ -130,7 +130,7 @@ export default async function DashboardOverview() {
             AGENT PAUSED — the master-admin kill switch is engaged. No new
             decisions are being produced.
           </span>
-          {ctx.role === "master_admin" && (
+          {isMasterAdmin(ctx.role) && (
             <Link
               href="/dashboard/controls"
               className="flex shrink-0 items-center gap-1 underline"

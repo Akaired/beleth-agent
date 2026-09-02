@@ -1,5 +1,5 @@
 import "server-only";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 
 /**
  * Resend client for the admin Email section. The webapp sends no mail itself —
@@ -55,7 +55,7 @@ export class ResendForbidden extends Error {
 
 export async function resendRequest<T>(path: string, init: ReqInit = {}): Promise<T> {
   const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "master_admin") throw new ResendForbidden();
+  if (!ctx || !isMasterAdmin(ctx.role)) throw new ResendForbidden();
 
   const key = getResendKey();
   if (!key) throw new ResendNotConfigured();

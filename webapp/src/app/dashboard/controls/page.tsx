@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireSession, roleAtLeast } from "@/lib/auth";
+import { requireSession, roleAtLeast, isMasterAdmin } from "@/lib/auth";
 import { fetchControlPanel } from "@/lib/dashboard-queries";
 import { ForbiddenPanel, Panel, timeAgo } from "@/components/dashboard/ui";
 import { KillSwitch } from "@/components/dashboard/kill-switch";
@@ -16,7 +16,7 @@ export default async function ControlsPage() {
 
   // demo_admin sees the full operator view; only master_admin can flip the
   // kill switch (the server action and the RPC both re-check this).
-  const canControl = ctx.role === "master_admin";
+  const canControl = isMasterAdmin(ctx.role);
 
   const { agentStatus, hostHistory, recentEvents } = await fetchControlPanel();
   const paused = agentStatus?.paused ?? false;

@@ -9,7 +9,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
 
@@ -17,7 +17,7 @@ type Result = { ok: true } | { ok: false; error: string };
 
 async function assertMasterAdmin(): Promise<{ ok: false; error: string } | null> {
   const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "master_admin") {
+  if (!ctx || !isMasterAdmin(ctx.role)) {
     return { ok: false, error: "Master-admin only." };
   }
   return null;

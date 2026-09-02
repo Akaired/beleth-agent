@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { MasterOnlyPanel, Panel } from "@/components/dashboard/ui";
 import { ResendUnavailable } from "@/components/dashboard/admin/email-ui";
 import { CampaignForm } from "@/components/dashboard/admin/campaign-form";
@@ -20,7 +20,7 @@ export default async function NewCampaignPage() {
   // The admin shell opens to demo_admin so the judges can read the Forum tab; this
   // section is master-admin only and has to say so itself. It reads Resend, whose key
   // is account-wide, and the demo login is public.
-  if (!ctx || ctx.role !== "master_admin") return <MasterOnlyPanel />;
+  if (!ctx || !isMasterAdmin(ctx.role)) return <MasterOnlyPanel />;
 
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 

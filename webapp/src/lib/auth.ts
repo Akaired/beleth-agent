@@ -11,7 +11,7 @@ import type { Role } from "@/lib/roles";
 
 export type AccountStatus = "active" | "deactivated";
 
-export { roleAtLeast, isDemoAdmin, DEMO_READ_ONLY } from "@/lib/roles";
+export { roleAtLeast, isDemoAdmin, isMasterAdmin, DEMO_READ_ONLY } from "@/lib/roles";
 export type { Role } from "@/lib/roles";
 
 export type SessionContext = {

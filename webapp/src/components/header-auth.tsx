@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseAuthCookie } from "@/lib/supabase/auth-cookie";
-import type { Role } from "@/lib/roles";
+import { DEFAULT_ROLE, toRole, type Role } from "@/lib/roles";
 import { AccountDropdown } from "@/components/account-dropdown";
 import { IconSignIn } from "@/components/icons";
 
@@ -30,7 +30,6 @@ const NAME_KEY = "beleth-account-name";
  */
 const LEGACY_EMAIL_KEY = "beleth-account-email";
 const AVATAR_KEY = "beleth-account-avatar";
-const ROLES: Role[] = ["public_user", "demo_admin", "master_admin"];
 
 function readCache(): {
   role: Role;
@@ -39,15 +38,14 @@ function readCache(): {
 } {
   try {
     localStorage.removeItem(LEGACY_EMAIL_KEY);
-    const cached = localStorage.getItem(ROLE_KEY) as Role | null;
-    const role = cached && ROLES.includes(cached) ? cached : "public_user";
+    const role = toRole(localStorage.getItem(ROLE_KEY));
     return {
       role,
       displayName: localStorage.getItem(NAME_KEY),
       avatarUrl: localStorage.getItem(AVATAR_KEY),
     };
   } catch {
-    return { role: "public_user", displayName: null, avatarUrl: null };
+    return { role: DEFAULT_ROLE, displayName: null, avatarUrl: null };
   }
 }
 
@@ -121,7 +119,7 @@ export function HeaderAuth() {
         .eq("user_id", user.id)
         .maybeSingle();
       if (cancelled) return;
-      const role = (profile?.role as Role | undefined) ?? "public_user";
+      const role = toRole(profile?.role);
       const email = user.email ?? null;
       const displayName = (profile?.display_name as string | null) ?? null;
       const avatarUrl = (profile?.avatar_url as string | null) ?? null;

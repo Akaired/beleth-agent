@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSessionContext, roleAtLeast } from "@/lib/auth";
+import {getSessionContext, isMasterAdmin} from "@/lib/auth";
 import { FORUM_PAGE_SIZE, fetchForumCategory } from "@/lib/forum/queries";
 import { TopicListTable } from "@/components/forum/topic-list-table";
 import { NewTopicButton } from "@/components/forum/new-topic-button";
@@ -29,7 +29,7 @@ export default async function ForumCategoryPage({
 
   const canStartTopic =
     !data.category.admin_only_topics ||
-    (!!ctx && roleAtLeast(ctx.role, "master_admin"));
+    (!!ctx && isMasterAdmin(ctx.role));
 
   const pages = Math.max(1, Math.ceil(data.total / FORUM_PAGE_SIZE));
   const clamped = Math.min(page, pages);

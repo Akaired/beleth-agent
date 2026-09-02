@@ -5,7 +5,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
 
@@ -21,7 +21,7 @@ const EXT_BY_TYPE: Record<string, string> = {
 
 export async function POST(req: Request) {
   const ctx = await getSessionContext();
-  if (!ctx || ctx.role !== "master_admin") {
+  if (!ctx || !isMasterAdmin(ctx.role)) {
     return NextResponse.json({ error: "Master-admin only." }, { status: 403 });
   }
 

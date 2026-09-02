@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { requireSession, roleAtLeast } from "@/lib/auth";
+import {requireSession, isMasterAdmin} from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Panel } from "@/components/dashboard/ui";
 import { Stat } from "@/components/dashboard/admin/email-ui";
@@ -64,7 +64,7 @@ function Check({ ok, label, detail }: { ok: boolean; label: string; detail: stri
  */
 export default async function AdminOverviewPage() {
   const ctx = await requireSession();
-  const isMaster = roleAtLeast(ctx.role, "master_admin");
+  const isMaster = isMasterAdmin(ctx.role);
 
   const supabase = await createClient();
   const resendKey = getResendKey();

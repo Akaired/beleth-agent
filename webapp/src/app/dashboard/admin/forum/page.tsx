@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSessionContext } from "@/lib/auth";
+import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { fetchForumCategories, fetchAllForumTopics } from "@/lib/forum/queries";
 import { ForumAdmin } from "@/components/dashboard/admin/forum-admin";
 
@@ -18,7 +18,7 @@ export default async function AdminForumPage() {
     <ForumAdmin
       categories={categories}
       topics={topics}
-      canWrite={ctx?.role === "master_admin"}
+      canWrite={!!ctx && isMasterAdmin(ctx.role)}
     />
   );
 }

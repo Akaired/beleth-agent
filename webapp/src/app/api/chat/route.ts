@@ -12,7 +12,7 @@
  * an unlimited one (see lib/chat/demo-allowance.ts).
  */
 import { NextResponse } from "next/server";
-import { getSessionContext, isDemoAdmin } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin, isMasterAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ChatModelError, runBelethTurn } from "@/lib/chat/aiml";
 import { fetchBelethChatContext } from "@/lib/chat/context";
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
   // Registered accounts get their own daily ceiling. AIML_API_KEY is one key with one
   // free-tier quota shared by every visitor, and self-signup is open, so without this
   // one account can spend the day for everyone — the judges included.
-  if (!demo && ctx.role !== "master_admin") {
+  if (!demo && !isMasterAdmin(ctx.role)) {
     const supabaseForQuota = await createClient();
     if ((await userTurnsUsedToday(supabaseForQuota, ctx.userId)) >= USER_DAILY_MESSAGES) {
       return NextResponse.json({ error: CHAT_QUOTA_EXHAUSTED }, { status: 429 });

@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
-import type { Role } from "@/lib/roles";
+import { isMasterAdmin, type Role } from "@/lib/roles";
 import {
   IconArrowDown,
   IconArrowUp,
@@ -52,7 +52,7 @@ const ROLE_LABEL: Record<Role, string> = {
 
 export function RoleChip({ role }: { role: Role }) {
   const tone =
-    role === "master_admin"
+    isMasterAdmin(role)
       ? "text-acc border-acc/40"
       : role === "demo_admin"
         ? "text-txt border-emphline"

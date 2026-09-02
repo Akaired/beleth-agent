@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isDemoAdmin, requireSession } from "@/lib/auth";
+import { isDemoAdmin, isMasterAdmin, requireSession } from "@/lib/auth";
 import { fetchAccountProfile } from "@/lib/profile";
 import { Panel, RoleChip } from "@/components/dashboard/ui";
 import { AvatarUploader } from "@/components/dashboard/account/avatar-uploader";
@@ -109,7 +109,7 @@ export default async function AccountSettingsPage() {
       {!readOnly && (
         <DangerZone
           email={profile.email}
-          isMasterAdmin={profile.role === "master_admin"}
+          isMasterAdmin={isMasterAdmin(profile.role)}
         />
       )}
     </div>

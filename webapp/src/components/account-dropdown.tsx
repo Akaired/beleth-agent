@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { signOutAction } from "@/app/dashboard/actions";
-import type { Role } from "@/lib/roles";
+import { isMasterAdmin, type Role } from "@/lib/roles";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   IconAccount,
@@ -21,7 +21,7 @@ import {
  * eye for the read-only observer (demo admin), nothing for a plain user.
  */
 function RoleMark({ role }: { role: Role }) {
-  if (role === "master_admin")
+  if (isMasterAdmin(role))
     return (
       <IconCrown size={13} weight="fill" className="text-acc" aria-label="master admin" />
     );
