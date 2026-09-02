@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-from scripts.check_market_data import _match_candidate, _prepare_order
+from app.cycle.planning import _match_candidate, _prepare_order
 
 _STRATEGY = {
     "risk": {"max_risk_per_trade_pct_of_equity": 2.0},
@@ -378,7 +378,7 @@ def test_a_failed_underlying_quote_disables_only_the_itm_rule(monkeypatch):
 
 
 def test_prepare_closings_builds_one_plan_per_triggered_spread():
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     plans, notes = _prepare_closings(
         [_triggered_exit()], working_exits={}, strategy_config=_EXIT_STRATEGY
@@ -398,7 +398,7 @@ def test_prepare_closings_builds_one_plan_per_triggered_spread():
 
 
 def test_prepare_closings_skips_a_spread_with_a_good_resting_close():
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     evaluation = _triggered_exit()
     spread = evaluation.spread
@@ -413,7 +413,7 @@ def test_prepare_closings_skips_a_spread_with_a_good_resting_close():
 
 
 def test_prepare_closings_reprices_a_stale_resting_close():
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     evaluation = _triggered_exit()
     spread = evaluation.spread
@@ -434,7 +434,7 @@ def test_prepare_closings_replaces_only_past_the_reprice_step():
     0.02 step: a resting 0.58 is exactly at the threshold and is left alone, 0.57 is
     past it and is replaced. Too small a step and every cycle re-prices the same order;
     too large and a close stays stuck on a wide book."""
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     spread = _triggered_exit().spread
     leg_set = frozenset({spread.short_symbol, spread.long_symbol})
@@ -450,7 +450,7 @@ def test_prepare_closings_replaces_only_past_the_reprice_step():
 
 def test_prepare_closings_reads_the_reprice_step_from_the_config():
     """It was a module constant — a live trading threshold inside a script."""
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     spread = _triggered_exit().spread
     leg_set = frozenset({spread.short_symbol, spread.long_symbol})
@@ -470,7 +470,7 @@ def test_prepare_closings_reads_the_reprice_step_from_the_config():
 
 def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
     from app.exits import evaluate_exit
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     # A blown-out book: marketable debit would be 2.10, but R5's loss-close price on a
     # 0.90 credit at 2x is 1.80 — never bid more than the rule's own defined max.
@@ -491,7 +491,7 @@ def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
 
 def test_prepare_closings_fails_closed_without_a_measurable_mark():
     from app.exits import evaluate_exit
-    from scripts.check_market_data import _prepare_closings
+    from app.cycle.planning import _prepare_closings
 
     # The ITM rule fires with no usable leg quotes: the close is triggered but cannot
     # be priced, so no order is built and the fail-closed note lands in the summary.
