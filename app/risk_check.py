@@ -45,6 +45,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from app.options.contracts import CONTRACT_MULTIPLIER
 from app.options.spreads import SpreadCandidate
 
 
@@ -112,7 +113,8 @@ def check_r4(candidate: SpreadCandidate) -> RuleResult:
     on the verdict whatever the outcome."""
     max_loss = candidate.max_loss
     breakeven = candidate.breakeven
-    structural_cap = candidate.strike_width * 100  # (width - credit) * 100, credit >= 0
+    # (width - credit) * multiplier, and credit >= 0, so width * multiplier bounds it.
+    structural_cap = candidate.strike_width * CONTRACT_MULTIPLIER
 
     if max_loss is None:
         return RuleResult(

@@ -32,8 +32,7 @@ from datetime import date
 from typing import Any
 
 from app.occ import InvalidOccSymbolError, OccSymbol, parse_occ_symbol
-
-CONTRACT_MULTIPLIER = 100
+from app.options.contracts import CONTRACT_MULTIPLIER
 
 RULE_PROFIT_TARGET = "profit_target"
 RULE_LOSS_MULTIPLE = "loss_credit_multiple"
@@ -84,7 +83,7 @@ class OpenSpread:
         credit = self.entry_credit
         if credit is None:
             return None
-        return (self.strike_width - credit) * 100
+        return (self.strike_width - credit) * CONTRACT_MULTIPLIER
 
     def as_dict(self) -> dict[str, Any]:
         credit = self.entry_credit

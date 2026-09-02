@@ -17,8 +17,7 @@ from dataclasses import dataclass
 from alpaca.data.models.snapshots import OptionsSnapshot
 
 from app.occ import InvalidOccSymbolError, parse_occ_symbol
-
-CONTRACT_MULTIPLIER = 100
+from app.options.contracts import CONTRACT_MULTIPLIER
 
 
 @dataclass(frozen=True)

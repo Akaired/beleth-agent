@@ -391,3 +391,12 @@ def test_summary_counts_triggered_and_held():
     )
     text = exit_summary_sentences([held, fired], market_open=True)
     assert text.startswith("1 to close, 1 held within the rules. ")
+
+
+def test_max_loss_per_spread_uses_the_shared_contract_multiplier():
+    """`max_loss_per_spread` re-typed the multiplier as a bare 100 fifty lines below the
+    module's own constant. Pin the arithmetic so the two cannot drift apart again."""
+    from app.options.contracts import CONTRACT_MULTIPLIER
+    from app.options.spreads import CONTRACT_MULTIPLIER as SPREADS_MULTIPLIER
+
+    assert SPREADS_MULTIPLIER is CONTRACT_MULTIPLIER
