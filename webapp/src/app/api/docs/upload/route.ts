@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { reportError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
@@ -49,7 +50,11 @@ export async function POST(req: Request) {
     .from("docs-media")
     .upload(path, file, { contentType: file.type, upsert: false });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 502 });
+    // Storage errors name buckets, paths and policies; the visitor gets one sentence.
+    return NextResponse.json(
+      { error: reportError("docs upload", error, "Upload failed. Please try again.") },
+      { status: 502 },
+    );
   }
 
   const { data } = supabase.storage.from("docs-media").getPublicUrl(path);

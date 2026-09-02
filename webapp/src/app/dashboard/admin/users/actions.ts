@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles";
+import { reportError } from "@/lib/errors";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -42,7 +43,7 @@ export async function setUserRoleAction(
     p_user_id: userId,
     p_role: role,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("users admin", error) };
   bump();
   return { ok: true };
 }
@@ -55,7 +56,7 @@ export async function deleteUserAction(userId: string): Promise<Result> {
   const { error } = await supabase.rpc("beleth_admin_delete_user", {
     p_user_id: userId,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("users admin", error) };
   bump();
   return { ok: true };
 }
@@ -68,7 +69,7 @@ export async function confirmUserEmailAction(userId: string): Promise<Result> {
   const { error } = await supabase.rpc("beleth_admin_confirm_email", {
     p_user_id: userId,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("users admin", error) };
   bump();
   return { ok: true };
 }

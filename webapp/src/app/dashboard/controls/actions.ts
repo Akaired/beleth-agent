@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { reportError } from "@/lib/errors";
 
 export type ControlActionResult =
   | { ok: true; paused: boolean }
@@ -28,7 +29,7 @@ export async function setAgentPausedAction(
     p_paused: paused,
   });
   if (error) {
-    return { ok: false, error: error.message };
+    return { ok: false, error: reportError("kill switch", error) };
   }
 
   revalidatePath("/dashboard/controls");

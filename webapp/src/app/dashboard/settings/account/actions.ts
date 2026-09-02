@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { REMEMBER_COOKIE } from "@/lib/supabase/remember";
+import { reportError, userFacingAuthError } from "@/lib/errors";
 import type {
   AvatarResult,
   FormState,
@@ -64,7 +65,7 @@ export async function updateProfileAction(
     p_display_name: displayName || null,
     p_bio: bio || null,
   });
-  if (error) return { error: error.message, notice: null };
+  if (error) return { error: reportError("update profile", error), notice: null };
 
   revalidateIdentity(ctx.userId);
   return { error: null, notice: "Profile saved." };
@@ -100,7 +101,8 @@ export async function uploadAvatarAction(
   const up = await supabase.storage
     .from(AVATAR_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
-  if (up.error) return { ok: false, error: up.error.message };
+  if (up.error)
+    return { ok: false, error: reportError("avatar upload", up.error, "Upload failed. Please try again.") };
 
   const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
   const { error: rpcError } = await supabase.rpc("beleth_set_avatar_url", {
@@ -134,7 +136,7 @@ export async function removeAvatarAction(): Promise<AvatarResult> {
   const oldPath = avatarPathFromUrl(current?.avatar_url as string | null);
 
   const { error } = await supabase.rpc("beleth_set_avatar_url", { p_url: null });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("clear avatar", error) };
 
   if (oldPath) {
     await supabase.storage.from(AVATAR_BUCKET).remove([oldPath]).catch(() => {});
@@ -183,7 +185,7 @@ export async function changePasswordAction(
   }
 
   const { error } = await supabase.auth.updateUser({ password: next });
-  if (error) return { error: error.message, notice: null };
+  if (error) return { error: userFacingAuthError(error, "Could not update your password."), notice: null };
 
   return { error: null, notice: "Password updated." };
 }
@@ -217,7 +219,7 @@ export async function deactivateAccountAction(
       ok: false,
       error: error.message.includes("master admin")
         ? "The master-admin account can't be deactivated here."
-        : error.message,
+        : reportError("deactivate account", error),
     };
   }
 
@@ -247,7 +249,7 @@ export async function deleteAccountAction(
       ok: false,
       error: error.message.includes("master admin")
         ? "The master-admin account can't be deleted here."
-        : error.message,
+        : reportError("delete account", error),
     };
   }
 

@@ -11,6 +11,7 @@
 import { revalidatePath } from "next/cache";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { reportError } from "@/lib/errors";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -60,7 +61,7 @@ export async function saveCategoryAction(input: {
   if (error && /beleth_forum_category_upsert/.test(error.message)) {
     ({ error } = await supabase.rpc("beleth_forum_category_upsert", base));
   }
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   bump();
   return { ok: true };
 }
@@ -73,7 +74,7 @@ export async function deleteCategoryAction(id: string): Promise<Result> {
   const { error } = await supabase.rpc("beleth_forum_category_delete", {
     p_id: id,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   bump();
   return { ok: true };
 }
@@ -88,7 +89,7 @@ export async function reorderCategoriesAction(
   const { error } = await supabase.rpc("beleth_forum_category_reorder", {
     p_items: items,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   bump();
   return { ok: true };
 }
@@ -117,7 +118,7 @@ export async function updateTopicAction(
     p_closed: patch.closed ?? null,
     p_title: patch.title ?? null,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   bump();
   return { ok: true };
 }
@@ -130,7 +131,7 @@ export async function deleteTopicAction(topicId: string): Promise<Result> {
   const { error } = await supabase.rpc("beleth_forum_admin_delete_topic", {
     p_topic_id: topicId,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   bump();
   return { ok: true };
 }
@@ -147,7 +148,7 @@ export async function deletePostAction(
   const { error } = await supabase.rpc("beleth_forum_admin_delete_post", {
     p_post_id: postId,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("forum admin", error) };
   revalidatePath(`/forum/t/${topicSlug}`);
   bump();
   return { ok: true };

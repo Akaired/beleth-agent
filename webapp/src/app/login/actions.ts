@@ -3,6 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { userFacingAuthError } from "@/lib/errors";
 import {
   LONG_SESSION_SECONDS,
   REMEMBER_COOKIE,
@@ -59,7 +60,7 @@ export async function signInAction(
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return { error: error.message, notice: null };
+  if (error) return { error: userFacingAuthError(error), notice: null };
 
   redirect(next);
 }
@@ -83,7 +84,8 @@ export async function signUpAction(
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return { error: error.message, notice: null };
+  if (error)
+    return { error: userFacingAuthError(error, "Could not create the account."), notice: null };
 
   // Email confirmation is currently disabled on the project (mailer_autoconfirm),
   // so signUp returns a live session. Keep the fallback in case that changes.
@@ -128,7 +130,8 @@ export async function resetPasswordAction(
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${await originUrl()}/auth/callback?next=/login/update-password`,
   });
-  if (error) return { error: error.message, notice: null };
+  if (error)
+    return { error: userFacingAuthError(error, "Could not send the reset link."), notice: null };
 
   return {
     error: null,

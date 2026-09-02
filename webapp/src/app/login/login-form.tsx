@@ -9,6 +9,7 @@ import {
   type AuthState,
 } from "@/app/login/actions";
 import { createClient } from "@/lib/supabase/client";
+import { userFacingAuthError } from "@/lib/errors";
 import { IconArrowLeft, IconEnvelope, IconLock } from "@/components/icons";
 
 const field =
@@ -100,7 +101,7 @@ export function LoginForm({
       },
     });
     if (error) {
-      setOauthError(error.message);
+      setOauthError(userFacingAuthError(error));
       setOauthPending(false);
     }
   }

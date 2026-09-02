@@ -13,6 +13,7 @@ import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { renderDocMarkdown } from "@/lib/docs/markdown";
 import type { DocStatus } from "@/lib/docs/types";
+import { reportError } from "@/lib/errors";
 
 type Result = { ok: true } | { ok: false; error: string };
 type SaveResult = { ok: true; id: string; slug: string } | { ok: false; error: string };
@@ -79,7 +80,7 @@ export async function setPageStatusAction(
     p_id: id,
     p_status: status,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }
@@ -90,7 +91,7 @@ export async function deletePageAction(id: string): Promise<Result> {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("beleth_docs_delete", { p_id: id });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }
@@ -103,7 +104,7 @@ export async function reorderPagesAction(
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("beleth_docs_reorder", { p_items: items });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }
@@ -124,7 +125,7 @@ export async function saveCategoryAction(input: {
     p_slug: input.slug,
     p_position: input.position,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }
@@ -135,7 +136,7 @@ export async function deleteCategoryAction(id: string): Promise<Result> {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("beleth_docs_category_delete", { p_id: id });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }
@@ -150,7 +151,7 @@ export async function reorderCategoriesAction(
   const { error } = await supabase.rpc("beleth_docs_category_reorder", {
     p_items: items,
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("docs admin", error) };
   bump();
   return { ok: true };
 }

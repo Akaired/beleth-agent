@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { htmlToText, sanitizeForumHtml } from "@/lib/forum/sanitize";
 import type { ForumActionState } from "@/lib/forum/types";
 import { AUTHOR_NAME_MAX, BODY_MAX, TITLE_MAX, TITLE_MIN } from "@/lib/forum/limits";
+import { reportError } from "@/lib/errors";
 
 /**
  * The shared demo account posts under a per-post alias typed into a blocking
@@ -120,7 +121,7 @@ export async function createReplyAction(
     body: cleaned.html,
     ...(alias ? { author_name: alias } : {}),
   });
-  if (error) return { error: error.message };
+  if (error) return { error: reportError("forum", error) };
 
   revalidatePath(`/forum/t/${topicSlug}`);
   return { error: null, ok: true };
@@ -149,7 +150,7 @@ export async function editPostAction(
     p_post_id: postId,
     p_body: cleaned.html,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: reportError("forum", error) };
 
   revalidatePath(`/forum/t/${slug}`);
   return { error: null, ok: true };

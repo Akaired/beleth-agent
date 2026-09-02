@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { REMEMBER_COOKIE } from "@/lib/supabase/remember";
+import { reportError } from "@/lib/errors";
 
 export type ReactivateResult = { ok: true } | { ok: false; error: string };
 
@@ -14,7 +15,7 @@ export async function reactivateAccountAction(): Promise<ReactivateResult> {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("beleth_reactivate_account");
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: reportError("account reactivate", error) };
 
   redirect("/dashboard");
 }

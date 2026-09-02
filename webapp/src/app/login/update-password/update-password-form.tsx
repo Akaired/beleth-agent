@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { userFacingAuthError } from "@/lib/errors";
 import { IconLock } from "@/components/icons";
 
 const field =
@@ -26,7 +27,7 @@ export function UpdatePasswordForm() {
     const { error } = await createClient().auth.updateUser({ password });
     setPending(false);
     if (error) {
-      setError(error.message);
+      setError(userFacingAuthError(error, "Could not update your password."));
       return;
     }
     setDone(true);
