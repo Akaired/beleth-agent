@@ -21,7 +21,6 @@ from __future__ import annotations
 import os
 import resource
 import shutil
-import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -227,10 +226,3 @@ def new_runner_stats() -> dict[str, Any]:
         "net": {},
     }
 
-
-# Kept for callers that time a network round-trip and want to fold it in.
-def timed_call(fn: Callable[[], _T]) -> tuple[_T, int]:
-    """Return ``(result, elapsed_ms)`` for ``fn()``."""
-    start = time.monotonic()
-    result = fn()
-    return result, int((time.monotonic() - start) * 1000)

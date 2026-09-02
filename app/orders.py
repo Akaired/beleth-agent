@@ -41,8 +41,6 @@ from app.exits import OpenSpread
 from app.options.spreads import SpreadCandidate
 from app.redact import describe_exception
 
-CONTRACT_MULTIPLIER = 100  # one option contract covers 100 shares
-
 
 class OrderSubmissionError(RuntimeError):
     """Alpaca refused or failed an order submission. The caller records the failure —

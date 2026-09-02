@@ -210,7 +210,7 @@ Both are expanded in [`docs/strategy.md`](docs/strategy.md), notes C2 and C5.
 │   ├── orders.py          # sizing, pricing, submission of the one mleg order
 │   ├── exits.py           # R5 — pair open legs into spreads, measure against targets
 │   ├── market/            # VIX (FRED), realized vol, IV term structure, macro calendar
-│   ├── options/           # chain fetch, delta filter, IV rank, spread-candidate builder
+│   ├── options/           # chain fetch, delta filter, spread-candidate builder
 │   └── llm/               # OpenAI SDK → OpenRouter client (+ fallback)
 ├── config/
 │   ├── strategy.yaml      # every strategy parameter (never hardcoded)
