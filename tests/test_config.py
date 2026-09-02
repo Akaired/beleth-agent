@@ -61,3 +61,26 @@ def test_strategy_config_loads_expected_shape():
     assert "SPY" in config["universe"]["symbols"]
     assert config["structure"]["short_leg_delta_min"] < config["structure"]["short_leg_delta_max"]
     assert config["risk"]["max_concurrent_positions"] > 0
+
+
+def test_an_empty_environment_variable_means_unset():
+    """Deployment systems that forward a fixed list of variables pass empty strings for
+    the ones nobody configured — compose.yaml does. Without this, an unset optional value
+    is a startup crash instead of a default."""
+    settings = Settings(
+        alpaca_api_key="k",
+        alpaca_secret_key="s",
+        openrouter_key="o",
+        alpaca_http_timeout_seconds="",  # type: ignore[arg-type]
+        openrouter_model="",
+        llm_fallback_key="",
+    )
+    assert settings.alpaca_http_timeout_seconds == 30.0
+    assert settings.openrouter_model  # the module default, not ""
+    assert settings.llm_fallback_key is None
+
+
+def test_an_empty_required_value_is_reported_as_missing_not_as_a_parse_error():
+    with pytest.raises(ValidationError) as exc:
+        Settings(alpaca_api_key="", alpaca_secret_key="s", openrouter_key="o")
+    assert exc.value.errors()[0]["type"] == "missing"

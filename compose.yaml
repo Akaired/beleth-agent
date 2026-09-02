@@ -15,9 +15,31 @@ services:
     # random container id).
     hostname: beleth-agent
     restart: unless-stopped
-    env_file:
-      - .env
+    # Deliberately NOT `env_file: .env`. That file also holds SUPABASE_ACCESS_TOKEN — a
+    # database-admin PAT used only by the local migration runner — plus the webapp's
+    # RESEND_API_KEY and AIML_API_KEY. None of the three is read by anything in this
+    # image, and a container should not hold a credential it cannot use. Compose still
+    # reads .env to resolve the interpolations below, so nothing changes about how the
+    # host is configured; only what crosses into the container narrows.
+    #
+    # `:?` on the required values means a missing secret fails `compose up` loudly
+    # instead of starting an agent that cannot reach its broker.
     environment:
+      ALPACA_API_KEY: ${ALPACA_API_KEY:?set ALPACA_API_KEY in .env}
+      ALPACA_SECRET_KEY: ${ALPACA_SECRET_KEY:?set ALPACA_SECRET_KEY in .env}
+      ALPACA_BASE_URL: ${ALPACA_BASE_URL:-}
+      ALPACA_HTTP_TIMEOUT_SECONDS: ${ALPACA_HTTP_TIMEOUT_SECONDS:-}
+      OPENROUTER_KEY: ${OPENROUTER_KEY:?set OPENROUTER_KEY in .env}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      # Secondary LLM provider. Optional: the decision layer runs on the primary alone.
+      LLM_FALLBACK_KEY: ${LLM_FALLBACK_KEY:-}
+      LLM_FALLBACK_BASE_URL: ${LLM_FALLBACK_BASE_URL:-}
+      LLM_FALLBACK_MODEL: ${LLM_FALLBACK_MODEL:-}
+      # Service-role credentials: the agent is the only writer of the decision log.
+      SUPABASE_URL: ${SUPABASE_URL:?set SUPABASE_URL in .env}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?set SUPABASE_SERVICE_ROLE_KEY in .env}
+      AGENT_VERSION: ${AGENT_VERSION:-dev}
       # Label shown on the backoffice Host panel.
       BELETH_HOST_LABEL: agent-host
     stop_grace_period: 30s

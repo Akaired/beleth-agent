@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import ValidationError, field_validator
+from pydantic import ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -65,6 +65,21 @@ class Settings(BaseSettings):
     # Build identifier written onto every persisted decision. Set AGENT_VERSION in the env
     # (e.g. to a git sha) once the agent loop lands; "dev" is the local default.
     agent_version: str = "dev"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _empty_means_unset(cls, data: Any) -> Any:
+        """An environment variable set to the empty string means "not set".
+
+        Every deployment system that forwards a fixed list of variables ends up passing
+        empty strings for the ones nobody configured — compose.yaml does exactly that
+        for the optional values. Without this, `ALPACA_HTTP_TIMEOUT_SECONDS=""` is a
+        startup crash rather than "use the default", and a required field reports a
+        confusing parse error instead of "missing".
+        """
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v != ""}
+        return data
 
     @field_validator("supabase_url")
     @classmethod
