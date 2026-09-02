@@ -30,8 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files. The template is committed on purpose — it is the only record of which
+# variables the webapp needs, and it holds names, never values.
 .env*
+!.env.example
 
 # vercel
 .vercel
