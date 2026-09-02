@@ -26,6 +26,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from app.config import REPO_ROOT
+from app.redact import describe_exception
 
 if TYPE_CHECKING:
     from app.risk_check import RiskVerdict
@@ -651,7 +652,7 @@ def _run_llm_turns(
                 args=None,
                 texts=texts,
                 usage=usage,
-                failure=f"{type(exc).__name__}: {exc}"[:300],
+                failure=describe_exception(exc),
                 rate_limited=_is_rate_limit(exc),
             )
         usage = _accumulate_usage(usage, response)

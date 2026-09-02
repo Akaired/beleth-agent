@@ -39,6 +39,7 @@ from alpaca.trading.requests import LimitOrderRequest, OptionLegRequest
 
 from app.exits import OpenSpread
 from app.options.spreads import SpreadCandidate
+from app.redact import describe_exception
 
 CONTRACT_MULTIPLIER = 100  # one option contract covers 100 shares
 
@@ -307,5 +308,5 @@ def submit_mleg_order(trading_client: Any, request: LimitOrderRequest) -> dict[s
     try:
         order = trading_client.submit_order(request)
     except Exception as exc:
-        raise OrderSubmissionError(f"{type(exc).__name__}: {exc}") from exc
+        raise OrderSubmissionError(describe_exception(exc, limit=1000)) from exc
     return order.model_dump(mode="json")

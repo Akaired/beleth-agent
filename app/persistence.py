@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from app.config import Settings
+from app.redact import redact
 
 if TYPE_CHECKING:
     from app.decision import DecisionDraft
@@ -151,10 +152,10 @@ def _request(
                 json=json_body,
             )
     except httpx.HTTPError as exc:
-        raise PersistenceRequestError(f"Supabase {method} {url} failed: {exc}") from exc
+        raise PersistenceRequestError(redact(f"Supabase {method} {url} failed: {exc}")) from exc
     if response.status_code >= 300:
         raise PersistenceRequestError(
-            f"Supabase {method} {url} -> HTTP {response.status_code}: {response.text[:500]}"
+            redact(f"Supabase {method} {url} -> HTTP {response.status_code}: {response.text[:500]}")
         )
     if not response.content:
         return None

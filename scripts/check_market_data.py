@@ -114,6 +114,7 @@ from app.persistence import (
     supabase_config_from_settings,
     trade_row,
 )
+from app.redact import describe_exception
 from app.risk_check import (
     AccountRiskState,
     apply_aggregate_cap,
@@ -278,7 +279,7 @@ def _underlying_prices_for_spreads(
             prices[root] = None
             print(
                 f"WARNING: last price for {root} unavailable "
-                f"({type(exc).__name__}: {exc}) — its short-leg ITM exit rule "
+                f"({describe_exception(exc)}) — its short-leg ITM exit rule "
                 "cannot fire this cycle.",
                 file=sys.stderr,
             )
@@ -588,7 +589,7 @@ def main() -> int:
             leg_quotes = fetch_latest_quotes(option_client, leg_symbols)
         except Exception as exc:  # noqa: BLE001 — unquotable legs must not kill the cycle
             print(
-                f"WARNING: quotes for open legs unavailable ({type(exc).__name__}: {exc}) "
+                f"WARNING: quotes for open legs unavailable ({describe_exception(exc)}) "
                 "— the P/L exit rules cannot fire this cycle (the ITM rule still can).",
                 file=sys.stderr,
             )
@@ -627,7 +628,7 @@ def main() -> int:
                 trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True))
             )
         except Exception as exc:  # noqa: BLE001 — unknown order state must not cause more orders
-            open_orders_error = f"{type(exc).__name__}: {exc}"
+            open_orders_error = describe_exception(exc)
             print(
                 "WARNING: cannot list open orders "
                 f"({open_orders_error}) — no closings and no new entries this cycle "
@@ -919,7 +920,7 @@ def main() -> int:
                         except Exception as exc:
                             raise OrderSubmissionError(
                                 f"could not cancel stale closing order {replace_order_id}: "
-                                f"{type(exc).__name__}: {exc}"
+                                f"{describe_exception(exc)}"
                             ) from exc
                         elog.info(
                             "exit_repriced",

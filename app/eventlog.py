@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.redact import describe_exception
+
 LEVELS = ("debug", "info", "warn", "error")
 
 
@@ -93,5 +95,9 @@ class EventLog:
             persist_events(config, rows)
             return len(rows)
         except Exception as exc:  # noqa: BLE001 — the event log must never be fatal
-            print(f"WARNING: agent_events flush failed ({exc}) — {len(rows)} dropped", flush=True)
+            print(
+                f"WARNING: agent_events flush failed ({describe_exception(exc)}) — "
+                f"{len(rows)} dropped",
+                flush=True,
+            )
             return 0
