@@ -225,4 +225,3 @@ def new_runner_stats() -> dict[str, Any]:
         "last_symbol": None,
         "net": {},
     }
-

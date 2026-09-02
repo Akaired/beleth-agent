@@ -45,7 +45,6 @@ from __future__ import annotations
 import json
 import math
 import sys
-import uuid
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -87,6 +86,7 @@ from app.market.underlying import fetch_daily_closes, fetch_last_price
 from app.market.vix import VixDataUnavailable, fetch_vix_history, summarize_regime
 from app.options.chain import fetch_chain_for_ladder, fetch_latest_quotes
 from app.options.spreads import SpreadCandidate, build_candidates
+from app.order_ids import is_agent_id, is_exit_id, new_entry_id, new_exit_id
 from app.orders import (
     OrderSubmissionError,
     build_closing_mleg_order,
@@ -171,7 +171,7 @@ def _classify_open_order(order: Any) -> str:
     carry no readable intent (nested-leg fields have proved unreliable on the paper
     API — resting orders whose leg intents never reach the cycle), an order the agent
     created itself is classified by the client order id
-    it stamps on submission: entries carry ``beleth-``, closings ``beleth-exit-``. A
+    it stamps on submission (see ``app/order_ids.py``). A
     foreign order with unreadable intents is ``"unknown"`` — callers treat it as
     opening risk (fail-closed), never as a closing.
     """
@@ -181,9 +181,11 @@ def _classify_open_order(order: Any) -> str:
     if any("to_close" in intent for intent in intents):
         return "close"
     client_order_id = _client_order_id(order)
-    if client_order_id.startswith("beleth-exit-"):
+    # Order matters: every exit id also starts with the entry prefix. `is_exit_id` is
+    # asked first for that reason — see app/order_ids.py.
+    if is_exit_id(client_order_id):
         return "close"
-    if client_order_id.startswith("beleth-"):
+    if is_agent_id(client_order_id):
         return "entry"
     return "unknown"
 
@@ -343,7 +345,7 @@ def _prepare_closings(
             spread,
             spread.qty,
             limit_price,
-            client_order_id=f"beleth-exit-{uuid.uuid4().hex}",
+            client_order_id=new_exit_id(),
         )
         plans.append(
             {
@@ -448,9 +450,7 @@ def _prepare_order(
             f"slippage {slippage:.2f}) — fail-closed."
         )
 
-    request = build_mleg_order(
-        candidate, qty, limit_price, client_order_id=f"beleth-{uuid.uuid4().hex}"
-    )
+    request = build_mleg_order(candidate, qty, limit_price, client_order_id=new_entry_id())
     note = (
         f" One multi-leg order ({qty} spread(s) at a {abs(limit_price):.2f} net-credit "
         f"limit — {slippage:.2f} slippage off the {credit:.2f} measured mid) is being "
