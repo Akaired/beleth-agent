@@ -10,6 +10,7 @@ import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
 import { MEDIA_MAX_BYTES, describeMaxBytes } from "@/lib/limits";
+import { FORUM_MEDIA_BUCKET } from "@/lib/schema";
 
 export const runtime = "nodejs";
 
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
   const path = `${ctx.userId}/${randomUUID()}.${ext}`;
   const supabase = await createClient();
   const { error } = await supabase.storage
-    .from("forum-media")
+    .from(FORUM_MEDIA_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
   if (error) {
     // Storage errors name buckets, paths and policies; the visitor gets one sentence.
@@ -63,6 +64,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data } = supabase.storage.from("forum-media").getPublicUrl(path);
+  const { data } = supabase.storage.from(FORUM_MEDIA_BUCKET).getPublicUrl(path);
   return NextResponse.json({ url: data.publicUrl });
 }

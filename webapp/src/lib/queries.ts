@@ -4,6 +4,7 @@
  * dashboard queries documented in db/README.md.
  */
 import { DataUnavailableError, restCount, restGet } from "@/lib/supabase";
+import { AGENT_STATUS_COLS, AGENT_STATUS_ID } from "@/lib/schema";
 
 export type DecisionRow = {
   id: string;
@@ -124,8 +125,8 @@ export async function fetchHomepageData(): Promise<HomepageData> {
       limit: "1",
     }),
     restGet<AgentStatusRow>("agent_status", {
-      select: "state,paused,last_cycle_at,detail",
-      id: "eq.1",
+      select: AGENT_STATUS_COLS,
+      id: `eq.${AGENT_STATUS_ID}`,
       limit: "1",
     }).catch(() => [] as AgentStatusRow[]),
     // Open spreads = short-side legs in `positions`, the same definition the

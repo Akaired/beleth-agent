@@ -100,6 +100,14 @@ export async function fetchAccountSnapshot(): Promise<AccountSnapshot> {
  */
 const ALPACA_TIMEOUT_MS = 8_000;
 
+/**
+ * Data-cache window for every Alpaca call. A burst of range switches or page renders
+ * collapses to one upstream hit per minute — the account and the portfolio history do
+ * not move faster than that, and the paper API is rate limited. It was written out at
+ * each of the three fetches.
+ */
+const ALPACA_CACHE_SECONDS = 60;
+
 function alpacaCreds(): { key: string; secret: string } {
   const key = process.env.ALPACA_API_KEY;
   const secret = process.env.ALPACA_SECRET_KEY;
@@ -117,7 +125,7 @@ async function alpacaGet<T>(path: string): Promise<T> {
   try {
     res = await fetch(`${alpacaBaseUrl()}${path}`, {
       headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
-      next: { revalidate: 60 },
+      next: { revalidate: ALPACA_CACHE_SECONDS },
       signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
     });
   } catch (err) {
@@ -196,7 +204,7 @@ export async function fetchStockSnapshots(
   try {
     res = await fetch(url, {
       headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
-      next: { revalidate: 60 },
+      next: { revalidate: ALPACA_CACHE_SECONDS },
       signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
     });
   } catch (err) {
@@ -259,9 +267,7 @@ export async function fetchEquityHistory(
   try {
     res = await fetch(url, {
       headers: { "APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret },
-      // Data-cache the upstream call so a burst of range switches or page
-      // renders collapses to one Alpaca hit per minute.
-      next: { revalidate: 60 },
+      next: { revalidate: ALPACA_CACHE_SECONDS },
       signal: AbortSignal.timeout(ALPACA_TIMEOUT_MS),
     });
   } catch (err) {

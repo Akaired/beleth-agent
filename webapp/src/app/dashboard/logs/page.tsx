@@ -4,6 +4,7 @@ import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchEventLog } from "@/lib/dashboard-queries";
 import { ForbiddenPanel } from "@/components/dashboard/ui";
 import { EventList } from "@/components/dashboard/event-list";
+import { LOGS_PAGE_SIZE } from "@/lib/pagination";
 import {
   DEFAULT_RANGE,
   EVENT_FILTER_SLUGS,
@@ -20,7 +21,6 @@ import {
 
 export const metadata: Metadata = { title: "Logs — Beleth backoffice" };
 
-const PAGE_SIZE = 40;
 
 function toArray(v: string | string[] | undefined): string[] {
   if (!v) return [];
@@ -44,11 +44,11 @@ export default async function LogsPage({
 
   const { rows, total } = await fetchEventLog({
     page,
-    pageSize: PAGE_SIZE,
+    pageSize: LOGS_PAGE_SIZE,
     events: selected,
     since: rangeSince(range),
   });
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / LOGS_PAGE_SIZE));
 
   // Build a query string from the current state with overrides applied.
   const qs = (o: {

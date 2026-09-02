@@ -8,6 +8,7 @@ import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { REMEMBER_COOKIE } from "@/lib/supabase/remember";
 import { reportError, userFacingAuthError } from "@/lib/errors";
+import { AVATAR_BUCKET } from "@/lib/schema";
 import {
   AVATAR_MAX_BYTES,
   BIO_MAX,
@@ -24,7 +25,6 @@ import type {
 /** The shared read-only judges' account may not change its own identity. */
 const DEMO_LOCKED = "The demo account is read-only.";
 
-const AVATAR_BUCKET = "avatars";
 const EXT_BY_TYPE: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",

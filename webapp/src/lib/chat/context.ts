@@ -7,6 +7,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { belethPnl, belethScene, type BelethScene } from "@/lib/beleth";
 import type { AgentStatusRow, DecisionRow } from "@/lib/queries";
+import { AGENT_STATUS_COLS, AGENT_STATUS_ID } from "@/lib/schema";
 
 const DECISION_COLS =
   "id,created_at,as_of,symbol,action,summary,market_open,equity,day_pnl,decision_source,llm_model,evidence";
@@ -20,8 +21,8 @@ export async function fetchBelethChatContext(): Promise<{
     const [statusRes, decisionRes] = await Promise.all([
       supabase
         .from("agent_status")
-        .select("state,paused,last_cycle_at,detail")
-        .eq("id", 1)
+        .select(AGENT_STATUS_COLS)
+        .eq("id", AGENT_STATUS_ID)
         .maybeSingle(),
       supabase
         .from("decisions")

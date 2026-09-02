@@ -9,6 +9,7 @@ import { getSessionContext, isMasterAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { reportError } from "@/lib/errors";
 import { MEDIA_MAX_BYTES, describeMaxBytes } from "@/lib/limits";
+import { DOCS_MEDIA_BUCKET } from "@/lib/schema";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
   const path = `${randomUUID()}.${ext}`;
   const supabase = await createClient();
   const { error } = await supabase.storage
-    .from("docs-media")
+    .from(DOCS_MEDIA_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
   if (error) {
     // Storage errors name buckets, paths and policies; the visitor gets one sentence.
@@ -57,6 +58,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data } = supabase.storage.from("docs-media").getPublicUrl(path);
+  const { data } = supabase.storage.from(DOCS_MEDIA_BUCKET).getPublicUrl(path);
   return NextResponse.json({ url: data.publicUrl });
 }

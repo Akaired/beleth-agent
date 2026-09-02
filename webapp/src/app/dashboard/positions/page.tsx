@@ -11,6 +11,7 @@ import {
   formatUsd,
 } from "@/components/dashboard/ui";
 import { TickerBadge } from "@/components/ticker-badge";
+import { POSITIONS_PAGE_SIZE } from "@/lib/pagination";
 import {
   IconArrowDown,
   IconArrowRight,
@@ -23,7 +24,6 @@ import {
 
 export const metadata: Metadata = { title: "Positions — Beleth backoffice" };
 
-const HISTORY_PAGE_SIZE = 20;
 
 const FILTERS = [
   { key: undefined, label: "All" },
@@ -246,11 +246,11 @@ export default async function PositionsPage({
     ? history.filter((p) => p.state === stateFilter)
     : history;
 
-  const pages = Math.max(1, Math.ceil(filtered.length / HISTORY_PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(filtered.length / POSITIONS_PAGE_SIZE));
   const clamped = Math.min(page, pages);
   const rows = filtered.slice(
-    (clamped - 1) * HISTORY_PAGE_SIZE,
-    clamped * HISTORY_PAGE_SIZE,
+    (clamped - 1) * POSITIONS_PAGE_SIZE,
+    clamped * POSITIONS_PAGE_SIZE,
   );
   const qs = (p: number) =>
     `?${stateFilter ? `state=${stateFilter}&` : ""}page=${p}`;

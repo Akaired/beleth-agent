@@ -44,6 +44,8 @@ import {
 import type { SpreadPosition } from "@/lib/positions";
 import type { HostHistoryPoint } from "@/lib/host";
 import type { AgentEvent } from "@/lib/events";
+import { AGENT_STATUS_COLS, AGENT_STATUS_ID } from "@/lib/schema";
+import { DECISIONS_PAGE_SIZE } from "@/lib/pagination";
 import {
   deriveOrderOutcome,
   type AgentStatusRow,
@@ -191,8 +193,8 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
       .maybeSingle(),
     supabase
       .from("agent_status")
-      .select("state,paused,last_cycle_at,detail")
-      .eq("id", 1)
+      .select(AGENT_STATUS_COLS)
+      .eq("id", AGENT_STATUS_ID)
       .maybeSingle(),
     supabase
       .from("decisions")
@@ -341,7 +343,7 @@ export async function fetchDecisionHistory(opts: {
   action?: "trade" | "no_trade";
 }): Promise<DecisionHistoryPage> {
   const page = Math.max(1, opts.page ?? 1);
-  const pageSize = opts.pageSize ?? 50;
+  const pageSize = opts.pageSize ?? DECISIONS_PAGE_SIZE;
   const from = (page - 1) * pageSize;
 
   const supabase = await createClient();
@@ -490,8 +492,8 @@ export async function fetchControlPanel(): Promise<ControlPanel> {
   const [status, host, recent] = await Promise.all([
     supabase
       .from("agent_status")
-      .select("state,paused,last_cycle_at,detail")
-      .eq("id", 1)
+      .select(AGENT_STATUS_COLS)
+      .eq("id", AGENT_STATUS_ID)
       .maybeSingle(),
     supabase
       .from("host_metrics")

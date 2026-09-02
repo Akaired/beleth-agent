@@ -15,6 +15,7 @@ import {
   updateTopicAction,
 } from "@/app/dashboard/admin/forum/actions";
 import { ForumCategoryModal } from "@/components/dashboard/admin/forum-category-modal";
+import { FORUM_PAGE_SIZE } from "@/lib/pagination";
 import {
   IconCheck,
   IconDragHandle,
@@ -30,7 +31,6 @@ import {
   IconWarning,
 } from "@/components/icons";
 
-const TOPICS_PER_PAGE = 20;
 
 type ActionResult = { ok: boolean; error?: string };
 
@@ -319,11 +319,11 @@ function TopicsSection({
     });
   }, [topics, q, catFilter]);
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / TOPICS_PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / FORUM_PAGE_SIZE));
   const clampedPage = Math.min(page, pageCount - 1);
   const rows = filtered.slice(
-    clampedPage * TOPICS_PER_PAGE,
-    clampedPage * TOPICS_PER_PAGE + TOPICS_PER_PAGE,
+    clampedPage * FORUM_PAGE_SIZE,
+    clampedPage * FORUM_PAGE_SIZE + FORUM_PAGE_SIZE,
   );
 
   return (

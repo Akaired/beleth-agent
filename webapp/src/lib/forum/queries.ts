@@ -16,7 +16,9 @@ import type {
   ForumTopicListItem,
 } from "@/lib/forum/types";
 
-export const FORUM_PAGE_SIZE = 20;
+import { FORUM_PAGE_SIZE } from "@/lib/pagination";
+
+export { FORUM_PAGE_SIZE };
 
 const TOPIC_LIST_COLS =
   "id,slug,title,author_id,author_name,created_at,last_posted_at,reply_count,view_count,pinned,closed,category_id";

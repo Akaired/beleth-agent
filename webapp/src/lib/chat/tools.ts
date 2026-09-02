@@ -11,6 +11,7 @@ import "server-only";
 import type { createClient } from "@/lib/supabase/server";
 import { fetchAccountSnapshot, fetchSpreadPositions } from "@/lib/alpaca";
 import { METHODOLOGY_TEXT } from "@/lib/chat/methodology";
+import { AGENT_STATUS_ID } from "@/lib/schema";
 
 type SupabaseSSR = Awaited<ReturnType<typeof createClient>>;
 
@@ -111,7 +112,7 @@ const TOOLS: ToolDef[] = [
         supabase
           .from("agent_status")
           .select("state,paused,last_cycle_at")
-          .eq("id", 1)
+          .eq("id", AGENT_STATUS_ID)
           .maybeSingle(),
         supabase
           .from("decisions")
