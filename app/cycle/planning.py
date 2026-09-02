@@ -13,9 +13,14 @@ trade says why, in the same place a cycle that traded says what it did.
 from __future__ import annotations
 
 import math
+import sys
+from dataclasses import replace
 from typing import Any
 
-from app.exits import ExitEvaluation
+from app.cycle.context import AccountState, CycleConfig, GateOutcome, MarketEvidence, OrderPlans
+from app.cycle.open_orders import working_exit_orders
+from app.decision import DecisionDraft
+from app.exits import ExitEvaluation, exit_summary_sentences
 from app.options.spreads import SpreadCandidate
 from app.order_ids import new_entry_id, new_exit_id
 from app.orders import (
@@ -246,3 +251,72 @@ def _prepare_order(
         },
         note,
     )
+
+
+def plan_orders(
+    cfg: CycleConfig,
+    market: MarketEvidence,
+    state: AccountState,
+    gates: GateOutcome,
+    draft: DecisionDraft,
+) -> tuple[OrderPlans, DecisionDraft]:
+    """Everything this cycle may send, and the decision text that goes with it.
+
+    Nothing is submitted here. The plans are built before the decision row is written
+    and sent after it, which is the whole reason planning and execution are separate
+    stages: an order live at the broker with no decision row is the one state this
+    project must never produce.
+
+    The draft comes back amended, because what the cycle *did* has to be visible in the
+    sentence it persists:
+
+    * the order note — the size and limit that were sent, or the fail-closed reason
+      nothing was;
+    * R9's reason whenever the taper was not neutral, so a smaller trade or a stated
+      "no" is never silent;
+    * the exit sentences first, because managing open positions outranks new entries;
+    * `action='trade'` when a close is going out, since closing a spread is itself a
+      trade the dashboard must show as one — an exit-only cycle has no entry candidate.
+
+    `gates.vix_size_mult` is passed to `_prepare_order` explicitly. Its default there is
+    1.0, so forgetting it would double the size in a tapered regime with nothing in the
+    log to show for it.
+    """
+    exit_plans: list[dict[str, Any]] = []
+    exit_notes = ""
+    if state.triggered_exits and state.market_open:
+        if state.open_orders_error:
+            # Fail-closed against duplicates: without the order book a resting close
+            # cannot be ruled out. The rule stays triggered and re-arms next cycle.
+            print(
+                "WARNING: open orders unavailable — closings are not sent this cycle "
+                "(fail-closed); they re-arm next cycle.",
+                file=sys.stderr,
+            )
+        else:
+            exit_plans, exit_notes = _prepare_closings(
+                state.triggered_exits,
+                working_exits=working_exit_orders(state.open_orders),
+                strategy_config=cfg.strategy,
+            )
+
+    entry: dict[str, Any] | None = None
+    if draft.action == "trade" and draft.chosen_candidate is not None:
+        entry, order_note = _prepare_order(
+            draft.chosen_candidate,
+            market.candidates,
+            equity=state.equity,
+            strategy_config=cfg.strategy,
+            risk_pct_multiplier=gates.vix_size_mult,
+        )
+        draft = replace(draft, summary=draft.summary + order_note)
+    if gates.vix_size_mult != 1.0:
+        draft = replace(draft, summary=draft.summary + " " + gates.vix_size_reason)
+
+    exit_sentences = exit_summary_sentences(state.exit_evaluations, market_open=state.market_open)
+    if exit_sentences or exit_notes:
+        draft = replace(draft, summary=exit_sentences + exit_notes + draft.summary)
+    if exit_plans:
+        draft = replace(draft, action="trade")
+
+    return OrderPlans(entry=entry, exits=exit_plans, exit_notes=exit_notes), draft

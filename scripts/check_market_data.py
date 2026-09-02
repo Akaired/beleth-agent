@@ -44,7 +44,6 @@ from __future__ import annotations
 
 import json
 import sys
-from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -57,14 +56,8 @@ from app.cycle.config import build_clients, load_cycle_config
 from app.cycle.decide import decide
 from app.cycle.gates import build_package, evaluate_gates
 from app.cycle.gather import gather_market_evidence
-from app.cycle.open_orders import (
-    working_exit_orders,
-)
-from app.cycle.planning import _prepare_closings, _prepare_order
+from app.cycle.planning import plan_orders
 from app.eventlog import EventLog
-from app.exits import (
-    exit_summary_sentences,
-)
 from app.orders import (
     OrderSubmissionError,
     submit_mleg_order,
@@ -108,64 +101,16 @@ def main() -> int:
     position_anomalies = state.position_anomalies
     exit_evaluations = state.exit_evaluations
     triggered_exits = state.triggered_exits
-    open_orders = state.open_orders
-    open_orders_error = state.open_orders_error
-    equity = state.equity
 
     package = build_package(cfg, market, state)
     gates = evaluate_gates(cfg, market, state)
     verdicts = gates.verdicts
-    vix_size_mult = gates.vix_size_mult
-    vix_size_reason = gates.vix_size_reason
 
     draft = decide(cfg, state, gates, package, settings)
 
-    # --- exit path: a triggered close may itself become the cycle's order -----------------
-    # Closings are prepared only while the market is open, and only against the open
-    # orders listed earlier this cycle; if that listing failed the close is not sent
-    # (fail-closed against duplicates) and re-arms next cycle.
-    exit_plans: list[dict[str, Any]] = []
-    exit_plan_notes = ""
-    if triggered_exits and clock_is_open:
-        if open_orders_error:
-            print(
-                "WARNING: open orders unavailable — closings are not sent this cycle "
-                "(fail-closed); they re-arm next cycle.",
-                file=sys.stderr,
-            )
-        else:
-            exit_plans, exit_plan_notes = _prepare_closings(
-                triggered_exits,
-                working_exits=working_exit_orders(open_orders),
-                strategy_config=strategy,
-            )
-
-    # --- order path: only a 'trade' decision may become an order, and only through the gate
-    # The order is prepared (sized, priced, built) here but submitted only after the
-    # decision row is persisted — no order ever goes out unlogged.
-    plan: dict[str, Any] | None = None
-    if draft.action == "trade" and draft.chosen_candidate is not None:
-        plan, order_note = _prepare_order(
-            draft.chosen_candidate,
-            candidates,
-            equity=equity,
-            strategy_config=strategy,
-            risk_pct_multiplier=vix_size_mult,
-        )
-        draft = replace(draft, summary=draft.summary + order_note)
-    # When R9 tapered the size down or hard-blocked, that is disclosed on the persisted
-    # decision summary — a smaller trade or a "no" for a stated reason, never silent.
-    if vix_size_mult != 1.0:
-        draft = replace(draft, summary=draft.summary + " " + vix_size_reason)
-
-    exit_sentences = exit_summary_sentences(exit_evaluations, market_open=clock_is_open)
-    if exit_sentences or exit_plan_notes:
-        # Open positions come first in the persisted summary: managing them outranks entries.
-        draft = replace(draft, summary=exit_sentences + exit_plan_notes + draft.summary)
-    if exit_plans:
-        # Closing an open spread is itself a trade the dashboard must show as such —
-        # an exit-only cycle is action='trade' with no chosen entry candidate.
-        draft = replace(draft, action="trade")
+    plans, draft = plan_orders(cfg, market, state, gates, draft)
+    plan = plans.entry
+    exit_plans = plans.exits
 
     # --- persistence: every decision, risk-check outcome and position state --
     decision_id = None
