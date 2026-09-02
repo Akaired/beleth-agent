@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
+import requests
 from alpaca.common.enums import BaseURL
 from alpaca.data.historical.option import OptionHistoricalDataClient
 from alpaca.data.historical.stock import StockHistoricalDataClient
@@ -17,6 +18,37 @@ from alpaca.trading.models import Clock, Order, Position, TradeAccount
 from app.config import Settings
 
 _Model = TypeVar("_Model")
+
+
+class _TimeoutSession(requests.Session):
+    """A ``requests`` session that refuses to wait forever.
+
+    alpaca-py builds a bare ``requests.Session`` and calls it with no timeout, so a
+    socket that hangs hangs the whole cycle. The worst case is not a slow cycle: an
+    order can be live at the broker while the process is stuck between
+    ``submit_mleg_order`` and ``persist_trade``, which is exactly the state the
+    persistence-before-submission ordering exists to avoid.
+    """
+
+    def __init__(self, timeout: float) -> None:
+        super().__init__()
+        self._timeout = timeout
+
+    def request(self, *args: Any, **kwargs: Any) -> requests.Response:
+        kwargs.setdefault("timeout", self._timeout)
+        return super().request(*args, **kwargs)
+
+
+def _with_timeout(client: Any, settings: Settings) -> None:
+    """Swap in a session that carries a default timeout.
+
+    Reaching for ``_session`` is reaching into the SDK, so it is done here, once, and
+    only after checking the attribute is what we think it is — a future alpaca-py that
+    renames it leaves the client untouched rather than silently unprotected. The
+    accompanying test fails loudly if that ever happens.
+    """
+    if isinstance(getattr(client, "_session", None), requests.Session):
+        client._session = _TimeoutSession(settings.alpaca_http_timeout_seconds)
 
 
 def model_response(value: _Model | dict[str, Any]) -> _Model:
@@ -72,23 +104,28 @@ def get_trading_client(settings: Settings) -> TradingClient:
         paper=True,
     )
     assert_paper_trading(client)
+    _with_timeout(client, settings)
     return client
 
 
 def get_option_data_client(settings: Settings) -> OptionHistoricalDataClient:
-    return OptionHistoricalDataClient(
+    client = OptionHistoricalDataClient(
         api_key=settings.alpaca_api_key,
         secret_key=settings.alpaca_secret_key,
     )
+    _with_timeout(client, settings)
+    return client
 
 
 def get_stock_data_client(settings: Settings) -> StockHistoricalDataClient:
     """Historical stock bars — used only to compute the underlying's realized volatility
     and read its last price. Read-only market data, no trading surface."""
-    return StockHistoricalDataClient(
+    client = StockHistoricalDataClient(
         api_key=settings.alpaca_api_key,
         secret_key=settings.alpaca_secret_key,
     )
+    _with_timeout(client, settings)
+    return client
 
 
 class NotPaperAccountError(RuntimeError):

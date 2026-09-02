@@ -35,7 +35,15 @@ class Settings(BaseSettings):
 
     alpaca_api_key: str
     alpaca_secret_key: str
+    # A tripwire, not a setting: no client reads this, because letting an environment
+    # variable choose the Alpaca endpoint is exactly what hard constraint #1 forbids.
+    # It exists so that someone who sets ALPACA_BASE_URL to the live endpoint hoping to
+    # flip this project live gets a startup failure instead of silence. `paper=True` in
+    # app/alpaca_client.py is what actually decides, and it is not configurable.
     alpaca_base_url: str = PAPER_BASE_URL
+    # Seconds before an Alpaca HTTP call is abandoned. Applies per request; the SDK
+    # ships with no timeout at all, which lets a hung socket stall a whole cycle.
+    alpaca_http_timeout_seconds: float = 30.0
 
     openrouter_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
@@ -70,6 +78,7 @@ class Settings(BaseSettings):
     @field_validator("alpaca_base_url")
     @classmethod
     def _must_be_paper_endpoint(cls, v: str) -> str:
+        """See the field comment: this refuses a live endpoint, it never selects one."""
         if v.rstrip("/") != PAPER_BASE_URL:
             raise ValueError(
                 f"ALPACA_BASE_URL must be exactly {PAPER_BASE_URL!r} (paper trading). "
