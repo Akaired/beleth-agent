@@ -31,6 +31,11 @@ import {
   spendDemoTurn,
   DEMO_DAILY_MESSAGES,
 } from "@/lib/chat/demo-allowance";
+import {
+  CHAT_QUOTA_EXHAUSTED,
+  USER_DAILY_MESSAGES,
+  userTurnsUsedToday,
+} from "@/lib/chat/quota";
 
 const MAX_MESSAGE_CHARS = 2_000;
 /** Bound a single conversation so a free model's quota is not open-ended. */
@@ -54,6 +59,15 @@ export async function POST(req: Request) {
       { error: DEMO_CHAT_EXHAUSTED, demoExhausted: true },
       { status: 403 },
     );
+  }
+  // Registered accounts get their own daily ceiling. AIML_API_KEY is one key with one
+  // free-tier quota shared by every visitor, and self-signup is open, so without this
+  // one account can spend the day for everyone — the judges included.
+  if (!demo && ctx.role !== "master_admin") {
+    const supabaseForQuota = await createClient();
+    if ((await userTurnsUsedToday(supabaseForQuota, ctx.userId)) >= USER_DAILY_MESSAGES) {
+      return NextResponse.json({ error: CHAT_QUOTA_EXHAUSTED }, { status: 429 });
+    }
   }
 
   let body: { sessionId?: unknown; message?: unknown };

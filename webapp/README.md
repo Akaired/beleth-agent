@@ -81,6 +81,11 @@ trade, edits config, or pauses the agent.
   are optional (defaults in `src/lib/chat/aiml.ts`). AI/ML API's free tier has a
   small **daily request quota** — once it is spent the chat surfaces a clear
   "quota used up, try again later" message.
+- **Quotas:** that upstream quota belongs to one key shared by everyone, and
+  self-signup is open, so each account gets `CHAT_DAILY_MESSAGES` turns per UTC
+  day (default 40, master admin exempt) and the shared demo login gets a smaller
+  per-browser allowance. Both are enforced in the route handler, which is what
+  actually spends the key.
 
 ## Rendering model
 
