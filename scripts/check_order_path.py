@@ -229,9 +229,14 @@ def main() -> int:
         trading.cancel_order_by_id(order_id)
         time.sleep(2)
         current = fetch_order(trading, order_id, filter=GetOrderByIdRequest(nested=True))
-        print(f"after cancel: status={current.status} filled_qty={current.filled_qty}", file=sys.stderr)
+        print(
+            f"after cancel: status={current.status} filled_qty={current.filled_qty}",
+            file=sys.stderr,
+        )
     except Exception as exc:  # noqa: BLE001 — report loudly, the order may need manual cancel
-        print(f"ERROR: cancellation failed ({exc}) — cancel order {order_id} by hand", file=sys.stderr)
+        print(
+            f"ERROR: cancellation failed ({exc}) — cancel order {order_id} by hand", file=sys.stderr
+        )
         return 1
 
     if not sign_confirmed:

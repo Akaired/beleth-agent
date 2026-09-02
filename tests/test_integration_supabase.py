@@ -106,9 +106,7 @@ def test_decision_and_risk_checks_round_trip(supabase_config):
         assert row["strategy_config"]["itest"] is True
 
         assert (
-            persist_risk_checks(
-                supabase_config, decision_id=decision_id, verdicts=[_verdict()]
-            )
+            persist_risk_checks(supabase_config, decision_id=decision_id, verdicts=[_verdict()])
             == 3
         )
         checks = fetch_risk_checks(supabase_config, decision_id)
@@ -245,16 +243,19 @@ def test_exit_trade_rows_and_r5_checks_round_trip(supabase_config):
         )
         evaluation = evaluate_exit(
             spread,
-            short_bid=0.80, short_ask=0.91,
-            long_bid=0.35, long_ask=0.45,
+            short_bid=0.80,
+            short_ask=0.91,
+            long_bid=0.35,
+            long_ask=0.45,
             underlying_last=450.0,
             profit_target_pct=50,
             loss_multiple=2,
             exit_on_short_itm=True,
         )
-        assert persist_exit_checks(
-            supabase_config, decision_id=decision_id, evaluations=[evaluation]
-        ) == 1
+        assert (
+            persist_exit_checks(supabase_config, decision_id=decision_id, evaluations=[evaluation])
+            == 1
+        )
         checks = fetch_risk_checks(supabase_config, decision_id)
         assert [c["rule"] for c in checks] == ["R5"]
         assert checks[0]["passed"] is True and checks[0]["approved"] is False

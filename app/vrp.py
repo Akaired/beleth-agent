@@ -57,7 +57,9 @@ def scan_tenors(
             strike_tolerance_pct=strike_tolerance_pct,
         )
         if atm_iv is None or rv20 is None:
-            results.append(TenorVrp(dte=dte, atm_iv=atm_iv, vrp_vs_rv20=None, passes_threshold=False))
+            results.append(
+                TenorVrp(dte=dte, atm_iv=atm_iv, vrp_vs_rv20=None, passes_threshold=False)
+            )
             continue
         vrp = vrp_points(atm_iv, rv20)
         results.append(

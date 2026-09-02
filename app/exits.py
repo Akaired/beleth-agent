@@ -182,9 +182,7 @@ def pair_open_spreads(
                     }
                 )
                 return
-            index, paired = min(
-                pool, key=lambda item: abs(item[1].occ.strike - short.occ.strike)
-            )
+            index, paired = min(pool, key=lambda item: abs(item[1].occ.strike - short.occ.strike))
             qty = min(remaining, paired.qty)
             key = (short.occ.raw, paired.occ.raw)
             entry = opened.setdefault(
@@ -230,9 +228,7 @@ def pair_open_spreads(
             short_entry_price=row["short_entry_price"],
             long_entry_price=row["long_entry_price"],
         )
-        for row in sorted(
-            opened.values(), key=lambda r: (r["expiry"], r["short_strike"])
-        )
+        for row in sorted(opened.values(), key=lambda r: (r["expiry"], r["short_strike"]))
     ]
     return spreads, anomalies
 
@@ -361,9 +357,7 @@ def evaluate_exit(
     return ExitEvaluation(spread, True, rule, reason, detail)
 
 
-def exit_summary_sentences(
-    evaluations: list[ExitEvaluation], *, market_open: bool
-) -> str:
+def exit_summary_sentences(evaluations: list[ExitEvaluation], *, market_open: bool) -> str:
     """The open-positions paragraph a cycle prepends to its summary: what is open, what
     fires, and — market closed — that the close waits for the next open."""
     if not evaluations:

@@ -19,7 +19,9 @@ import re
 from dataclasses import dataclass
 from datetime import date
 
-_OCC_RE = re.compile(r"^(?P<root>[A-Z]{1,6})(?P<yy>\d{2})(?P<mm>\d{2})(?P<dd>\d{2})(?P<right>[CP])(?P<strike>\d{8})$")
+_OCC_RE = re.compile(
+    r"^(?P<root>[A-Z]{1,6})(?P<yy>\d{2})(?P<mm>\d{2})(?P<dd>\d{2})(?P<right>[CP])(?P<strike>\d{8})$"
+)
 
 
 @dataclass(frozen=True)

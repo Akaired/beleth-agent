@@ -58,9 +58,11 @@ def main() -> int:
         delta_min=structure["short_leg_delta_min"],
         delta_max=structure["short_leg_delta_max"],
     )
-    print(f"\nRelevant contracts after delta filter "
-          f"({structure['short_leg_delta_min']}-{structure['short_leg_delta_max']} delta): "
-          f"{len(relevant)}")
+    print(
+        f"\nRelevant contracts after delta filter "
+        f"({structure['short_leg_delta_min']}-{structure['short_leg_delta_max']} delta): "
+        f"{len(relevant)}"
+    )
     for c in relevant[:10]:
         print(f"  {c.symbol}: delta={c.delta:.3f} iv={c.implied_volatility}")
     if len(relevant) > 10:
@@ -77,7 +79,9 @@ def main() -> int:
     ]
     payload_json = json.dumps(payload)
     approx_tokens = len(payload_json) // 4  # rough chars/4 heuristic, not exact
-    print(f"\nFiltered payload size: {len(payload_json)} chars (~{approx_tokens} tokens, rough estimate)")
+    print(
+        f"\nFiltered payload size: {len(payload_json)} chars (~{approx_tokens} tokens, rough estimate)"
+    )
 
     return 0
 

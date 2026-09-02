@@ -36,9 +36,7 @@ def priced_candidate(strategy):
     trading = get_trading_client(settings)
     assert_paper_trading(trading)
     option_client = get_option_data_client(settings)
-    chain = fetch_chain_for_ladder(
-        option_client, "SPY", strategy["tenor_scan"]["dte_ladder"]
-    )
+    chain = fetch_chain_for_ladder(option_client, "SPY", strategy["tenor_scan"]["dte_ladder"])
     structure = strategy["structure"]
     candidates = build_candidates(
         chain,

@@ -230,7 +230,9 @@ def test_position_rows_handles_null_numerics():
 
 
 def test_agent_status_row_pins_id_to_one_and_omits_paused():
-    row = agent_status_row(state="monitoring", last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=UTC))
+    row = agent_status_row(
+        state="monitoring", last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=UTC)
+    )
     assert row["id"] == 1
     assert row["state"] == "monitoring"
     assert "paused" not in row
@@ -368,8 +370,10 @@ def _open_spread():
 def _held_evaluation():
     return evaluate_exit(
         _open_spread(),
-        short_bid=0.80, short_ask=0.91,
-        long_bid=0.35, long_ask=0.45,
+        short_bid=0.80,
+        short_ask=0.91,
+        long_bid=0.35,
+        long_ask=0.45,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -392,8 +396,10 @@ def test_exit_check_rows_holding_position_passes():
 def test_exit_check_rows_triggered_position_approves_the_close():
     fired = evaluate_exit(
         _open_spread(),
-        short_bid=2.00, short_ask=2.10,
-        long_bid=0.20, long_ask=0.30,
+        short_bid=2.00,
+        short_ask=2.10,
+        long_bid=0.20,
+        long_ask=0.30,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -401,8 +407,10 @@ def test_exit_check_rows_triggered_position_approves_the_close():
     )
     fired = evaluate_exit(
         _open_spread(),
-        short_bid=2.00, short_ask=2.10,
-        long_bid=0.20, long_ask=0.30,
+        short_bid=2.00,
+        short_ask=2.10,
+        long_bid=0.20,
+        long_ask=0.30,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,

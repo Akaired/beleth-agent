@@ -70,8 +70,14 @@ def test_no_candidate_when_no_contract_in_delta_band():
         occ(EXP, "P", 435): FakeSnapshot(FakeGreeks(-0.05), FakeQuote(1.0, 1.2)),
     }
     candidates = build_candidates(
-        chain, underlying="SPY", target_dtes=[30], today_ordinal=TODAY.toordinal(),
-        delta_min=0.15, delta_max=0.25, width_min=5.0, width_max=5.0,
+        chain,
+        underlying="SPY",
+        target_dtes=[30],
+        today_ordinal=TODAY.toordinal(),
+        delta_min=0.15,
+        delta_max=0.25,
+        width_min=5.0,
+        width_max=5.0,
     )
     assert candidates == []
 
@@ -82,8 +88,14 @@ def test_missing_quotes_leave_economics_none_but_still_a_structure():
         occ(EXP, "P", 435): FakeSnapshot(FakeGreeks(-0.10), FakeQuote(None, None)),
     }
     candidates = build_candidates(
-        chain, underlying="SPY", target_dtes=[30], today_ordinal=TODAY.toordinal(),
-        delta_min=0.15, delta_max=0.25, width_min=5.0, width_max=5.0,
+        chain,
+        underlying="SPY",
+        target_dtes=[30],
+        today_ordinal=TODAY.toordinal(),
+        delta_min=0.15,
+        delta_max=0.25,
+        width_min=5.0,
+        width_max=5.0,
     )
     assert len(candidates) == 1
     assert candidates[0].credit is None

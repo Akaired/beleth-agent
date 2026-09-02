@@ -72,9 +72,7 @@ def test_container_mem_v2(monkeypatch, tmp_path):
     def fake_read(p):
         return (tmp_path / p.split("/")[-1]).read_text()
 
-    monkeypatch.setattr(
-        hostinfo.Path, "exists", lambda self: self.name == "memory.current"
-    )
+    monkeypatch.setattr(hostinfo.Path, "exists", lambda self: self.name == "memory.current")
     monkeypatch.setattr(hostinfo, "_read_text", fake_read)
 
     cm = hostinfo._container_mem()
@@ -85,9 +83,7 @@ def test_container_mem_v2(monkeypatch, tmp_path):
 
 def test_container_mem_unlimited_omits_limit(monkeypatch):
     reads = iter(["4096", "max"])
-    monkeypatch.setattr(
-        hostinfo.Path, "exists", lambda self: self.name == "memory.current"
-    )
+    monkeypatch.setattr(hostinfo.Path, "exists", lambda self: self.name == "memory.current")
     monkeypatch.setattr(hostinfo, "_read_text", lambda _p: next(reads))
     cm = hostinfo._container_mem()
     assert "limit_mb" not in cm and "used_pct" not in cm

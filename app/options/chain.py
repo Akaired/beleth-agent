@@ -65,5 +65,8 @@ def fetch_latest_quotes(
     for symbol, quote in quotes.items():
         bid = getattr(quote, "bid_price", None)
         ask = getattr(quote, "ask_price", None)
-        out[symbol] = (float(bid) if bid is not None else None, float(ask) if ask is not None else None)
+        out[symbol] = (
+            float(bid) if bid is not None else None,
+            float(ask) if ask is not None else None,
+        )
     return out

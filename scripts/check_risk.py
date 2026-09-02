@@ -108,7 +108,9 @@ def main() -> int:
         print("No well-formed candidate from the live chain to risk-check.", file=sys.stderr)
     for v in verdicts:
         c = v.candidate
-        tag = "APPROVED" if v.approved else "REJECTED (" + ", ".join(v.as_dict()["rejected_by"]) + ")"
+        tag = (
+            "APPROVED" if v.approved else "REJECTED (" + ", ".join(v.as_dict()["rejected_by"]) + ")"
+        )
         print(
             f"{c['symbol']} {c['right']} {c['expiry']} {c['strikes']} "
             f"max_loss={c['max_loss']} -> {tag}",

@@ -61,9 +61,7 @@ def atm_iv_for_expiry(
         dte = occ.expiry.toordinal() - today_ordinal
         if dte < 0:
             continue
-        by_expiry.setdefault(dte, []).append(
-            (occ.strike, occ.right, snap.implied_volatility)
-        )
+        by_expiry.setdefault(dte, []).append((occ.strike, occ.right, snap.implied_volatility))
 
     if not by_expiry:
         return None

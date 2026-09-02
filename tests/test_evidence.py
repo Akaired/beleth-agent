@@ -26,7 +26,11 @@ def _base_kwargs():
         underlying_last=451.2,
         realized_vols={10: _rv(10, 0.11), 20: _rv(20, 0.134), 30: _rv(30, 0.14)},
         vix_regime=VixRegime(
-            level=15.45, as_of=date(2026, 8, 25), percentile_1y=42.0, rank_1y=30.0, lookback_points=252
+            level=15.45,
+            as_of=date(2026, 8, 25),
+            percentile_1y=42.0,
+            rank_1y=30.0,
+            lookback_points=252,
         ),
         vix_error=None,
         term_structure=TermStructure(CONTANGO, 0.150, 0.180, 7, 45),
@@ -39,7 +43,10 @@ def _base_kwargs():
         now_et=now_et,
         candidates=[],
         account=AccountSnapshot(
-            cash=100000.0, buying_power=400000.0, open_positions=0, day_pnl=0.0,
+            cash=100000.0,
+            buying_power=400000.0,
+            open_positions=0,
+            day_pnl=0.0,
             risk_budget_remaining_today=2000.0,
         ),
     )
@@ -48,8 +55,15 @@ def _base_kwargs():
 def test_package_has_the_agreed_top_level_shape():
     pkg = build_evidence_package(**_base_kwargs())
     assert set(pkg) == {
-        "as_of", "market_open", "underlying", "vix", "vrp", "calendar",
-        "candidates", "open_positions_detail", "account",
+        "as_of",
+        "market_open",
+        "underlying",
+        "vix",
+        "vrp",
+        "calendar",
+        "candidates",
+        "open_positions_detail",
+        "account",
     }
     assert pkg["open_positions_detail"] == []
     assert pkg["underlying"]["realized_vol"] == {"10d": 0.11, "20d": 0.134, "30d": 0.14}

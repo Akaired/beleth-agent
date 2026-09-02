@@ -52,6 +52,4 @@ def realized_vol(
 def realized_vol_for_windows(
     closes: list[float], windows_days: list[int], annualization_trading_days: int = 252
 ) -> dict[int, RealizedVolResult]:
-    return {
-        w: realized_vol(closes, w, annualization_trading_days) for w in windows_days
-    }
+    return {w: realized_vol(closes, w, annualization_trading_days) for w in windows_days}

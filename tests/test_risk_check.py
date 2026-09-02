@@ -281,7 +281,9 @@ def test_block_entries_flips_approved_verdicts_with_an_r10_row_not_r6():
 
 def test_block_entries_keeps_distinct_kinds_and_leaves_rejected_verdicts_untouched():
     already_rejected = evaluate_candidate(
-        make_candidate(max_loss=400.0), state(day_pnl=-3_500.0), STRATEGY  # R7 trips
+        make_candidate(max_loss=400.0),
+        state(day_pnl=-3_500.0),
+        STRATEGY,  # R7 trips
     )
     assert already_rejected.approved is False
     blocks = [
@@ -299,24 +301,31 @@ def test_block_entries_keeps_distinct_kinds_and_leaves_rejected_verdicts_untouch
 
 
 def test_aggregate_cap_is_inert_at_zero():
-    out = apply_aggregate_cap([_approved_verdict()], state(capital_at_risk=99_000.0),
-                              max_aggregate_risk_pct=0)
+    out = apply_aggregate_cap(
+        [_approved_verdict()], state(capital_at_risk=99_000.0), max_aggregate_risk_pct=0
+    )
     assert out[0].approved is True
     assert not any(r.rule == "R11" for r in out[0].results)
 
 
 def test_aggregate_cap_admits_a_candidate_that_stays_within_the_cap():
     # cap = 5% of 100k = $5,000; $2,000 already at risk + $400 candidate = $2,400 < cap.
-    out = apply_aggregate_cap([_approved_verdict(max_loss=400.0)],
-                              state(capital_at_risk=2_000.0), max_aggregate_risk_pct=5)
+    out = apply_aggregate_cap(
+        [_approved_verdict(max_loss=400.0)],
+        state(capital_at_risk=2_000.0),
+        max_aggregate_risk_pct=5,
+    )
     assert out[0].approved is True
     assert not any(r.rule == "R11" for r in out[0].results)
 
 
 def test_aggregate_cap_rejects_with_an_r11_row_when_the_projection_breaches_it():
     # cap = $5,000; $4,800 at risk + $400 candidate = $5,200 > cap -> reject.
-    out = apply_aggregate_cap([_approved_verdict(max_loss=400.0)],
-                              state(capital_at_risk=4_800.0), max_aggregate_risk_pct=5)
+    out = apply_aggregate_cap(
+        [_approved_verdict(max_loss=400.0)],
+        state(capital_at_risk=4_800.0),
+        max_aggregate_risk_pct=5,
+    )
     verdict = out[0]
     assert verdict.approved is False
     r11 = next(r for r in verdict.results if r.rule == "R11")
@@ -327,12 +336,13 @@ def test_aggregate_cap_rejects_with_an_r11_row_when_the_projection_breaches_it()
 
 
 def test_aggregate_cap_leaves_already_rejected_and_unknown_max_loss_verdicts_alone():
-    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0),
-                                  STRATEGY)
-    unknown = evaluate_candidate(make_candidate(credit=None, max_loss=None, breakeven=None),
-                                 state(), STRATEGY)  # R4 already fails this
-    out = apply_aggregate_cap([rejected, unknown], state(capital_at_risk=99_000.0),
-                              max_aggregate_risk_pct=5)
+    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0), STRATEGY)
+    unknown = evaluate_candidate(
+        make_candidate(credit=None, max_loss=None, breakeven=None), state(), STRATEGY
+    )  # R4 already fails this
+    out = apply_aggregate_cap(
+        [rejected, unknown], state(capital_at_risk=99_000.0), max_aggregate_risk_pct=5
+    )
     assert not any(r.rule == "R11" for v in out for r in v.results)
 
 
@@ -411,7 +421,6 @@ def test_apply_vix_regime_hard_block_rejects_with_an_r9_row():
 
 
 def test_apply_vix_regime_hard_block_leaves_already_rejected_verdicts_untouched():
-    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0),
-                                  STRATEGY)
+    rejected = evaluate_candidate(make_candidate(max_loss=400.0), state(day_pnl=-3_500.0), STRATEGY)
     out = apply_vix_regime([rejected], 0.0, "R9 block")
     assert [r.rule for r in out[0].results] == [r.rule for r in rejected.results]

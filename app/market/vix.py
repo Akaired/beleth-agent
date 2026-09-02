@@ -151,9 +151,7 @@ def rank_of(history: list[float], value: float) -> float:
     return (value - lo) / (hi - lo) * 100
 
 
-def summarize_regime(
-    history: list[VixObservation], lookback_trading_days: int
-) -> VixRegime:
+def summarize_regime(history: list[VixObservation], lookback_trading_days: int) -> VixRegime:
     """Latest VIX level plus its percentile and rank within the trailing
     `lookback_trading_days` observations."""
     if not history:

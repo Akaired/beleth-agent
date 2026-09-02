@@ -209,9 +209,7 @@ def decision_row(draft: DecisionDraft, *, agent_version: str = "dev") -> dict[st
     return row
 
 
-def risk_check_rows(
-    decision_id: str, verdicts: Sequence[RiskVerdict]
-) -> list[dict[str, Any]]:
+def risk_check_rows(decision_id: str, verdicts: Sequence[RiskVerdict]) -> list[dict[str, Any]]:
     """One row per (candidate, rule): ``candidate_index`` groups a verdict's rule rows."""
     rows = []
     for index, verdict in enumerate(verdicts):
@@ -595,9 +593,7 @@ def fetch_position(
     *,
     select: str = "symbol,first_seen_at,qty,avg_entry_price",
 ) -> dict[str, Any] | None:
-    data = _request(
-        config, "GET", "positions", params={"select": select, "symbol": f"eq.{symbol}"}
-    )
+    data = _request(config, "GET", "positions", params={"select": select, "symbol": f"eq.{symbol}"})
     return data[0] if data else None
 
 
@@ -673,12 +669,11 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
             ],
             candidate={"symbol": "SPY", "smoke": True},
         )
-        persisted = persist_risk_checks(
-            smoke_config, decision_id=decision_id, verdicts=[verdict]
-        )
+        persisted = persist_risk_checks(smoke_config, decision_id=decision_id, verdicts=[verdict])
         rows = fetch_risk_checks(smoke_config, decision_id)
         results["risk checks written and read back"] = (
-            persisted == 3 and [r["rule"] for r in rows] == ["R4", "R6", "R7"]
+            persisted == 3
+            and [r["rule"] for r in rows] == ["R4", "R6", "R7"]
             and rows[0]["candidate_index"] == 0
             and all(r["candidate_index"] == 0 for r in rows)
             and rows[-1]["passed"] is False
@@ -707,9 +702,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
             ),
         )
         status = fetch_agent_status(smoke_config, select="id,state")
-        results["agent status upserted"] = (
-            status is not None and status.get("state") == "idle"
-        )
+        results["agent status upserted"] = status is not None and status.get("state") == "idle"
 
         delete_decision(smoke_config, decision_id)
         results["cleanup removes the smoke decision"] = (

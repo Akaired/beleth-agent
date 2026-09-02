@@ -53,10 +53,7 @@ def _verdict(*, approved, rules, max_loss=None, candidate=None):
         approved=approved,
         max_loss=(max_loss if max_loss is not None else (400.0 if approved else 900.0)),
         breakeven=450.25,
-        results=[
-            RuleResult(rule, passed, f"{rule} reason", {})
-            for rule, passed in rules
-        ],
+        results=[RuleResult(rule, passed, f"{rule} reason", {}) for rule, passed in rules],
         candidate=candidate if candidate is not None else dict(_CANDIDATE),
     )
 
@@ -130,9 +127,7 @@ def test_calendar_block_beats_vrp_reason():
 
 def test_vrp_reason_quotes_best_tenor_and_threshold():
     draft = _decide(
-        evidence=_evidence(
-            per_tenor=[_tenor(7, 1.6, False), _tenor(30, 1.9, False)]
-        ),
+        evidence=_evidence(per_tenor=[_tenor(7, 1.6, False), _tenor(30, 1.9, False)]),
     )
     assert "best VRP was 1.90 vol points (30 DTE)" in draft.summary
     assert "2.0 vol-point threshold" in draft.summary
@@ -318,9 +313,7 @@ def test_no_approved_candidate_never_calls_the_llm():
 def test_out_of_range_index_is_corrected_then_accepted():
     scripted = _ScriptedLLM(
         _response(tool_args={"action": "trade", "candidate_index": 5, "reasoning": "x"}),
-        _response(
-            tool_args={"action": "trade", "candidate_index": 0, "reasoning": "fine now"}
-        ),
+        _response(tool_args={"action": "trade", "candidate_index": 0, "reasoning": "fine now"}),
     )
     draft = _llm_decide(scripted)
     assert draft.action == "trade"
@@ -469,9 +462,7 @@ def test_rate_limited_primary_is_retried_once_after_a_pause():
 def test_persistent_rate_limit_falls_through_to_the_fallback_provider():
     fake = _RoutingLLM(
         primary=[_RateLimitError("429"), _RateLimitError("429 again")],
-        fallback=[
-            _response(tool_args={"action": "no_trade", "reasoning": "fallback declined"})
-        ],
+        fallback=[_response(tool_args={"action": "no_trade", "reasoning": "fallback declined"})],
     )
     waits: list[float] = []
     draft = _decide_llm(fake, settings=_SETTINGS_FB, sleep_fn=waits.append)

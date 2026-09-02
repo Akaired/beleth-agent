@@ -45,9 +45,7 @@ def deploy_blocked(market_open: bool, *, force: bool) -> tuple[bool, str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Block a container rebuild during market hours."
-    )
+    parser = argparse.ArgumentParser(description="Block a container rebuild during market hours.")
     parser.add_argument(
         "--force",
         action="store_true",

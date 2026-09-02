@@ -156,8 +156,7 @@ def _order_leg_symbols(order: Any) -> set[str]:
 def _order_leg_intents(order: Any) -> set[str]:
     """Leg position intents of an open order, as plain strings (may be absent)."""
     return {
-        str(getattr(leg, "position_intent", "") or "")
-        for leg in getattr(order, "legs", None) or []
+        str(getattr(leg, "position_intent", "") or "") for leg in getattr(order, "legs", None) or []
     }
 
 
@@ -335,8 +334,7 @@ def _prepare_closings(
             resting_limit = resting.get("limit")
             if resting_limit is None or limit_price <= resting_limit + _REPRICE_MIN_STEP:
                 notes.append(
-                    f" {spread.short_symbol}: a closing order is already working — "
-                    "not duplicated."
+                    f" {spread.short_symbol}: a closing order is already working — not duplicated."
                 )
                 continue
             replace_order_id = resting.get("id")
@@ -421,8 +419,7 @@ def _prepare_order(
 
     if qty < 1:
         taper_note = (
-            f", after the R9 VIX taper cut the per-trade budget to "
-            f"{risk_pct_multiplier * 100:.0f}%"
+            f", after the R9 VIX taper cut the per-trade budget to {risk_pct_multiplier * 100:.0f}%"
             if risk_pct_multiplier != 1.0
             else ""
         )
@@ -434,9 +431,7 @@ def _prepare_order(
     if (
         credit is not None
         and credit > 0
-        and not slippage_within_credit_cap(
-            slippage, credit, max_frac_of_credit=max_frac_of_credit
-        )
+        and not slippage_within_credit_cap(slippage, credit, max_frac_of_credit=max_frac_of_credit)
     ):
         return None, (
             f" No order was sent: to be marketable this spread's limit would concede "
@@ -514,9 +509,7 @@ def main() -> int:
     vix_regime = None
     vix_error = None
     try:
-        history = fetch_vix_history(
-            vix_cfg["fred_csv_url"], vix_cfg.get("cboe_fallback_url")
-        )
+        history = fetch_vix_history(vix_cfg["fred_csv_url"], vix_cfg.get("cboe_fallback_url"))
         vix_regime = summarize_regime(history, vix_cfg["lookback_trading_days"])
     except VixDataUnavailable as exc:
         vix_error = str(exc)
@@ -528,7 +521,10 @@ def main() -> int:
     short_iv = atm_iv_for_expiry(chain, min(dte_ladder), today_ordinal, last_price, tol)
     long_iv = atm_iv_for_expiry(chain, max(dte_ladder), today_ordinal, last_price, tol)
     term_structure = classify(
-        short_iv, long_iv, min(dte_ladder), max(dte_ladder),
+        short_iv,
+        long_iv,
+        min(dte_ladder),
+        max(dte_ladder),
         regime_cfg["term_structure_flat_band_iv"],
     )
 
@@ -545,24 +541,19 @@ def main() -> int:
     # --- macro calendar gate --------------------------------------------------------
     events = load_macro_events(cal_cfg["events_file"])
     next_event = next_macro_event(events, now_et)
-    blocks = blocked_tenors(
-        events, dte_ladder, now_et, cal_cfg["block_within_days"]
-    )
+    blocks = blocked_tenors(events, dte_ladder, now_et, cal_cfg["block_within_days"])
     blocked_dtes = {b.dte for b in blocks}
 
     # --- candidates: only for tenors that clear VRP and aren't gate-blocked -------------
     # R2: an inverted term structure blocks every new short-premium position (enforced here,
     # not just reported — the LLM layer must never even see a backwardation candidate).
     backwardation_block = (
-        regime_cfg["block_new_shorts_on_backwardation"]
-        and term_structure.state == "backwardation"
+        regime_cfg["block_new_shorts_on_backwardation"] and term_structure.state == "backwardation"
     )
     tradable_dtes = [
         t.dte
         for t in tenor_vrp
-        if t.passes_threshold
-        and t.dte not in blocked_dtes
-        and not backwardation_block
+        if t.passes_threshold and t.dte not in blocked_dtes and not backwardation_block
     ]
     candidates = build_candidates(
         chain,
@@ -652,8 +643,7 @@ def main() -> int:
     # Each block is tagged with a ``kind`` so the R10 rejection row can tell a resting
     # order apart from a position anomaly apart from an unreadable order book.
     entry_blocks: list[dict[str, str]] = [
-        {"kind": "position_anomaly", "reason": str(a["reason"])}
-        for a in position_anomalies
+        {"kind": "position_anomaly", "reason": str(a["reason"])} for a in position_anomalies
     ]
     entry_blocks += [
         {
@@ -747,9 +737,7 @@ def main() -> int:
     verdicts = apply_aggregate_cap(
         verdicts,
         risk_state,
-        max_aggregate_risk_pct=strategy["risk"].get(
-            "max_aggregate_risk_pct_of_equity", 0
-        ),
+        max_aggregate_risk_pct=strategy["risk"].get("max_aggregate_risk_pct_of_equity", 0),
     )
     # R9 — VIX-regime size taper. Reads the VIX's own 1y percentile: a partial taper
     # (0 < m < 1) scales the per-trade risk budget in `_prepare_order`; a hard block
@@ -880,9 +868,7 @@ def main() -> int:
             )
             approved_n = sum(1 for v in verdicts if v.approved)
             if candidates and approved_n < len(candidates):
-                reject_reasons = sorted(
-                    {r.rule for v in verdicts for r in v.rejections}
-                )
+                reject_reasons = sorted({r.rule for v in verdicts for r in v.rejections})
                 elog.warn(
                     "risk_rejected",
                     f"{approved_n}/{len(candidates)} candidates cleared the risk gate "
@@ -1101,14 +1087,23 @@ def main() -> int:
             file=sys.stderr,
         )
     if regime_cfg["block_new_shorts_on_backwardation"] and term_structure.state == "backwardation":
-        print("Term structure is BACKWARDATION — regime gate blocks new short premium.", file=sys.stderr)
+        print(
+            "Term structure is BACKWARDATION — regime gate blocks new short premium.",
+            file=sys.stderr,
+        )
 
     print("\n--- risk gate ---", file=sys.stderr)
     if not verdicts:
-        print("No candidate reached the risk gate (see the no-trade reason above).", file=sys.stderr)
+        print(
+            "No candidate reached the risk gate (see the no-trade reason above).", file=sys.stderr
+        )
     for v in verdicts:
         c = v.candidate
-        tag = "APPROVED" if v.approved else "REJECTED (" + ", ".join(r.rule for r in v.rejections) + ")"
+        tag = (
+            "APPROVED"
+            if v.approved
+            else "REJECTED (" + ", ".join(r.rule for r in v.rejections) + ")"
+        )
         print(
             f"{c['symbol']} {c['right']} {c['expiry']} {c['strikes']} "
             f"max_loss={c['max_loss']} -> {tag}",

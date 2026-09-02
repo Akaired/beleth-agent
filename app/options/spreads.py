@@ -165,9 +165,7 @@ def _build_one_side(
     breakeven: float | None = None
     if credit is not None:
         max_loss = (strike_width - credit) * CONTRACT_MULTIPLIER
-        breakeven = (
-            short_leg.strike - credit if right == "P" else short_leg.strike + credit
-        )
+        breakeven = short_leg.strike - credit if right == "P" else short_leg.strike + credit
 
     net_quote_width: float | None = None
     if short_leg.quote_width is not None and long_leg.quote_width is not None:
@@ -216,8 +214,15 @@ def build_candidates(
                 continue
             seen.add((dte, right))
             candidate = _build_one_side(
-                underlying, right, legs, dte, expiry_iso,
-                delta_min, delta_max, width_min, width_max,
+                underlying,
+                right,
+                legs,
+                dte,
+                expiry_iso,
+                delta_min,
+                delta_max,
+                width_min,
+                width_max,
             )
             if candidate is not None:
                 out.append(candidate)

@@ -63,6 +63,11 @@ def test_term_structure_from_real_chain_classifies(strategy):
     long_iv = atm_iv_for_expiry(chain, max(ladder), today_ordinal, last, tol)
     assert short_iv is not None and long_iv is not None
 
-    ts = classify(short_iv, long_iv, min(ladder), max(ladder),
-                  strategy["regime"]["term_structure_flat_band_iv"])
+    ts = classify(
+        short_iv,
+        long_iv,
+        min(ladder),
+        max(ladder),
+        strategy["regime"]["term_structure_flat_band_iv"],
+    )
     assert ts.state in {CONTANGO, BACKWARDATION, FLAT}

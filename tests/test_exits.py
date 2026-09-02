@@ -113,26 +113,20 @@ def test_short_pairs_with_the_nearest_protective_strike():
 
 
 def test_naked_short_is_an_anomaly():
-    spreads, anomalies = pair_open_spreads(
-        [pos("SPY260918P00440000", 1, "short", 1.20)]
-    )
+    spreads, anomalies = pair_open_spreads([pos("SPY260918P00440000", 1, "short", 1.20)])
     assert spreads == []
     assert len(anomalies) == 1
     assert "naked exposure" in anomalies[0]["reason"]
 
 
 def test_unpaired_long_is_an_anomaly():
-    spreads, anomalies = pair_open_spreads(
-        [pos("SPY260918P00435000", 1, "long", 0.30)]
-    )
+    spreads, anomalies = pair_open_spreads([pos("SPY260918P00435000", 1, "long", 0.30)])
     assert spreads == []
     assert "unpaired protective" in anomalies[0]["reason"]
 
 
 def test_non_option_position_is_an_anomaly():
-    spreads, anomalies = pair_open_spreads(
-        [pos("SPY", 100, "long", 450.0)]
-    )
+    spreads, anomalies = pair_open_spreads([pos("SPY", 100, "long", 450.0)])
     assert spreads == []
     assert "not a parseable option position" in anomalies[0]["reason"]
 
@@ -156,8 +150,10 @@ def test_profit_target_fires_at_the_exact_threshold():
     # credit 0.90, 50% target -> close at 0.45; mark exactly 0.45 fires.
     e = evaluate_exit(
         make_spread(),
-        short_bid=0.80, short_ask=0.90,  # short mid 0.85
-        long_bid=0.35, long_ask=0.45,    # long mid 0.40 -> mark 0.45
+        short_bid=0.80,
+        short_ask=0.90,  # short mid 0.85
+        long_bid=0.35,
+        long_ask=0.45,  # long mid 0.40 -> mark 0.45
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -172,8 +168,10 @@ def test_between_target_and_loss_close_holds():
     # mark 0.46 is above the 0.45 target and far below the 1.80 loss close: hold.
     e = evaluate_exit(
         make_spread(),
-        short_bid=0.80, short_ask=0.91,
-        long_bid=0.35, long_ask=0.45,
+        short_bid=0.80,
+        short_ask=0.91,
+        long_bid=0.35,
+        long_ask=0.45,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -187,8 +185,10 @@ def test_loss_close_fires_at_the_exact_multiple():
     # mark 1.80 == 2x credit 0.90 fires; short strike NOT breached.
     e = evaluate_exit(
         make_spread(),
-        short_bid=2.00, short_ask=2.10,   # short mid 2.05
-        long_bid=0.20, long_ask=0.30,     # long mid 0.25 -> mark 1.80
+        short_bid=2.00,
+        short_ask=2.10,  # short mid 2.05
+        long_bid=0.20,
+        long_ask=0.30,  # long mid 0.25 -> mark 1.80
         underlying_last=445.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -200,8 +200,10 @@ def test_loss_close_fires_at_the_exact_multiple():
 def test_short_leg_itm_fires_for_puts_below_the_strike():
     e = evaluate_exit(
         make_spread(),
-        short_bid=1.00, short_ask=1.10,
-        long_bid=0.40, long_ask=0.50,
+        short_bid=1.00,
+        short_ask=1.10,
+        long_bid=0.40,
+        long_ask=0.50,
         underlying_last=439.5,  # below the 440 short put strike
         profit_target_pct=50,
         loss_multiple=2,
@@ -213,8 +215,10 @@ def test_short_leg_itm_fires_for_puts_below_the_strike():
 def test_short_leg_itm_fires_for_calls_above_the_strike():
     e = evaluate_exit(
         make_spread(right="C", long_strike=445.0),
-        short_bid=1.00, short_ask=1.10,
-        long_bid=0.40, long_ask=0.50,
+        short_bid=1.00,
+        short_ask=1.10,
+        long_bid=0.40,
+        long_ask=0.50,
         underlying_last=440.5,  # above the 440 short call
         profit_target_pct=50,
         loss_multiple=2,
@@ -227,8 +231,10 @@ def test_short_leg_itm_takes_priority_over_the_loss_close():
     # Loss close also fires, but the defensive rule wins the reason.
     e = evaluate_exit(
         make_spread(),
-        short_bid=2.00, short_ask=2.10,
-        long_bid=0.20, long_ask=0.30,
+        short_bid=2.00,
+        short_ask=2.10,
+        long_bid=0.20,
+        long_ask=0.30,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -241,8 +247,10 @@ def test_short_leg_itm_takes_priority_over_the_loss_close():
 def test_itm_rule_can_be_disabled():
     e = evaluate_exit(
         make_spread(),
-        short_bid=1.00, short_ask=1.10,
-        long_bid=0.40, long_ask=0.50,
+        short_bid=1.00,
+        short_ask=1.10,
+        long_bid=0.40,
+        long_ask=0.50,
         underlying_last=439.5,
         profit_target_pct=50,
         loss_multiple=2,
@@ -255,8 +263,10 @@ def test_missing_leg_quotes_hold_but_itm_still_protects():
     # No usable quotes: the P/L rules cannot fire, the ITM rule still can.
     e = evaluate_exit(
         make_spread(),
-        short_bid=None, short_ask=None,
-        long_bid=None, long_ask=None,
+        short_bid=None,
+        short_ask=None,
+        long_bid=None,
+        long_ask=None,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -269,8 +279,10 @@ def test_missing_leg_quotes_hold_but_itm_still_protects():
 def test_missing_quotes_without_itm_means_hold_with_an_incomplete_measurement():
     e = evaluate_exit(
         make_spread(),
-        short_bid=None, short_ask=None,
-        long_bid=None, long_ask=None,
+        short_bid=None,
+        short_ask=None,
+        long_bid=None,
+        long_ask=None,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -284,8 +296,10 @@ def test_zero_width_quotes_do_not_price_a_mark():
     # bid == ask == 0 is unusable, not a free spread.
     e = evaluate_exit(
         make_spread(),
-        short_bid=0.0, short_ask=0.0,
-        long_bid=0.0, long_ask=0.0,
+        short_bid=0.0,
+        short_ask=0.0,
+        long_bid=0.0,
+        long_ask=0.0,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -298,8 +312,10 @@ def test_zero_width_quotes_do_not_price_a_mark():
 def test_unknown_entry_credit_disables_the_pl_rules():
     e = evaluate_exit(
         make_spread(short_entry=None),
-        short_bid=2.00, short_ask=2.10,
-        long_bid=0.20, long_ask=0.30,
+        short_bid=2.00,
+        short_ask=2.10,
+        long_bid=0.20,
+        long_ask=0.30,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -321,8 +337,10 @@ def test_summary_is_empty_with_no_open_positions():
 def test_summary_reports_held_positions():
     e = evaluate_exit(
         make_spread(),
-        short_bid=0.80, short_ask=0.91,
-        long_bid=0.35, long_ask=0.45,
+        short_bid=0.80,
+        short_ask=0.91,
+        long_bid=0.35,
+        long_ask=0.45,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -335,8 +353,10 @@ def test_summary_reports_held_positions():
 def test_closed_market_says_the_close_waits():
     e = evaluate_exit(
         make_spread(),
-        short_bid=1.00, short_ask=1.10,
-        long_bid=0.40, long_ask=0.50,
+        short_bid=1.00,
+        short_ask=1.10,
+        long_bid=0.40,
+        long_ask=0.50,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -349,8 +369,10 @@ def test_closed_market_says_the_close_waits():
 def test_summary_counts_triggered_and_held():
     held = evaluate_exit(
         make_spread(),
-        short_bid=0.80, short_ask=0.91,
-        long_bid=0.35, long_ask=0.45,
+        short_bid=0.80,
+        short_ask=0.91,
+        long_bid=0.35,
+        long_ask=0.45,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -358,8 +380,10 @@ def test_summary_counts_triggered_and_held():
     )
     fired = evaluate_exit(
         make_spread(short_strike=441.0, long_strike=436.0),
-        short_bid=1.00, short_ask=1.10,
-        long_bid=0.40, long_ask=0.50,
+        short_bid=1.00,
+        short_ask=1.10,
+        long_bid=0.40,
+        long_ask=0.50,
         underlying_last=440.0,
         profit_target_pct=50,
         loss_multiple=2,

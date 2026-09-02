@@ -24,9 +24,7 @@ class IVRankResult:
         return self.history_points >= self.lookback_days
 
 
-def compute_iv_rank(
-    history: list[float], current_iv: float, lookback_days: int
-) -> IVRankResult:
+def compute_iv_rank(history: list[float], current_iv: float, lookback_days: int) -> IVRankResult:
     """Standard IV Rank formula: (current - min) / (max - min) * 100, over `history`.
 
     `history` should already be scoped to the lookback window by the caller (this function
@@ -39,6 +37,4 @@ def compute_iv_rank(
     # No variation in the observed window leaves the rank undefined in the usual sense.
     rank = 0.0 if hi == lo else (current_iv - lo) / (hi - lo) * 100
 
-    return IVRankResult(
-        rank=rank, history_points=len(history), lookback_days=lookback_days
-    )
+    return IVRankResult(rank=rank, history_points=len(history), lookback_days=lookback_days)

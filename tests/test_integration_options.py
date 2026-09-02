@@ -27,7 +27,9 @@ def test_chain_is_non_empty(chain):
 
 
 def test_snapshots_carry_greeks_or_iv(chain):
-    with_data = [s for s in chain.values() if s.greeks is not None or s.implied_volatility is not None]
+    with_data = [
+        s for s in chain.values() if s.greeks is not None or s.implied_volatility is not None
+    ]
     assert with_data, "expected at least some contracts to carry Greeks or IV"
 
 

@@ -192,9 +192,7 @@ def test_prepare_order_uses_the_candidate_dict_numbers_the_gate_saw():
     candidate = _candidate(credit=1.0049, max_loss=400.49)
     chosen = candidate.as_dict()
     assert chosen["credit"] == 1.0049 and chosen["max_loss"] == 400.49
-    plan, _ = _prepare_order(
-        chosen, [candidate], equity=100_000.0, strategy_config=_STRATEGY
-    )
+    plan, _ = _prepare_order(chosen, [candidate], equity=100_000.0, strategy_config=_STRATEGY)
     assert plan is not None
     assert plan["request"].to_request_fields()["qty"] == 4  # floor(2000 / 400.49)
     assert plan["credit"] == 0.98  # floor(1.0049 - 0.02) to the cent
@@ -245,8 +243,10 @@ def _triggered_exit():
     # Mark 0.45 == the 50% profit target on entry credit 0.90 -> close.
     return evaluate_exit(
         spread,
-        short_bid=0.80, short_ask=0.90,
-        long_bid=0.35, long_ask=0.45,
+        short_bid=0.80,
+        short_ask=0.90,
+        long_bid=0.35,
+        long_ask=0.45,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
@@ -298,9 +298,7 @@ def test_leg_set_helpers_fall_back_to_client_order_id_without_leg_intents():
     agent_close = _FakeOrder(leg, client_order_id="beleth-exit-def456")
     foreign = _FakeOrder(leg, client_order_id="manual-order-1")
 
-    assert resting_entry_leg_sets([agent_entry]) == {
-        frozenset({"SPY261009P00742000"})
-    }
+    assert resting_entry_leg_sets([agent_entry]) == {frozenset({"SPY261009P00742000"})}
     assert resting_entry_leg_sets([agent_close]) == set()
     assert resting_entry_leg_sets([foreign]) == {frozenset({"SPY261009P00742000"})}
     assert working_exit_leg_sets([agent_close]) == {frozenset({"SPY261009P00742000"})}
@@ -392,9 +390,7 @@ def test_prepare_closings_builds_one_plan_per_triggered_spread():
     # Priced off the marketable debit (short ask 0.90 - long bid 0.35 = 0.55) + 0.05
     # concession, not the 0.45 mid: a mid-priced close rests unfilled on a wide book.
     assert fields["limit_price"] == 0.60
-    assert [leg["position_intent"] for leg in fields["legs"]] == [
-        "buy_to_close", "sell_to_close"
-    ]
+    assert [leg["position_intent"] for leg in fields["legs"]] == ["buy_to_close", "sell_to_close"]
     assert plan["exit_reason"] == "profit_target"
     assert plan["client_order_id"].startswith("beleth-exit-")
     assert plan["replace_order_id"] is None
@@ -441,16 +437,16 @@ def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
     # 0.90 credit at 2x is 1.80 — never bid more than the rule's own defined max.
     evaluation = evaluate_exit(
         _triggered_exit().spread,
-        short_bid=2.30, short_ask=2.50,
-        long_bid=0.40, long_ask=0.60,
+        short_bid=2.30,
+        short_ask=2.50,
+        long_bid=0.40,
+        long_ask=0.60,
         underlying_last=450.0,
         profit_target_pct=50,
         loss_multiple=2,
         exit_on_short_itm=True,
     )
-    plans, _ = _prepare_closings(
-        [evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY
-    )
+    plans, _ = _prepare_closings([evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY)
     assert plans[0]["request"].to_request_fields()["limit_price"] == 1.80
 
 
@@ -462,17 +458,17 @@ def test_prepare_closings_fails_closed_without_a_measurable_mark():
     # be priced, so no order is built and the fail-closed note lands in the summary.
     evaluation = evaluate_exit(
         _triggered_exit().spread,
-        short_bid=None, short_ask=None,
-        long_bid=None, long_ask=None,
+        short_bid=None,
+        short_ask=None,
+        long_bid=None,
+        long_ask=None,
         underlying_last=439.0,
         profit_target_pct=50,
         loss_multiple=2,
         exit_on_short_itm=True,
     )
     assert evaluation.triggered is True
-    plans, notes = _prepare_closings(
-        [evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY
-    )
+    plans, notes = _prepare_closings([evaluation], working_exits={}, strategy_config=_EXIT_STRATEGY)
     assert plans == []
     assert "no closing order" in notes and "fail-closed" in notes
 

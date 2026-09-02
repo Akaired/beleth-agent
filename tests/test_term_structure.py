@@ -28,7 +28,9 @@ def _chain():
     return {
         occ(SHORT, "C", 450): FakeSnapshot(0.150),
         occ(SHORT, "P", 450): FakeSnapshot(0.160),
-        occ(SHORT, "P", 430): FakeSnapshot(0.190),  # further OTM, higher IV (skew) — ignored for ATM
+        occ(SHORT, "P", 430): FakeSnapshot(
+            0.190
+        ),  # further OTM, higher IV (skew) — ignored for ATM
         occ(LONG, "C", 450): FakeSnapshot(0.180),
         occ(LONG, "P", 450): FakeSnapshot(0.182),
         occ(LONG, "C", 470): FakeSnapshot(0.175),

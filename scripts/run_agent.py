@@ -102,7 +102,9 @@ def runner_config(strategy: Mapping[str, Any]) -> dict[str, float]:
             cfg.get("closed_heartbeat_interval_minutes", DEFAULT_CLOSED_HEARTBEAT_MINUTES)
         ),
         "pause_poll_seconds": float(cfg.get("pause_poll_seconds", DEFAULT_PAUSE_POLL_SECONDS)),
-        "cycle_timeout_seconds": float(cfg.get("cycle_timeout_seconds", DEFAULT_CYCLE_TIMEOUT_SECONDS)),
+        "cycle_timeout_seconds": float(
+            cfg.get("cycle_timeout_seconds", DEFAULT_CYCLE_TIMEOUT_SECONDS)
+        ),
     }
 
 
@@ -272,7 +274,8 @@ def main() -> int:
     write_runner_stats(runner_stats)
 
     print(
-        "beleth runner up: " + ", ".join(symbols)
+        "beleth runner up: "
+        + ", ".join(symbols)
         + f" | open cycles every {cfg['open_cycle_interval_minutes']:.0f} min"
         + f" | closed heartbeat every {cfg['closed_heartbeat_interval_minutes']:.0f} min"
         + f" | cycle timeout {cfg['cycle_timeout_seconds']:.0f} s",
@@ -297,7 +300,9 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 — a clock failure must not kill the loop
             print(f"WARNING: market clock unavailable ({exc}) — retrying in 60 s", flush=True)
             emit_runner_event(
-                supabase, "warn", "clock_unavailable",
+                supabase,
+                "warn",
+                "clock_unavailable",
                 f"market clock unavailable: {exc} — retrying in 60 s",
             )
             chunked_sleep(60, should_stop=stop)
@@ -312,7 +317,9 @@ def main() -> int:
                 flush=True,
             )
             emit_runner_event(
-                supabase, "error", "switch_unreadable",
+                supabase,
+                "error",
+                "switch_unreadable",
                 f"kill switch unreadable ({exc}) — cycles skipped, failing closed",
             )
             paused = True
@@ -321,7 +328,9 @@ def main() -> int:
             if not paused_logged:
                 print("paused via agent_status.paused — cycles suspended (polling)", flush=True)
                 emit_runner_event(
-                    supabase, "warn", "paused",
+                    supabase,
+                    "warn",
+                    "paused",
                     "kill switch engaged — cycles suspended, heartbeat only",
                 )
                 paused_logged = True
@@ -329,7 +338,9 @@ def main() -> int:
             continue
         if paused_logged:
             emit_runner_event(
-                supabase, "info", "resumed",
+                supabase,
+                "info",
+                "resumed",
                 "kill switch cleared — normal evaluation resumes",
             )
         paused_logged = False

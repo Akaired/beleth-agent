@@ -164,9 +164,7 @@ def check_r6(
     max_loss = candidate.max_loss
     per_trade_cap = state.equity * max_risk_per_trade_pct / 100
     pct_of_equity = (
-        max_loss / state.equity * 100
-        if max_loss is not None and state.equity > 0
-        else None
+        max_loss / state.equity * 100 if max_loss is not None and state.equity > 0 else None
     )
 
     detail = {
@@ -289,9 +287,7 @@ def evaluate_candidates(
     return [evaluate_candidate(c, state, strategy_config) for c in candidates]
 
 
-def block_entries(
-    verdicts: list[RiskVerdict], blocks: list[dict[str, str]]
-) -> list[RiskVerdict]:
+def block_entries(verdicts: list[RiskVerdict], blocks: list[dict[str, str]]) -> list[RiskVerdict]:
     """Reject every currently-approved verdict with one extra **R10** row naming the
     account-state problems that block new entries — a resting entry order, unpaired
     option legs, open spreads whose risk cannot be computed, an unreadable order book.
@@ -312,9 +308,7 @@ def block_entries(
         return list(verdicts)
     reasons = [b["reason"] for b in blocks]
     kinds = sorted({b["kind"] for b in blocks})
-    reason_text = (
-        "R10 (entry blocked by account state): " + "; ".join(reasons) + "."
-    )
+    reason_text = "R10 (entry blocked by account state): " + "; ".join(reasons) + "."
     detail = {"kinds": kinds, "reasons": list(reasons)}
     out: list[RiskVerdict] = []
     for verdict in verdicts:

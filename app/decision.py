@@ -166,9 +166,7 @@ def decide_from_risk_engine(
     if not market_open:
         headline = "No trade: the market is closed."
     elif not verdicts:
-        headline = _no_candidate_summary(
-            evidence=evidence, strategy_config=strategy_config
-        )
+        headline = _no_candidate_summary(evidence=evidence, strategy_config=strategy_config)
     else:
         headline = _verdict_summary(verdicts)
     return DecisionDraft(
@@ -190,9 +188,7 @@ def _ensure_leading_space(text: str) -> str:
     return text if text.startswith(" ") else (" " + text if text else "")
 
 
-def _no_candidate_summary(
-    *, evidence: dict[str, Any], strategy_config: dict[str, Any]
-) -> str:
+def _no_candidate_summary(*, evidence: dict[str, Any], strategy_config: dict[str, Any]) -> str:
     """Why nothing even reached the risk gate. Priority: regime gate (R2) > macro calendar
     (R3) > VRP threshold (R1/R8)."""
     regime = strategy_config.get("regime", {})
@@ -207,9 +203,7 @@ def _no_candidate_summary(
 
     blocks = evidence.get("calendar", {}).get("blocks_detail") or []
     if blocks:
-        described = ", ".join(
-            f"{b.get('dte')} DTE ({b.get('event')})" for b in blocks
-        )
+        described = ", ".join(f"{b.get('dte')} DTE ({b.get('event')})" for b in blocks)
         return f"No trade: macro calendar blocks every candidate tenor — {described}."
 
     per_tenor = evidence.get("vrp", {}).get("per_tenor") or []
@@ -221,9 +215,7 @@ def _no_candidate_summary(
             "No trade: no realized-vol baseline (RV20 unavailable) to measure the "
             "volatility risk premium against."
         )
-    threshold = strategy_config.get("tenor_scan", {}).get(
-        "vrp_threshold_vol_points", "configured"
-    )
+    threshold = strategy_config.get("tenor_scan", {}).get("vrp_threshold_vol_points", "configured")
     best = max(measured, key=lambda t: t["vrp_vs_rv20"])
     return (
         f"No trade: best VRP was {best['vrp_vs_rv20']:.2f} vol points ({best['dte']} DTE), "
@@ -423,9 +415,7 @@ def decide_from_llm(
     if sleep_fn is None:
         sleep_fn = time.sleep
 
-    base_messages = build_decision_messages(
-        evidence=evidence, approved=approved, strategy=strategy
-    )
+    base_messages = build_decision_messages(evidence=evidence, approved=approved, strategy=strategy)
     total_usage: dict[str, int] = {
         "prompt_tokens": 0,
         "completion_tokens": 0,
@@ -457,9 +447,7 @@ def decide_from_llm(
                     action=args["action"],
                     decision_source="llm",
                     summary=(
-                        _trade_summary(
-                            approved[args["candidate_index"]], args["reasoning"]
-                        )
+                        _trade_summary(approved[args["candidate_index"]], args["reasoning"])
                         if args["action"] == "trade"
                         else _decline_summary(args["reasoning"], len(approved))
                     ),
@@ -599,8 +587,7 @@ def _run_llm_turns(
                 {
                     "role": "user",
                     "content": (
-                        "Record your decision now by calling the submit_decision tool "
-                        "exactly once."
+                        "Record your decision now by calling the submit_decision tool exactly once."
                     ),
                 }
             )
@@ -643,9 +630,7 @@ def _run_llm_turns(
             )
             continue
 
-        return _LlmTurnResult(
-            args=args, texts=texts, usage=usage, failure=None, rate_limited=False
-        )
+        return _LlmTurnResult(args=args, texts=texts, usage=usage, failure=None, rate_limited=False)
 
     return _LlmTurnResult(
         args=None,
