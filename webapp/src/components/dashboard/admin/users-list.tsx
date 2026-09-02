@@ -70,7 +70,11 @@ export function UsersList({
 }: {
   users: AdminUser[];
   currentUserId: string;
-  /** false for the read-only demo-admin account — hides role / delete controls. */
+  /**
+   * false for the read-only demo-admin account — hides role / delete controls, and
+   * marks the email column as masked. The masking itself is done in the database
+   * (0031), because the demo login is public.
+   */
   canWrite?: boolean;
 }) {
   const router = useRouter();
@@ -95,6 +99,7 @@ export function UsersList({
           Roster
         </h2>
         <span className="font-mono text-[10.5px] text-faint">
+          {!canWrite && <span className="mr-2">emails masked</span>}
           {users.length} user{users.length === 1 ? "" : "s"}
         </span>
       </div>

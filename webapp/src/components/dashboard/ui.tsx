@@ -172,6 +172,21 @@ export function PassFail({ ok, label }: { ok: boolean; label?: string }) {
   );
 }
 
+/**
+ * For a section the demo-admin account must not see at all. The demo login is public —
+ * one click from the homepage — so anything it can read, anyone can read.
+ */
+export function MasterOnlyPanel() {
+  return (
+    <Panel title="Not available for your account">
+      <p className="text-[13px] text-sec leading-relaxed">
+        This section is master-admin only: it reaches an account-wide third-party
+        credential, so it is not part of the read-only backoffice the demo account sees.
+      </p>
+    </Panel>
+  );
+}
+
 export function ForbiddenPanel() {
   return (
     <Panel title="Not available for your account">

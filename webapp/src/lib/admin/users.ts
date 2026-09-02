@@ -1,10 +1,14 @@
 /**
- * User-roster reads for the master-admin "Users" panel. Everything goes
- * through the `beleth_admin_*` SECURITY DEFINER functions
- * (db/migrations/0019_admin_users.sql), which re-check
- * `beleth_role() = 'master_admin'` in the database — the webapp has no
- * service-role client. A failure degrades to `[]` so a Supabase hiccup never
- * 500s the page (same discipline as dashboard-queries / docs queries).
+ * User-roster reads for the backoffice "Users" panel. Everything goes through the
+ * `beleth_admin_*` SECURITY DEFINER functions (db/migrations/0019_admin_users.sql),
+ * which re-check the caller's role in the database — the webapp has no service-role
+ * client. A failure degrades to `[]` so a Supabase hiccup never 500s the page (same
+ * discipline as dashboard-queries / docs queries).
+ *
+ * Reading the roster is open to demo_admin (0026) but the **email column is masked**
+ * for it (0031): the demo login is public, one click from the homepage, so anything it
+ * reads is published. Only master_admin gets the address in full. The masking happens
+ * in the database, not here — this file could not enforce it.
  */
 import "server-only";
 import { createClient } from "@/lib/supabase/server";

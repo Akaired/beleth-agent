@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Panel } from "@/components/dashboard/ui";
+import { getSessionContext } from "@/lib/auth";
+import { MasterOnlyPanel, Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
   EventPill,
@@ -57,6 +58,12 @@ function whenLabel(b: {
  * No sub-tabs; the template / campaign editors are the only child routes.
  */
 export default async function AdminEmailPage() {
+  const ctx = await getSessionContext();
+  // The admin shell opens to demo_admin so the judges can read the Forum tab; this
+  // section is master-admin only and has to say so itself. It reads Resend, whose key
+  // is account-wide, and the demo login is public.
+  if (!ctx || ctx.role !== "master_admin") return <MasterOnlyPanel />;
+
   if (!getResendKey()) {
     return <ResendUnavailable message="not-configured" />;
   }

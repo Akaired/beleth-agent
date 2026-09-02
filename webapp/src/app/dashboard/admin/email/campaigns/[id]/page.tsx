@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Panel } from "@/components/dashboard/ui";
+import { getSessionContext } from "@/lib/auth";
+import { MasterOnlyPanel, Panel } from "@/components/dashboard/ui";
 import {
   ResendUnavailable,
   OutOfScope,
@@ -25,6 +26,12 @@ export const metadata: Metadata = { title: "Admin · Campaign — Beleth" };
 export default async function CampaignPage({
   params,
 }: PageProps<"/dashboard/admin/email/campaigns/[id]">) {
+  const ctx = await getSessionContext();
+  // The admin shell opens to demo_admin so the judges can read the Forum tab; this
+  // section is master-admin only and has to say so itself. It reads Resend, whose key
+  // is account-wide, and the demo login is public.
+  if (!ctx || ctx.role !== "master_admin") return <MasterOnlyPanel />;
+
   if (!getResendKey()) return <ResendUnavailable message="not-configured" />;
 
   const { id } = await params;
