@@ -20,40 +20,40 @@ type AuthState =
     };
 
 const ROLE_KEY = "beleth-account-role";
-const EMAIL_KEY = "beleth-account-email";
 const NAME_KEY = "beleth-account-name";
+/**
+ * Written by an earlier version of this component. `localStorage` outlives a sign-out
+ * that does not pass through `clearCache()` — a server-side redirect, a session that
+ * simply expires — so on a shared browser the next visitor saw the previous account's
+ * address until `getUser()` came back. The email is display-only; it is no longer
+ * cached, and this key is removed on sight.
+ */
+const LEGACY_EMAIL_KEY = "beleth-account-email";
 const AVATAR_KEY = "beleth-account-avatar";
 const ROLES: Role[] = ["public_user", "demo_admin", "master_admin"];
 
 function readCache(): {
-  email: string | null;
   role: Role;
   displayName: string | null;
   avatarUrl: string | null;
 } {
   try {
+    localStorage.removeItem(LEGACY_EMAIL_KEY);
     const cached = localStorage.getItem(ROLE_KEY) as Role | null;
     const role = cached && ROLES.includes(cached) ? cached : "public_user";
     return {
-      email: localStorage.getItem(EMAIL_KEY),
       role,
       displayName: localStorage.getItem(NAME_KEY),
       avatarUrl: localStorage.getItem(AVATAR_KEY),
     };
   } catch {
-    return { email: null, role: "public_user", displayName: null, avatarUrl: null };
+    return { role: "public_user", displayName: null, avatarUrl: null };
   }
 }
 
-function writeCache(
-  email: string | null,
-  role: Role,
-  displayName: string | null,
-  avatarUrl: string | null,
-) {
+function writeCache(role: Role, displayName: string | null, avatarUrl: string | null) {
   try {
     localStorage.setItem(ROLE_KEY, role);
-    if (email) localStorage.setItem(EMAIL_KEY, email);
     if (displayName) localStorage.setItem(NAME_KEY, displayName);
     else localStorage.removeItem(NAME_KEY);
     if (avatarUrl) localStorage.setItem(AVATAR_KEY, avatarUrl);
@@ -65,7 +65,7 @@ function writeCache(
 
 function clearCache() {
   try {
-    for (const k of [ROLE_KEY, EMAIL_KEY, NAME_KEY, AVATAR_KEY]) {
+    for (const k of [ROLE_KEY, LEGACY_EMAIL_KEY, NAME_KEY, AVATAR_KEY]) {
       localStorage.removeItem(k);
     }
   } catch {
@@ -78,8 +78,12 @@ function clearCache() {
  * homepage stays statically cached (ISR). The server always renders the
  * "Log in / Register" link but hidden (`invisible`) — so a signed-in visitor
  * never sees it flash. The first client effect resolves the real state from
- * the auth cookie (+ a small local cache for name/role) almost instantly;
- * `getUser()` then confirms it.
+ * the auth cookie (+ a small local cache for name/role/avatar) almost instantly;
+ * `getUser()` then confirms it and supplies the email.
+ *
+ * The cache deliberately holds no email. `localStorage` outlives a sign-out that does
+ * not pass through `clearCache()`, and a display name on a shared browser is a much
+ * smaller thing to leak than an address.
  */
 export function HeaderAuth() {
   const [state, setState] = useState<AuthState>({ status: "unknown" });
@@ -93,9 +97,11 @@ export function HeaderAuth() {
       await Promise.resolve();
       if (cancelled) return;
       if (hasSupabaseAuthCookie()) {
-        const { email, role, displayName, avatarUrl } = readCache();
-        setState({ status: "in", email, role, displayName, avatarUrl });
+        // No email in the fast pass: it is not cached. `getUser()` fills it in below.
+        const { role, displayName, avatarUrl } = readCache();
+        setState({ status: "in", email: null, role, displayName, avatarUrl });
       } else {
+        clearCache();
         setState({ status: "out" });
       }
 
@@ -119,7 +125,7 @@ export function HeaderAuth() {
       const email = user.email ?? null;
       const displayName = (profile?.display_name as string | null) ?? null;
       const avatarUrl = (profile?.avatar_url as string | null) ?? null;
-      writeCache(email, role, displayName, avatarUrl);
+      writeCache(role, displayName, avatarUrl);
       setState({ status: "in", email, role, displayName, avatarUrl });
     })();
     return () => {
