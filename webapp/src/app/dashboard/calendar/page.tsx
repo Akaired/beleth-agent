@@ -3,6 +3,7 @@ import { requireSession, roleAtLeast } from "@/lib/auth";
 import { fetchMarketCalendarView } from "@/lib/dashboard-queries";
 import { ForbiddenPanel } from "@/components/dashboard/ui";
 import { MonthNav, WEEKDAY_LABELS } from "@/components/dashboard/month-nav";
+import { formatWeekdayTime } from "@/lib/format";
 import {
   monthMatrix,
   nyToday,
@@ -43,17 +44,6 @@ function Chip({
       {children}
     </span>
   );
-}
-
-function fmtClock(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 export default async function CalendarPage({
@@ -110,7 +100,7 @@ export default async function CalendarPage({
           <span className="font-mono text-[10.5px] text-dim">
             {clock.isOpen ? "Next close" : "Next open"}:{" "}
             <span className="text-sec">
-              {fmtClock(clock.isOpen ? clock.nextClose : clock.nextOpen)}
+              {formatWeekdayTime(clock.isOpen ? clock.nextClose : clock.nextOpen)}
             </span>
           </span>
         )}

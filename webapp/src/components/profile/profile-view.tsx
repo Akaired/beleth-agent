@@ -6,15 +6,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Panel } from "@/components/dashboard/ui";
 import { TopicListTable } from "@/components/forum/topic-list-table";
 import { IconHistory, IconPencil } from "@/components/icons";
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
+import { formatDate } from "@/lib/format";
 
 function XpSummary({ xp, streak }: { xp: number; streak: number }) {
   const info = levelForXp(xp);

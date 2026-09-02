@@ -12,6 +12,7 @@ import {
 } from "@/components/dashboard/ui";
 import { TickerBadge } from "@/components/ticker-badge";
 import { POSITIONS_PAGE_SIZE } from "@/lib/pagination";
+import { formatDateTime } from "@/lib/format";
 import {
   IconArrowDown,
   IconArrowRight,
@@ -34,7 +35,7 @@ const FILTERS = [
 
 // --- formatting helpers ---------------------------------------------------
 
-function signedUsd(n: number | null, digits = 0): string {
+function signedUsd(n: number | null, digits: 0 | 2 = 0): string {
   if (n === null || Number.isNaN(n)) return "—";
   const s = formatUsd(Math.abs(n), digits);
   return n > 0 ? `+${s}` : n < 0 ? `−${s}` : s;
@@ -43,10 +44,6 @@ function signedUsd(n: number | null, digits = 0): string {
 function pnlTone(n: number | null): string {
   if (n === null) return "text-dim";
   return n > 0 ? "text-up" : n < 0 ? "text-down" : "text-sec";
-}
-
-function when(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "—";
 }
 
 function structureName(p: SpreadPosition): string {
@@ -218,7 +215,7 @@ function OpenCard({ p }: { p: SpreadPosition }) {
           value={formatUsd(p.maxLoss, 0)}
           tone="text-sec"
         />
-        <Metric label="Opened" value={when(p.openedAt)} tone="text-sec" />
+        <Metric label="Opened" value={formatDateTime(p.openedAt)} tone="text-sec" />
       </div>
 
       <div className="mt-3 flex justify-end border-t border-rowline pt-2.5">
@@ -351,7 +348,7 @@ export default async function PositionsPage({
                     className="border-t border-rowline align-top hover:bg-hoverbg"
                   >
                     <td className="whitespace-nowrap px-3 py-2.5 font-mono text-[10px] text-dim">
-                      {when(p.closedAt ?? p.openedAt)}
+                      {formatDateTime(p.closedAt ?? p.openedAt)}
                     </td>
                     <td className="px-3 py-2.5">
                       <div className="flex items-start gap-2">

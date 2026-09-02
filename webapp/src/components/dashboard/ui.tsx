@@ -198,26 +198,7 @@ export function ForbiddenPanel() {
   );
 }
 
-export function formatUsd(n: number | null | undefined, digits = 2): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "n/a";
-  return n.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-}
-
-export function formatPct(n: number | null | undefined, digits = 2): string {
-  if (n === null || n === undefined || Number.isNaN(n)) return "n/a";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-export function timeAgo(iso: string | null): string {
-  if (!iso) return "—";
-  const secs = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (secs < 90) return "just now";
-  if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.round(secs / 3600)}h ago`;
-  return `${Math.round(secs / 86400)}d ago`;
-}
+// The formatters live in @/lib/format so non-UI modules can use them without pulling
+// in JSX. Re-exported here because most of the dashboard already imports them from
+// this kit, and a churn of import lines would bury the change that matters.
+export { formatPct, formatUsd, timeAgo } from "@/lib/format";

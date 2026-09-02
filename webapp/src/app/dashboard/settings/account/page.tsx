@@ -8,17 +8,9 @@ import { ProfileForm } from "@/components/dashboard/account/profile-form";
 import { PasswordForm } from "@/components/dashboard/account/password-form";
 import { DangerZone } from "@/components/dashboard/settings/danger-zone";
 import { IconArrowUpRight, IconProhibit } from "@/components/icons";
+import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Account settings — Beleth" };
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export default async function AccountSettingsPage() {
   const ctx = await requireSession();

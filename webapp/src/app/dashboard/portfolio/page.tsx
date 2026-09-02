@@ -6,6 +6,7 @@ import type { InstrumentQuote, PortfolioInstrument } from "@/lib/portfolio";
 import { ForbiddenPanel, timeAgo } from "@/components/dashboard/ui";
 import { TickerBadge } from "@/components/ticker-badge";
 import { TvWidget } from "@/components/tv-widget";
+import { formatSignedUsd, formatUsd } from "@/lib/format";
 import {
   IconArrowRight,
   IconPortfolio,
@@ -16,23 +17,6 @@ import {
 export const metadata: Metadata = { title: "Portfolio · Beleth backoffice" };
 
 const CHART_WIDGET = "mini-symbol-overview";
-
-// --- formatting ---------------------------------------------------------
-
-const price2 = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function fmtPrice(n: number): string {
-  return `$${price2.format(n)}`;
-}
-
-function signedUsd(n: number | null): string {
-  if (n == null || Number.isNaN(n)) return "n/a";
-  const s = `$${price2.format(Math.abs(n))}`;
-  return n > 0 ? `+${s}` : n < 0 ? `−${s}` : s;
-}
 
 function signedPct(n: number | null): string {
   if (n == null || Number.isNaN(n)) return "n/a";
@@ -75,10 +59,10 @@ function Quote({ quote }: { quote: InstrumentQuote | null }) {
   return (
     <div className="text-right leading-tight">
       <div className="font-mono text-[15px] text-txt">
-        {fmtPrice(quote.price)}
+        {formatUsd(quote.price)}
       </div>
       <div className={`font-mono text-[10px] ${up ? "text-up" : "text-down"}`}>
-        {signedUsd(quote.changeAbs)}
+        {formatSignedUsd(quote.changeAbs)}
         {quote.changePct != null && (
           <span className="text-dim"> ({signedPct(quote.changePct)})</span>
         )}
@@ -141,7 +125,7 @@ function LiveCard({ i }: { i: PortfolioInstrument }) {
             value={String(s.openSpreads)}
             sub={
               s.openSpreads > 0
-                ? `${signedUsd(s.unrealizedPnl)} unreal.`
+                ? `${formatSignedUsd(s.unrealizedPnl)} unreal.`
                 : undefined
             }
             tone={s.openSpreads > 0 ? pnlTone(s.unrealizedPnl) : "text-txt"}
@@ -150,7 +134,7 @@ function LiveCard({ i }: { i: PortfolioInstrument }) {
             label="Closed"
             value={String(s.closed)}
             sub={
-              s.closed > 0 ? `${signedUsd(s.realizedPnl)} real.` : undefined
+              s.closed > 0 ? `${formatSignedUsd(s.realizedPnl)} real.` : undefined
             }
             tone={s.closed > 0 ? pnlTone(s.realizedPnl) : "text-txt"}
           />

@@ -38,6 +38,7 @@ import {
 } from "@/lib/equity";
 import { MarketChip } from "@/components/market-chip";
 import { TickerBadge } from "@/components/ticker-badge";
+import { formatSignedUsd, formatUsd } from "@/lib/format";
 
 type Variant = "hero" | "panel";
 type LwcModule = typeof import("lightweight-charts");
@@ -59,20 +60,6 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-const usd0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
-const usd2 = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-function formatUsd(v: number): string {
-  return `$${usd2.format(v)}`;
-}
-
-function formatSigned(v: number): string {
-  const sign = v > 0 ? "+" : v < 0 ? "−" : "";
-  return `${sign}$${usd2.format(Math.abs(v))}`;
-}
 
 function formatPct(v: number): string {
   const sign = v > 0 ? "+" : v < 0 ? "−" : "";
@@ -407,7 +394,7 @@ export function EquityCurve({
           axisDoubleClickReset: true,
         },
         localization: {
-          priceFormatter: (p: number) => `$${usd0.format(p)}`,
+          priceFormatter: (p: number) => formatUsd(p, 0),
         },
       });
 
@@ -589,7 +576,7 @@ export function EquityCurve({
           <span
             className={`font-mono text-[10px] ${changeUp ? "text-up" : "text-down"}`}
           >
-            {RANGE_LABEL[history.range]} {formatSigned(history.changeAbs)}{" "}
+            {RANGE_LABEL[history.range]} {formatSignedUsd(history.changeAbs)}{" "}
             <span className="text-dim">({formatPct(history.changePct)})</span>
           </span>
         </div>
