@@ -64,7 +64,7 @@ from app.alpaca_client import (
     get_trading_client,
     money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config
+from app.config import ConfigError, default_symbol, get_settings, load_strategy_config
 from app.decision import decide_from_llm, decide_from_risk_engine
 from app.eventlog import EventLog
 from app.evidence import AccountSnapshot, build_evidence_package
@@ -480,7 +480,7 @@ def _prepare_order(
 
 
 def main() -> int:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "SPY"
+    symbol = sys.argv[1].upper() if len(sys.argv) > 1 else default_symbol()
 
     try:
         settings = get_settings()

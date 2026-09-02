@@ -26,12 +26,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, TypeVar
 
+from app.runlog import DEFAULT_LOG_DIR
+
 _T = TypeVar("_T")
 
 # cgroup v1 uses a huge sentinel for "no limit"; at or above this counts as unlimited.
 _CGROUP_UNLIMITED = 1 << 62
 
-LOGS_DIR = Path(os.environ.get("BELETH_LOGS_DIR", "/app/logs"))
+LOGS_DIR = Path(DEFAULT_LOG_DIR)
 
 
 def _safe(fn: Callable[[], _T]) -> _T | None:

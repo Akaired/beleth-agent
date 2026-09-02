@@ -34,7 +34,7 @@ from app.alpaca_client import (
     get_trading_client,
     money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config
+from app.config import ConfigError, default_symbol, get_settings, load_strategy_config
 from app.market.underlying import fetch_last_price
 from app.options.chain import fetch_chain_for_ladder
 from app.options.spreads import build_candidates
@@ -42,7 +42,7 @@ from app.risk_check import AccountRiskState, evaluate_candidates
 
 
 def main() -> int:
-    symbol = sys.argv[1] if len(sys.argv) > 1 else "SPY"
+    symbol = sys.argv[1].upper() if len(sys.argv) > 1 else default_symbol()
 
     try:
         settings = get_settings()

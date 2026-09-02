@@ -19,6 +19,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TextIO
 
+# The defaults for the runner's on-disk log, in one place. `config/strategy.yaml`
+# (`runner.diagnostic_log`) carries the live values; these are what applies when a key
+# is missing. They used to be spelled out again in scripts/run_agent.py, and the
+# directory a third time in app/hostinfo.py — three copies of one number each.
+#
+# BELETH_LOGS_DIR exists because app/hostinfo.py needs the directory before any config
+# is read, to report the volume's free space; compose.yaml mounts the volume there.
+DEFAULT_LOG_DIR = os.environ.get("BELETH_LOGS_DIR", "/app/logs")
+DEFAULT_LOG_FILENAME = "runner.log"
 DEFAULT_MAX_BYTES = 5_000_000
 DEFAULT_BACKUP_COUNT = 5
 
@@ -112,7 +121,7 @@ class TeeStream:
 def install_run_log(
     *,
     directory: str | os.PathLike[str],
-    filename: str = "runner.log",
+    filename: str = DEFAULT_LOG_FILENAME,
     max_bytes: int = DEFAULT_MAX_BYTES,
     backup_count: int = DEFAULT_BACKUP_COUNT,
 ) -> Callable[[], None]:

@@ -47,7 +47,7 @@ from app.alpaca_client import (
     get_trading_client,
     money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config
+from app.config import ConfigError, default_symbol, get_settings, load_strategy_config
 from app.options.chain import fetch_chain_for_ladder
 from app.options.spreads import SpreadCandidate, build_candidates
 from app.orders import (
@@ -89,9 +89,9 @@ def best_candidate(
 
 def main() -> int:
     submit_probe = "--probe" in sys.argv
-    symbol = "SPY"
+    symbol = default_symbol()
     if "--symbol" in sys.argv:
-        symbol = sys.argv[sys.argv.index("--symbol") + 1]
+        symbol = sys.argv[sys.argv.index("--symbol") + 1].upper()
 
     try:
         settings = get_settings()

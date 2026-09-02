@@ -126,3 +126,30 @@ def get_settings() -> Settings:
 def load_strategy_config() -> dict[str, Any]:
     with STRATEGY_CONFIG_PATH.open() as f:
         return yaml.safe_load(f)
+
+
+def universe_symbols(strategy: dict[str, Any] | None = None) -> list[str]:
+    """The underlyings the agent trades, uppercased, from ``universe.symbols``.
+
+    One reader for a list that five separate places used to fall back to a bare
+    ``"SPY"`` for — the runner's loop and four diagnostic scripts' argv defaults. A
+    literal default there is a quiet way for a script to inspect a symbol the agent does
+    not actually trade.
+
+    Raises ``ConfigError`` on an empty universe rather than substituting a symbol: an
+    agent with nothing to trade is a configuration mistake, not a default.
+    """
+    strategy = load_strategy_config() if strategy is None else strategy
+    raw = (strategy.get("universe") or {}).get("symbols") or []
+    symbols = [str(symbol).strip().upper() for symbol in raw if str(symbol).strip()]
+    if not symbols:
+        raise ConfigError(
+            f"universe.symbols is empty in {STRATEGY_CONFIG_PATH} — nothing to trade."
+        )
+    return symbols
+
+
+def default_symbol(strategy: dict[str, Any] | None = None) -> str:
+    """The first symbol of the universe — what a diagnostic script inspects when the
+    operator names none on the command line."""
+    return universe_symbols(strategy)[0]

@@ -35,7 +35,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from app.alpaca_client import fetch_clock, get_trading_client  # noqa: E402
-from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
+from app.config import (  # noqa: E402
+    ConfigError,
+    get_settings,
+    load_strategy_config,
+    universe_symbols,
+)
 from app.eventlog import EventLog  # noqa: E402
 from app.hostinfo import (  # noqa: E402
     collect_host_metrics,
@@ -50,7 +55,13 @@ from app.persistence import (  # noqa: E402
     record_host_metrics,
     supabase_config_from_settings,
 )
-from app.runlog import install_run_log  # noqa: E402
+from app.runlog import (  # noqa: E402
+    DEFAULT_BACKUP_COUNT,
+    DEFAULT_LOG_DIR,
+    DEFAULT_LOG_FILENAME,
+    DEFAULT_MAX_BYTES,
+    install_run_log,
+)
 
 CYCLE_SCRIPT = REPO_ROOT / "scripts" / "check_market_data.py"
 
@@ -59,12 +70,6 @@ DEFAULT_OPEN_CYCLE_MINUTES = 5.0
 DEFAULT_CLOSED_HEARTBEAT_MINUTES = 15.0
 DEFAULT_PAUSE_POLL_SECONDS = 30.0
 DEFAULT_CYCLE_TIMEOUT_SECONDS = 600.0
-
-# Diagnostic-log fallbacks — real values in config/strategy.yaml (``runner.diagnostic_log``).
-DEFAULT_LOG_DIR = "/app/logs"
-DEFAULT_LOG_FILENAME = "runner.log"
-DEFAULT_LOG_MAX_BYTES = 5_000_000
-DEFAULT_LOG_BACKUP_COUNT = 5
 
 
 class _StopRequested:
@@ -119,8 +124,8 @@ def run_log_config(strategy: Mapping[str, Any]) -> dict[str, Any]:
         "enabled": bool(cfg.get("enabled", True)),
         "directory": str(cfg.get("dir", DEFAULT_LOG_DIR)),
         "filename": str(cfg.get("filename", DEFAULT_LOG_FILENAME)),
-        "max_bytes": int(cfg.get("max_bytes", DEFAULT_LOG_MAX_BYTES)),
-        "backup_count": int(cfg.get("backup_count", DEFAULT_LOG_BACKUP_COUNT)),
+        "max_bytes": int(cfg.get("max_bytes", DEFAULT_MAX_BYTES)),
+        "backup_count": int(cfg.get("backup_count", DEFAULT_BACKUP_COUNT)),
     }
 
 
@@ -252,10 +257,7 @@ def main() -> int:
         )
 
     cfg = runner_config(strategy)
-    symbols = [
-        str(symbol).upper()
-        for symbol in ((strategy.get("universe") or {}).get("symbols") or ["SPY"])
-    ]
+    symbols = universe_symbols(strategy)
 
     try:
         supabase = supabase_config_from_settings(settings)
