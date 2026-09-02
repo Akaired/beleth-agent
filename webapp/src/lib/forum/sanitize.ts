@@ -43,7 +43,10 @@ const OPTIONS: sanitizeHtml.IOptions = {
     "div",
   ],
   allowedAttributes: {
-    a: ["href", "title"],
+    // `rel` and `target` are not author input — `transformTags` below sets them,
+    // and an attribute the allowlist does not name is stripped after the
+    // transform runs, which silently undid it.
+    a: ["href", "title", "rel", "target"],
     img: ["src", "alt", "width", "height", "style"],
     div: ["class", "data-tv-widget", "data-tv-symbol", "data-tv-theme"],
     iframe: [

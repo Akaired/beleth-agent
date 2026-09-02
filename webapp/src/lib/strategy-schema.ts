@@ -582,12 +582,14 @@ export function readVixTaper(
 
 /** Size multiplier for a given VIX 1y percentile under a taper. */
 export function taperMultiplier(pct: number, t: VixTaper): number {
+  // Mirrors `vix_size_multiplier` in app/risk_check.py, including the order of the
+  // branches: an unset or inverted band (upper <= lower) means no taper at all —
+  // full size — and is checked before the ceiling, not folded in after the floor.
   if (t.blockBelowPct > 0 && pct < t.blockBelowPct) return 0;
+  if (t.upperPct <= t.lowerPct) return 1;
   if (pct >= t.upperPct) return 1;
   if (pct <= t.lowerPct) return t.floorFrac;
-  const span = t.upperPct - t.lowerPct;
-  if (span <= 0) return t.floorFrac;
-  return t.floorFrac + (1 - t.floorFrac) * ((pct - t.lowerPct) / span);
+  return t.floorFrac + (1 - t.floorFrac) * ((pct - t.lowerPct) / (t.upperPct - t.lowerPct));
 }
 
 /** One-paragraph plain-language summary, templated from the live snapshot. */
