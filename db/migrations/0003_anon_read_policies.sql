@@ -21,30 +21,35 @@
 -- silently fight the permissive policies later milestones add — this is the
 -- milestone it was left for.
 
+drop policy if exists "anon and authenticated can read decisions" on public.decisions;
 create policy "anon and authenticated can read decisions"
     on public.decisions
     for select
     to anon, authenticated
     using (true);
 
+drop policy if exists "anon and authenticated can read risk_checks" on public.risk_checks;
 create policy "anon and authenticated can read risk_checks"
     on public.risk_checks
     for select
     to anon, authenticated
     using (true);
 
+drop policy if exists "anon and authenticated can read trades" on public.trades;
 create policy "anon and authenticated can read trades"
     on public.trades
     for select
     to anon, authenticated
     using (true);
 
+drop policy if exists "anon and authenticated can read positions" on public.positions;
 create policy "anon and authenticated can read positions"
     on public.positions
     for select
     to anon, authenticated
     using (true);
 
+drop policy if exists "anon and authenticated can read agent_status" on public.agent_status;
 create policy "anon and authenticated can read agent_status"
     on public.agent_status
     for select

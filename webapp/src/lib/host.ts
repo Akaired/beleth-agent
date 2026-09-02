@@ -4,6 +4,7 @@
  * The resident runner is a container on a private host. Every loop iteration the
  * agent appends a machine snapshot (app/hostinfo.py) to the `host_metrics` table:
  * the newest row is the live value, the rest is the 48 h trail the sparklines read.
+ * The table is master_admin only (0033) — the snapshot names the machine.
  * It is deliberately not folded into `agent_status.detail` any more — that row is
  * readable anonymously, and the snapshot names the machine and its kernel.
  * This module only describes and formats that shape — no `server-only` import, so a

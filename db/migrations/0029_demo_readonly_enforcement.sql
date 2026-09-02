@@ -114,15 +114,18 @@ create policy "authenticated create forum posts"
 -- (demo included, so a judge can still read the conversation), writing does not.
 
 drop policy if exists "own chat sessions" on public.chat_sessions;
+drop policy if exists "read own chat sessions" on public.chat_sessions;
 create policy "read own chat sessions"
   on public.chat_sessions for select to authenticated
   using (user_id = (select auth.uid()));
+drop policy if exists "write own chat sessions" on public.chat_sessions;
 create policy "write own chat sessions"
   on public.chat_sessions for all to authenticated
   using (user_id = (select auth.uid()) and public.beleth_role() <> 'demo_admin')
   with check (user_id = (select auth.uid()) and public.beleth_role() <> 'demo_admin');
 
 drop policy if exists "own chat messages" on public.chat_messages;
+drop policy if exists "read own chat messages" on public.chat_messages;
 create policy "read own chat messages"
   on public.chat_messages for select to authenticated
   using (
@@ -132,6 +135,7 @@ create policy "read own chat messages"
          and s.user_id = (select auth.uid())
     )
   );
+drop policy if exists "write own chat messages" on public.chat_messages;
 create policy "write own chat messages"
   on public.chat_messages for all to authenticated
   using (

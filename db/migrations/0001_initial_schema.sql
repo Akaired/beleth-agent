@@ -116,9 +116,11 @@ create table if not exists public.positions (
     asset_class      text              null,
     raw              jsonb             null
 );
+drop trigger if exists trg_positions_touch_updated_at on public.positions;
 create trigger trg_positions_touch_updated_at
     before update on public.positions
     for each row execute function public.beleth_touch_updated_at();
+drop trigger if exists trg_positions_preserve_first_seen on public.positions;
 create trigger trg_positions_preserve_first_seen
     before update on public.positions
     for each row execute function public.beleth_preserve_first_seen_at();
@@ -137,6 +139,7 @@ create table if not exists public.agent_status (
     updated_at       timestamptz  not null default now(),
     detail           jsonb        not null default '{}'::jsonb
 );
+drop trigger if exists trg_agent_status_touch_updated_at on public.agent_status;
 create trigger trg_agent_status_touch_updated_at
     before update on public.agent_status
     for each row execute function public.beleth_touch_updated_at();

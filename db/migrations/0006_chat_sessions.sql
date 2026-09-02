@@ -32,6 +32,7 @@ create table if not exists public.chat_sessions (
 create index if not exists idx_chat_sessions_user_updated
     on public.chat_sessions (user_id, updated_at desc);
 
+drop trigger if exists trg_chat_sessions_touch_updated_at on public.chat_sessions;
 create trigger trg_chat_sessions_touch_updated_at
     before update on public.chat_sessions
     for each row execute function public.beleth_touch_updated_at();

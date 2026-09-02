@@ -194,7 +194,13 @@ export async function deleteTopicAction(formData: FormData): Promise<void> {
   redirect(categorySlug ? `/forum/c/${categorySlug}` : "/forum");
 }
 
-/** Fire-and-forget view bump on topic open (see ViewPing). */
+/**
+ * Fire-and-forget view bump on topic open (see ViewPing).
+ *
+ * Counts once per signed-in reader per topic per UTC day. An anonymous reader does not
+ * move the counter at all: the RPC used to be granted to anon with no check, which made
+ * it an unbounded UPDATE anybody could drive with the public key (0033).
+ */
 export async function bumpForumViewAction(topicId: string): Promise<void> {
   if (!topicId) return;
   try {

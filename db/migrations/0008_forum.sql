@@ -119,6 +119,7 @@ create index if not exists idx_forum_posts_topic
 create index if not exists idx_forum_posts_author
     on public.forum_posts (author_id);
 
+drop trigger if exists trg_forum_posts_touch_updated_at on public.forum_posts;
 create trigger trg_forum_posts_touch_updated_at
     before update on public.forum_posts
     for each row execute function public.beleth_touch_updated_at();
@@ -163,10 +164,12 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_forum_topics_stamp_author on public.forum_topics;
 create trigger trg_forum_topics_stamp_author
     before insert on public.forum_topics
     for each row execute function public.beleth_forum_stamp_author();
 
+drop trigger if exists trg_forum_posts_stamp_author on public.forum_posts;
 create trigger trg_forum_posts_stamp_author
     before insert on public.forum_posts
     for each row execute function public.beleth_forum_stamp_author();
@@ -185,6 +188,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_forum_posts_set_post_number on public.forum_posts;
 create trigger trg_forum_posts_set_post_number
     before insert on public.forum_posts
     for each row execute function public.beleth_forum_set_post_number();
@@ -208,6 +212,7 @@ begin
 end;
 $$;
 
+drop trigger if exists trg_forum_posts_after_insert on public.forum_posts;
 create trigger trg_forum_posts_after_insert
     after insert on public.forum_posts
     for each row execute function public.beleth_forum_after_post_insert();
