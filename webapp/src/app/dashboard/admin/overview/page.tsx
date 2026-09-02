@@ -96,8 +96,10 @@ export default async function AdminOverviewPage() {
   const paused = agent?.agentStatus?.paused ?? null;
   const agentState = agent?.agentStatus?.state ?? "unknown";
 
-  // Email is only reachable with a key; keep the reads off the critical path.
-  const email = resendKey
+  // Email is master-admin only (the key is account-wide) and needs a key; keep the
+  // reads off the critical path. `resendRequest` refuses below master anyway — not
+  // calling is just cheaper and keeps the tiles honestly blank.
+  const email = resendKey && isMaster
     ? await Promise.all([
         tolerant(fetchBelethTemplates),
         tolerant(fetchBelethBroadcasts),

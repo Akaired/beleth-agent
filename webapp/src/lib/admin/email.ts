@@ -1,4 +1,5 @@
 import "server-only";
+import { getSessionContext } from "@/lib/auth";
 
 /**
  * Resend client for the admin Email section. The webapp sends no mail itself —
@@ -6,6 +7,13 @@ import "server-only";
  * here is either read-only reporting or marketing "broadcasts" that a
  * master-admin drives deliberately from the UI (each mutating call is a
  * server action with its own role check and an armed confirm in the client).
+ *
+ * `RESEND_API_KEY` is the one secret in this project with no second gate behind it:
+ * it is account-wide, on an account shared with other projects, and `isBelethMail` /
+ * `isBelethSegmentName` scope the *results* by heuristic — a domain suffix and a name
+ * match — not the access. So the gate is here, at the single door, rather than left to
+ * each caller: `resendRequest` refuses without a master_admin session. That is what
+ * caught the admin Overview page reading Resend counts for the public demo login.
  *
  * Every shape below is taken from the live Resend API reference, not guessed.
  */
@@ -38,7 +46,17 @@ type ReqInit = {
   query?: Record<string, string | number | undefined>;
 };
 
+export class ResendForbidden extends Error {
+  constructor() {
+    super("Resend is master-admin only");
+    this.name = "ResendForbidden";
+  }
+}
+
 export async function resendRequest<T>(path: string, init: ReqInit = {}): Promise<T> {
+  const ctx = await getSessionContext();
+  if (!ctx || ctx.role !== "master_admin") throw new ResendForbidden();
+
   const key = getResendKey();
   if (!key) throw new ResendNotConfigured();
 
@@ -79,10 +97,14 @@ export async function tolerant<T>(
     return { ok: true, data: await fn() };
   } catch (err) {
     if (err instanceof ResendNotConfigured) return { ok: false, message: "not-configured" };
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : "Could not reach the email API",
-    };
+    if (err instanceof ResendForbidden) return { ok: false, message: "forbidden" };
+    // Resend's own message can carry account detail; the operator gets the status and
+    // the server log gets the rest.
+    console.error("resend request failed", err);
+    if (err instanceof ResendApiError) {
+      return { ok: false, message: `HTTP ${err.status} from the email API` };
+    }
+    return { ok: false, message: "Could not reach the email API" };
   }
 }
 

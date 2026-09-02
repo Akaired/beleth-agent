@@ -6,11 +6,17 @@ import { IconEnvelope, IconProhibit } from "@/components/icons";
 /** Shown wherever the email key is missing or the API call failed. */
 export function ResendUnavailable({ message }: { message: string }) {
   const noKey = message === "not-configured";
+  const forbidden = message === "forbidden";
   return (
-    <Panel title="Email not configured">
+    <Panel title={forbidden ? "Not available for your account" : "Email not configured"}>
       <div className="flex items-start gap-2 text-[13px] text-sec leading-relaxed">
         <IconEnvelope size={16} className="mt-0.5 shrink-0 text-dim" />
-        {noKey ? (
+        {forbidden ? (
+          <p>
+            The email section is master-admin only: it reaches an account-wide
+            third-party credential.
+          </p>
+        ) : noKey ? (
           <p>
             Set <span className="font-mono text-txt">RESEND_API_KEY</span> in the
             webapp environment (Vercel → Project → Environment Variables) to use
