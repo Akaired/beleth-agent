@@ -87,6 +87,20 @@ trade, edits config, or pauses the agent.
   per-browser allowance. Both are enforced in the route handler, which is what
   actually spends the key.
 
+## Known advisories
+
+`npm audit` reports one **low** finding, deliberately not fixed: `quill` 2.0.3, XSS via
+the HTML export API. The advisory is accurate and the vulnerable call is genuinely used
+— `getSemanticHTML()` in `src/components/forum/rich-editor.tsx`. It is not exploitable
+here because that output is untrusted input like any other: nothing the editor produces
+is stored or rendered without passing through `sanitizeForumHtml` on the server, which
+is an allowlist, is the only thing that decides what a post may contain, and is covered
+by `src/lib/forum/sanitize.test.ts`.
+
+The only available fix is a breaking downgrade to `quill` 2.0.2, which would mean
+re-qualifying the whole composer — images, TradingView embeds, code blocks, resize — to
+close a hole the server side already closes. Left at 2.0.3 on purpose.
+
 ## Rendering model
 
 The homepage is a server component with `export const revalidate = 15`: it is
