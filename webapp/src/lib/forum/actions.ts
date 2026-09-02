@@ -17,10 +17,7 @@ import type { SessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { htmlToText, sanitizeForumHtml } from "@/lib/forum/sanitize";
 import type { ForumActionState } from "@/lib/forum/types";
-
-const TITLE_MIN = 3;
-const TITLE_MAX = 120;
-const BODY_MAX = 100000;
+import { AUTHOR_NAME_MAX, BODY_MAX, TITLE_MAX, TITLE_MIN } from "@/lib/forum/limits";
 
 /**
  * The shared demo account posts under a per-post alias typed into a blocking
@@ -34,7 +31,7 @@ function demoAlias(ctx: SessionContext, formData: FormData): string | null {
   const raw = String(formData.get("author_name") ?? "")
     .replace(/\s+/g, " ")
     .trim();
-  return raw ? raw.slice(0, 40) : null;
+  return raw ? raw.slice(0, AUTHOR_NAME_MAX) : null;
 }
 
 /**

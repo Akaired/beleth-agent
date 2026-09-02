@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { AUTHOR_NAME_MAX } from "@/lib/forum/limits";
 
 const LAST_ALIAS_KEY = "beleth.demo.forumAlias";
 
@@ -107,7 +108,7 @@ export function DemoNameDialog({
             id={fieldId}
             type="text"
             value={value}
-            maxLength={40}
+            maxLength={AUTHOR_NAME_MAX}
             placeholder="e.g. Alex"
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {

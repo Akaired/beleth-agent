@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createTopicAction } from "@/lib/forum/actions";
 import type { ForumActionState } from "@/lib/forum/types";
+import { TITLE_MAX } from "@/lib/forum/limits";
 import { RichEditor } from "@/components/forum/rich-editor";
 import { DemoNameDialog } from "@/components/forum/demo-name-dialog";
 
@@ -97,7 +98,7 @@ export function NewTopicForm({
             type="text"
             required
             minLength={3}
-            maxLength={120}
+            maxLength={TITLE_MAX}
             placeholder="A clear, specific title"
             className={fieldBox}
           />
