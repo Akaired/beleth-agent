@@ -258,7 +258,7 @@ _EXIT_STRATEGY = {"exit": {"close_slippage_usd": 0.05}}
 
 
 def test_working_exit_leg_sets_collect_closing_orders_only():
-    from scripts.check_market_data import working_exit_leg_sets
+    from app.cycle.open_orders import working_exit_leg_sets
 
     orders = [_FakeOrder(*_ENTRY_LEGS), _FakeOrder(*_CLOSE_LEGS)]
     assert working_exit_leg_sets(orders) == {
@@ -269,7 +269,7 @@ def test_working_exit_leg_sets_collect_closing_orders_only():
 
 
 def test_resting_entry_leg_sets_collect_opening_orders_only():
-    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+    from app.cycle.open_orders import resting_entry_leg_sets, working_exit_leg_sets
 
     orders = [_FakeOrder(*_ENTRY_LEGS), _FakeOrder(*_CLOSE_LEGS)]
     # The two helpers are mirror filters over the same intents: an entry order blocks
@@ -291,7 +291,7 @@ def test_leg_set_helpers_fall_back_to_client_order_id_without_leg_intents():
     # entry orders stacked. Without readable intents, classification falls back to the
     # client order id the agent stamps on its own orders; a foreign unreadable order
     # blocks entries (fail-closed) but is never treated as a closing.
-    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+    from app.cycle.open_orders import resting_entry_leg_sets, working_exit_leg_sets
 
     leg = _FakeLeg("SPY261009P00742000", "")
     agent_entry = _FakeOrder(leg, client_order_id="beleth-abc123")
@@ -308,7 +308,7 @@ def test_leg_set_helpers_fall_back_to_client_order_id_without_leg_intents():
 def test_resting_entry_leg_sets_block_an_order_reported_without_legs():
     # Worst-case serialization: an agent entry order arrives with no legs at all. It
     # must still block new entries — committed risk that cannot be inspected is risk.
-    from scripts.check_market_data import resting_entry_leg_sets, working_exit_leg_sets
+    from app.cycle.open_orders import resting_entry_leg_sets, working_exit_leg_sets
 
     entry = _FakeOrder(client_order_id="beleth-abc123")
     assert resting_entry_leg_sets([entry]) == {frozenset({"unreadable-legs"})}
@@ -513,7 +513,7 @@ def test_prepare_closings_fails_closed_without_a_measurable_mark():
 
 
 def test_working_exit_orders_keeps_id_and_limit_for_closing_orders_only():
-    from scripts.check_market_data import working_exit_orders
+    from app.cycle.open_orders import working_exit_orders
 
     class _O:
         def __init__(self, *legs, cid=None, oid=None, limit=None):
