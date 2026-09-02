@@ -7,10 +7,12 @@
  *
  * The handler runs Beleth's bounded tool-calling loop (read-only tools),
  * persists the user message and every row the turn produced, and returns the
- * new session id plus the assistant's answer. Any signed-in user may call it.
+ * new session id plus the assistant's answer. Any signed-in user may call it;
+ * the shared demo login gets a small per-browser daily allowance instead of
+ * an unlimited one (see lib/chat/demo-allowance.ts).
  */
 import { NextResponse } from "next/server";
-import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
+import { getSessionContext, isDemoAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ChatModelError, runBelethTurn } from "@/lib/chat/aiml";
 import { fetchBelethChatContext } from "@/lib/chat/context";
@@ -23,6 +25,12 @@ import {
   touchChatSession,
 } from "@/lib/chat/queries";
 import { deriveTitle } from "@/lib/chat/types";
+import {
+  DEMO_CHAT_EXHAUSTED,
+  demoTurnsUsed,
+  spendDemoTurn,
+  DEMO_DAILY_MESSAGES,
+} from "@/lib/chat/demo-allowance";
 
 const MAX_MESSAGE_CHARS = 2_000;
 /** Bound a single conversation so a free model's quota is not open-ended. */
@@ -37,10 +45,15 @@ export async function POST(req: Request) {
   if (!ctx) {
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   }
-  // A turn writes the transcript, which the demo account may not do (0029).
-  // Refuse before spending a call on the model's free quota.
-  if (isDemoAdmin(ctx.role)) {
-    return NextResponse.json({ error: DEMO_READ_ONLY }, { status: 403 });
+  // The demo login is public, so its chat allowance is per browser rather than
+  // per account — otherwise the day's first visitor spends everyone else's.
+  const demo = isDemoAdmin(ctx.role);
+  const demoUsed = demo ? await demoTurnsUsed() : 0;
+  if (demo && demoUsed >= DEMO_DAILY_MESSAGES) {
+    return NextResponse.json(
+      { error: DEMO_CHAT_EXHAUSTED, demoExhausted: true },
+      { status: 403 },
+    );
   }
 
   let body: { sessionId?: unknown; message?: unknown };
@@ -172,10 +185,15 @@ export async function POST(req: Request) {
     console.error("[chat] xp award failed", err);
   }
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     sessionId: activeSessionId,
     answer: turn.answer,
     userMessageId,
     assistantMessageId,
+    // Only meaningful for the demo login; the composer shows it as a countdown.
+    demoTurnsLeft: demo ? DEMO_DAILY_MESSAGES - demoUsed - 1 : null,
   });
+  // Charged against the answer, not the attempt: a model outage costs nothing.
+  if (demo) spendDemoTurn(res, demoUsed);
+  return res;
 }

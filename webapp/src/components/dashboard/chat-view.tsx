@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BelethSprite } from "@/components/beleth-sprite";
 import type { BelethScene } from "@/lib/beleth";
 import { rateChatMessageAction } from "@/app/dashboard/chat/actions";
+import { DemoChatLimitDialog } from "@/components/dashboard/demo-chat-limit-dialog";
 import type {
   ChatDisplayMessage,
   ChatEditResponse,
@@ -47,11 +48,14 @@ export function ChatView({
   initialMessages,
   scene,
   mood,
+  demoTurnsLeft = null,
 }: {
   sessionId: string | null;
   initialMessages: ChatDisplayMessage[];
   scene: BelethScene;
   mood: "up" | "down" | null;
+  /** Turns left today on the shared demo login; null for a real account. */
+  demoTurnsLeft?: number | null;
 }) {
   const router = useRouter();
   const [sid, setSid] = useState<string | null>(sessionId);
@@ -60,6 +64,10 @@ export function ChatView({
   const [pending, setPending] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Demo only: turns left on this browser today, and the sign-up invitation
+  // shown once they run out. Seeded from the server, kept in step by each reply.
+  const [turnsLeft, setTurnsLeft] = useState<number | null>(demoTurnsLeft);
+  const [limitOpen, setLimitOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   // A route the Next router still needs to adopt: we swapped the URL with
@@ -91,6 +99,10 @@ export function ChatView({
   async function send(text: string) {
     const trimmed = text.trim();
     if (!trimmed || pending || editingId) return;
+    if (turnsLeft !== null && turnsLeft <= 0) {
+      setLimitOpen(true);
+      return;
+    }
     setError(null);
     setInput("");
     const nowIso = new Date().toISOString();
@@ -114,8 +126,23 @@ export function ChatView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sid, message: trimmed }),
       });
-      const data = (await res.json()) as ChatResponse & { error?: string };
+      const data = (await res.json()) as ChatResponse & {
+        error?: string;
+        demoExhausted?: boolean;
+      };
+      if (data.demoExhausted) {
+        setTurnsLeft(0);
+        setLimitOpen(true);
+        setMessages((m) =>
+          m.filter((msg) => msg.id !== thinkingId && msg.id !== userMsg.id),
+        );
+        setInput(trimmed);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (typeof data.demoTurnsLeft === "number") {
+        setTurnsLeft(data.demoTurnsLeft);
+      }
 
       setMessages((m) =>
         m.map((msg) => {
@@ -318,6 +345,7 @@ export function ChatView({
                 editing={editingId === m.id}
                 onReveal={scrollToBottom}
                 onComposed={handleComposed}
+                canAct={turnsLeft === null}
                 onStartEdit={() => setEditingId(m.id)}
                 onCancelEdit={() => setEditingId(null)}
                 onSubmitEdit={(text) => submitEdit(m.id, text)}
@@ -331,6 +359,14 @@ export function ChatView({
       {error && (
         <p className="rounded border border-killline/60 bg-down/5 px-3 py-2 text-[12px] text-down">
           {error}
+        </p>
+      )}
+
+      {turnsLeft !== null && (
+        <p className="text-center font-mono text-[10.5px] uppercase tracking-[0.08em] text-dim">
+          {turnsLeft > 0
+            ? `demo account · ${turnsLeft} question${turnsLeft === 1 ? "" : "s"} left today`
+            : "demo account · out of questions for today"}
         </p>
       )}
 
@@ -359,13 +395,20 @@ export function ChatView({
         />
         <button
           type="submit"
-          disabled={pending || !input.trim() || !!editingId}
+          disabled={
+            pending || !input.trim() || !!editingId || turnsLeft === 0
+          }
           aria-label="Send"
           className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md bg-acc/15 text-acc transition-colors hover:bg-acc/25 disabled:opacity-40"
         >
           <IconArrowRight size={16} weight="bold" />
         </button>
       </form>
+
+      <DemoChatLimitDialog
+        open={limitOpen}
+        onClose={() => setLimitOpen(false)}
+      />
     </div>
   );
 }
@@ -380,6 +423,7 @@ function Bubble({
   editing,
   onReveal,
   onComposed,
+  canAct = true,
   onStartEdit,
   onCancelEdit,
   onSubmitEdit,
@@ -394,6 +438,9 @@ function Bubble({
   editing: boolean;
   onReveal: () => void;
   onComposed: (id: string) => void;
+  /** False on the shared demo login: editing and rating a transcript nobody
+   *  owns alone is refused server-side (0030), so the controls stay hidden. */
+  canAct?: boolean;
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onSubmitEdit: (text: string) => void;
@@ -424,7 +471,7 @@ function Bubble({
         <MessageActions
           alwaysVisible={isLastUser}
           content={msg.content}
-          onEdit={isLastUser && !busy ? onStartEdit : undefined}
+          onEdit={isLastUser && !busy && canAct ? onStartEdit : undefined}
         />
       </div>
     );
@@ -456,7 +503,7 @@ function Bubble({
                 alwaysVisible={isLastAssistant}
                 content={msg.content}
                 rating={rating}
-                onRate={busy ? undefined : onRate}
+                onRate={busy || !canAct ? undefined : onRate}
               />
             )}
           </>

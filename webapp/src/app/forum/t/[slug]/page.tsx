@@ -27,7 +27,11 @@ export default async function ForumTopicPage({
 
   const replies = data.topic.reply_count;
   const views = data.topic.view_count;
-  const ownsTopic = !!ctx && ctx.userId === data.topic.author_id;
+  // The demo login is shared: every visitor holds the same uid, so ownership of
+  // a topic or a post is not a boundary between them. Demo may post, never edit
+  // or delete — so it is never shown the controls (0030 refuses them anyway).
+  const isDemo = !!ctx && isDemoAdmin(ctx.role);
+  const ownsTopic = !!ctx && !isDemo && ctx.userId === data.topic.author_id;
   const canModerate = ctx?.role === "master_admin";
 
   return (
@@ -97,7 +101,7 @@ export default async function ForumTopicPage({
             key={p.id}
             post={p}
             original={p.post_number === 1}
-            mine={!!ctx && ctx.userId === p.author_id}
+            mine={!!ctx && !isDemo && ctx.userId === p.author_id}
             canModerate={canModerate}
             topicSlug={data.topic.slug}
           />
@@ -113,7 +117,7 @@ export default async function ForumTopicPage({
         <ReplyComposer
           topicId={data.topic.id}
           slug={data.topic.slug}
-          isDemo={!!ctx && isDemoAdmin(ctx.role)}
+          isDemo={isDemo}
         />
       ) : (
         <LoginToPost next={`/forum/t/${data.topic.slug}`} />

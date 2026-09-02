@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { roleAtLeast, type Role } from "@/lib/roles";
+import { isDemoAdmin, roleAtLeast, type Role } from "@/lib/roles";
 import type { ChatSessionSummary } from "@/lib/chat/types";
 import type { ForumRecentTopic } from "@/lib/forum/types";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
@@ -230,7 +230,11 @@ function NavGroups({
         </div>
         {/* The Chat section sits right after User (present for every role). */}
         {g.label === "User" && (
-          <ChatNav recentChats={recentChats} onNavigate={onNavigate} />
+          <ChatNav
+            recentChats={recentChats}
+            onNavigate={onNavigate}
+            canDelete={!isDemoAdmin(role)}
+          />
         )}
         </div>
       ))}

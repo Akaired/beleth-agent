@@ -36,15 +36,19 @@ import {
 } from "@/components/forum/tradingview-dialog";
 import { TV_WIDGET_BY_ID } from "@/lib/forum/tradingview";
 
-const TOOLBAR = [
-  [{ header: [2, 3, false] }],
-  ["bold", "italic", "underline", "strike"],
-  [{ list: "ordered" }, { list: "bullet" }],
-  [{ align: "" }, { align: "center" }, { align: "right" }],
-  ["blockquote", "code-block"],
-  ["link", "image", "video", "tradingview"],
-  ["clean"],
-];
+function toolbar(allowImages: boolean) {
+  return [
+    [{ header: [2, 3, false] }],
+    ["bold", "italic", "underline", "strike"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ align: "" }, { align: "center" }, { align: "right" }],
+    ["blockquote", "code-block"],
+    allowImages
+      ? ["link", "image", "video", "tradingview"]
+      : ["link", "video", "tradingview"],
+    ["clean"],
+  ];
+}
 
 /** Toolbar glyph for the TradingView button — the official TradingView mark
  *  (simple-icons, CC0). `fill:currentColor` so it retints with the button. */
@@ -86,6 +90,7 @@ export function RichEditor({
   placeholder = "Write…",
   minHeight = 160,
   resetKey,
+  allowImages = true,
 }: {
   name: string;
   defaultValue?: string;
@@ -93,6 +98,9 @@ export function RichEditor({
   minHeight?: number;
   /** Change this to clear the editor (used after a successful post). */
   resetKey?: number;
+  /** False drops the image button: the shared demo login may write, but an
+   *  upload from it is an anonymous write to a public bucket (see 0030). */
+  allowImages?: boolean;
 }) {
   const holderRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<QuillType | null>(null);
@@ -267,7 +275,7 @@ export function RichEditor({
           syntax: { hljs },
           resize: { locale: {} },
           toolbar: {
-            container: TOOLBAR,
+            container: toolbar(allowImages),
             handlers: {
               image: uploadImage,
               link: () => openPrompt("link"),
@@ -332,6 +340,9 @@ export function RichEditor({
     return () => {
       cancelled = true;
     };
+    // allowImages only shapes the toolbar built on this one pass; it is fixed
+    // for the lifetime of a mount (it comes from the viewer's role).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultValue, placeholder]);
 
   // ── clear on resetKey (no rebuild) ──────────────────────────────────────

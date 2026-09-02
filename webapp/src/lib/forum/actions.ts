@@ -12,7 +12,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getSessionContext, isDemoAdmin } from "@/lib/auth";
+import { DEMO_READ_ONLY, getSessionContext, isDemoAdmin } from "@/lib/auth";
 import type { SessionContext } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { htmlToText, sanitizeForumHtml } from "@/lib/forum/sanitize";
@@ -139,6 +139,10 @@ export async function editPostAction(
 
   const postId = String(formData.get("post_id") ?? "");
   if (!postId) return { error: "Missing post." };
+  // The demo login is shared, so every demo post has the same author_id: an
+  // edit would reach another visitor's words, and blanking a body is a delete
+  // by another name. The database refuses this too (0030).
+  if (isDemoAdmin(ctx.role)) return { error: DEMO_READ_ONLY };
 
   const cleaned = cleanBody(String(formData.get("body") ?? ""));
   if ("error" in cleaned) return { error: cleaned.error };
@@ -154,28 +158,32 @@ export async function editPostAction(
   return { error: null, ok: true };
 }
 
-/** Delete one of the caller's own replies. RLS + the RPC enforce ownership. */
+/** Delete one of the caller's own replies. RLS + the RPC enforce ownership;
+ *  the shared demo account is refused outright (see 0030). */
 export async function deletePostAction(formData: FormData): Promise<void> {
   const slug = String(formData.get("slug") ?? "");
   const ctx = await getSessionContext();
   if (!ctx) redirect(`/login?next=/forum/t/${slug}`);
 
   const postId = String(formData.get("post_id") ?? "");
-  if (!postId) return;
+  if (!postId || isDemoAdmin(ctx.role)) return;
 
   const supabase = await createClient();
   await supabase.rpc("beleth_forum_delete_post", { p_post_id: postId });
   revalidatePath(`/forum/t/${slug}`);
 }
 
-/** Delete one of the caller's own topics (cascades to every post in it). */
+/** Delete one of the caller's own topics (cascades to every post in it).
+ *  Refused for the shared demo account (see 0030). */
 export async function deleteTopicAction(formData: FormData): Promise<void> {
   const categorySlug = String(formData.get("category_slug") ?? "");
   const ctx = await getSessionContext();
   if (!ctx) redirect("/login?next=/forum");
 
   const topicId = String(formData.get("topic_id") ?? "");
-  if (!topicId) return;
+  // Deleting a topic cascades to every reply: the widest reach a shared login
+  // has over other people's content.
+  if (!topicId || isDemoAdmin(ctx.role)) return;
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("beleth_forum_delete_topic", {

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { requireSession } from "@/lib/auth";
+import { isDemoAdmin, requireSession } from "@/lib/auth";
 import { fetchBelethChatContext } from "@/lib/chat/context";
+import { demoTurnsLeft } from "@/lib/chat/demo-allowance";
 import {
   fetchChatMessages,
   fetchChatSession,
@@ -26,12 +27,15 @@ export default async function ChatSessionPage({
     fetchBelethChatContext(),
   ]);
 
+  const left = isDemoAdmin(ctx.role) ? await demoTurnsLeft() : null;
+
   return (
     <ChatView
       sessionId={id}
       initialMessages={rowsToDisplayMessages(rows)}
       scene={scene}
       mood={mood}
+      demoTurnsLeft={left}
     />
   );
 }

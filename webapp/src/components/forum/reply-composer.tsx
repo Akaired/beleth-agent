@@ -60,6 +60,7 @@ export function ReplyComposer({
           placeholder="Write a reply…"
           minHeight={140}
           resetKey={resetKey}
+          allowImages={!isDemo}
         />
         {error && <p className="text-[11.5px] text-down">{error}</p>}
         <div className="flex justify-end">

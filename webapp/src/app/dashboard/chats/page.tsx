@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireSession } from "@/lib/auth";
+import { isDemoAdmin, requireSession } from "@/lib/auth";
 import { fetchAllChatSessions } from "@/lib/chat/queries";
 import { timeAgo } from "@/components/dashboard/ui";
 import { DeleteChatButton } from "@/components/dashboard/delete-chat-button";
@@ -9,7 +9,10 @@ import { IconChat, IconPlus } from "@/components/icons";
 export const metadata: Metadata = { title: "All chats — Beleth" };
 
 export default async function ChatsPage() {
-  await requireSession();
+  const ctx = await requireSession();
+  // The demo login is shared: one visitor must not discard another's
+  // transcript (the database refuses it too — see 0030).
+  const canDelete = !isDemoAdmin(ctx.role);
   const sessions = await fetchAllChatSessions();
 
   return (
@@ -50,7 +53,7 @@ export default async function ChatsPage() {
                     {timeAgo(s.updated_at)}
                   </span>
                 </Link>
-                <DeleteChatButton id={s.id} title={title} />
+                {canDelete && <DeleteChatButton id={s.id} title={title} />}
               </li>
             );
           })}

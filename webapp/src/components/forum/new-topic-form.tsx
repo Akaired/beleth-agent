@@ -105,7 +105,12 @@ export function NewTopicForm({
 
         <div className="flex flex-col gap-1.5">
           <span className={fieldLabel}>Body</span>
-          <RichEditor name="body" placeholder="Write your post…" minHeight={200} />
+          <RichEditor
+            name="body"
+            placeholder="Write your post…"
+            minHeight={200}
+            allowImages={!isDemo}
+          />
         </div>
 
         {state?.error && (

@@ -60,6 +60,8 @@ export type ChatResponse = {
   answer: string;
   userMessageId: string | null;
   assistantMessageId: string | null;
+  /** Turns the shared demo login has left today on this browser; null otherwise. */
+  demoTurnsLeft?: number | null;
 };
 
 /** POST /api/chat/edit — replace the last user message and regenerate. */

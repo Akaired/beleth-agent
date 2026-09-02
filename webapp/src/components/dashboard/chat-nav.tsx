@@ -50,10 +50,12 @@ function RecentRow({
   chat,
   active,
   onNavigate,
+  canDelete = true,
 }: {
   chat: ChatSessionSummary;
   active: boolean;
   onNavigate?: () => void;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
@@ -100,15 +102,17 @@ function RecentRow({
         />
         <span className="truncate">{title}</span>
       </Link>
-      <button
-        type="button"
-        onClick={() => setConfirming(true)}
-        disabled={busy}
-        aria-label={`Delete chat: ${title}`}
-        className="mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-faint opacity-0 transition-opacity hover:bg-hoverbg hover:text-down focus:opacity-100 group-hover:opacity-100 disabled:opacity-40"
-      >
-        <IconTrash size={12} />
-      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          disabled={busy}
+          aria-label={`Delete chat: ${title}`}
+          className="mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded text-faint opacity-0 transition-opacity hover:bg-hoverbg hover:text-down focus:opacity-100 group-hover:opacity-100 disabled:opacity-40"
+        >
+          <IconTrash size={12} />
+        </button>
+      )}
       <ConfirmDialog
         open={confirming}
         title="Delete chat"
@@ -130,15 +134,20 @@ function RecentRow({
 
 /**
  * The "Chat" sidebar section: a New-chat entry, an All-chats link, and the
- * three most recently active conversations (indented, each deletable).
+ * three most recently active conversations (indented, each deletable
+ * except on the shared demo login).
  * Rendered inside DashboardChrome, between Live and Records.
  */
 export function ChatNav({
   recentChats,
   onNavigate,
+  canDelete = true,
 }: {
   recentChats: ChatSessionSummary[];
   onNavigate?: () => void;
+  /** False on the shared demo login, which may read a transcript but not
+   *  discard one another visitor may still be reading (see 0030). */
+  canDelete?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -169,6 +178,7 @@ export function ChatNav({
           chat={c}
           active={pathname === `/dashboard/chat/${c.id}`}
           onNavigate={onNavigate}
+          canDelete={canDelete}
         />
       ))}
     </div>
