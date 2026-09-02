@@ -58,13 +58,11 @@ from app.alpaca_client import (
     fetch_account,
     fetch_clock,
     fetch_positions,
-    get_option_data_client,
-    get_stock_data_client,
-    get_trading_client,
     money,
 )
-from app.config import ConfigError, default_symbol, get_settings, load_strategy_config
 from app.cycle.account import _underlying_prices_for_spreads
+from app.cycle.config import build_clients, load_cycle_config
+from app.cycle.gather import gather_market_evidence
 from app.cycle.open_orders import (
     resting_entry_leg_sets,
     working_exit_orders,
@@ -79,18 +77,7 @@ from app.exits import (
     exit_summary_sentences,
     pair_open_spreads,
 )
-from app.market.calendar import (
-    EASTERN,
-    blocked_tenors,
-    load_macro_events,
-    next_macro_event,
-)
-from app.market.realized_vol import realized_vol_for_windows
-from app.market.term_structure import atm_iv_for_expiry, classify
-from app.market.underlying import fetch_daily_closes, fetch_last_price
-from app.market.vix import VixDataUnavailable, fetch_vix_history, summarize_regime
-from app.options.chain import fetch_chain_for_ladder, fetch_latest_quotes
-from app.options.spreads import build_candidates
+from app.options.chain import fetch_latest_quotes
 from app.orders import (
     OrderSubmissionError,
     submit_mleg_order,
@@ -117,105 +104,33 @@ from app.risk_check import (
     evaluate_candidates,
     vix_size_multiplier,
 )
-from app.vrp import best_tradable_tenor, scan_tenors
+from app.vrp import best_tradable_tenor
 
 
 def main() -> int:
-    symbol = sys.argv[1].upper() if len(sys.argv) > 1 else default_symbol()
-
-    try:
-        settings = get_settings()
-    except ConfigError as exc:
-        print(exc, file=sys.stderr)
+    loaded = load_cycle_config(sys.argv)
+    if loaded is None:
         return 1
+    settings, cfg = loaded
+    symbol = cfg.symbol
+    strategy = cfg.strategy
+    clients = build_clients(settings)
+    trading = clients.trading
+    option_client = clients.options
+    stock_client = clients.stocks
 
-    strategy = load_strategy_config()
-    tenor_cfg = strategy["tenor_scan"]
-    rv_cfg = strategy["realized_vol"]
-    vix_cfg = strategy["vix"]
-    regime_cfg = strategy["regime"]
-    cal_cfg = strategy["macro_calendar"]
-    structure = strategy["structure"]
-
-    dte_ladder = tenor_cfg["dte_ladder"]
-    today_ordinal = datetime.now().toordinal()
-    now_et = datetime.now(EASTERN)
-
-    trading = get_trading_client(settings)
-    option_client = get_option_data_client(settings)
-    stock_client = get_stock_data_client(settings)
-
-    # --- underlying: last price + realized vol ------------------------------------------
-    last_price = fetch_last_price(stock_client, symbol)
-    closes = fetch_daily_closes(
-        stock_client, symbol, lookback_days=max(rv_cfg["windows_days"]) * 3 + 30
-    )
-    realized_vols = realized_vol_for_windows(
-        closes, rv_cfg["windows_days"], rv_cfg["annualization_trading_days"]
-    )
-    rv20 = realized_vols.get(20)
-    rv20_value = rv20.value if rv20 is not None else None
-
-    # --- VIX regime (FRED) -------------------------------------------------------------
-    vix_regime = None
-    vix_error = None
-    try:
-        history = fetch_vix_history(vix_cfg["fred_csv_url"], vix_cfg.get("cboe_fallback_url"))
-        vix_regime = summarize_regime(history, vix_cfg["lookback_trading_days"])
-    except VixDataUnavailable as exc:
-        vix_error = str(exc)
-        print(f"WARNING: VIX data unavailable — {exc}", file=sys.stderr)
-
-    # --- chain, term structure, per-tenor VRP ----------------------------------------
-    chain = fetch_chain_for_ladder(option_client, symbol, dte_ladder)
-    tol = tenor_cfg["atm_strike_tolerance_pct"]
-    short_iv = atm_iv_for_expiry(chain, min(dte_ladder), today_ordinal, last_price, tol)
-    long_iv = atm_iv_for_expiry(chain, max(dte_ladder), today_ordinal, last_price, tol)
-    term_structure = classify(
-        short_iv,
-        long_iv,
-        min(dte_ladder),
-        max(dte_ladder),
-        regime_cfg["term_structure_flat_band_iv"],
-    )
-
-    tenor_vrp = scan_tenors(
-        chain,
-        dte_ladder=dte_ladder,
-        today_ordinal=today_ordinal,
-        underlying_last=last_price,
-        rv20=rv20_value,
-        threshold_vol_points=tenor_cfg["vrp_threshold_vol_points"],
-        strike_tolerance_pct=tol,
-    )
-
-    # --- macro calendar gate --------------------------------------------------------
-    events = load_macro_events(cal_cfg["events_file"])
-    next_event = next_macro_event(events, now_et)
-    blocks = blocked_tenors(events, dte_ladder, now_et, cal_cfg["block_within_days"])
-    blocked_dtes = {b.dte for b in blocks}
-
-    # --- candidates: only for tenors that clear VRP and aren't gate-blocked -------------
-    # R2: an inverted term structure blocks every new short-premium position (enforced here,
-    # not just reported — the LLM layer must never even see a backwardation candidate).
-    backwardation_block = (
-        regime_cfg["block_new_shorts_on_backwardation"] and term_structure.state == "backwardation"
-    )
-    tradable_dtes = [
-        t.dte
-        for t in tenor_vrp
-        if t.passes_threshold and t.dte not in blocked_dtes and not backwardation_block
-    ]
-    candidates = build_candidates(
-        chain,
-        underlying=symbol,
-        target_dtes=tradable_dtes,
-        today_ordinal=today_ordinal,
-        delta_min=structure["short_leg_delta_min"],
-        delta_max=structure["short_leg_delta_max"],
-        width_min=structure["strike_width_usd_min"],
-        width_max=structure["strike_width_usd_max"],
-    )
+    market = gather_market_evidence(clients, cfg)
+    last_price = market.underlying_last
+    realized_vols = market.realized_vols
+    vix_regime = market.vix_regime
+    vix_error = market.vix_error
+    term_structure = market.term_structure
+    tenor_vrp = market.tenor_vrp
+    next_event = market.next_event
+    blocks = market.blocked_tenors
+    blocked_dtes = market.blocked_dtes
+    candidates = market.candidates
+    now_et = cfg.now_et
 
     # --- account ------------------------------------------------------------------
     account = fetch_account(trading)
@@ -726,7 +641,8 @@ def main() -> int:
     if best is None:
         print(
             "No tenor clears the VRP threshold "
-            f"({tenor_cfg['vrp_threshold_vol_points']} vol points) — agent would NOT trade.",
+            f"({strategy['tenor_scan']['vrp_threshold_vol_points']} vol points) "
+            "— agent would NOT trade.",
             file=sys.stderr,
         )
     else:
@@ -736,7 +652,7 @@ def main() -> int:
             f"VRP {best.vrp_vs_rv20:.2f} vol points{blocked_note}.",
             file=sys.stderr,
         )
-    if regime_cfg["block_new_shorts_on_backwardation"] and term_structure.state == "backwardation":
+    if market.backwardation_block:
         print(
             "Term structure is BACKWARDATION — regime gate blocks new short premium.",
             file=sys.stderr,
