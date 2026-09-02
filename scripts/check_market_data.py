@@ -51,33 +51,20 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from alpaca.trading.enums import QueryOrderStatus
-from alpaca.trading.requests import GetOrdersRequest
 
-from app.alpaca_client import (
-    fetch_account,
-    fetch_clock,
-    fetch_positions,
-    money,
-)
-from app.cycle.account import _underlying_prices_for_spreads
+from app.cycle.account import gather_account_state
 from app.cycle.config import build_clients, load_cycle_config
 from app.cycle.gather import gather_market_evidence
 from app.cycle.open_orders import (
-    resting_entry_leg_sets,
     working_exit_orders,
 )
 from app.cycle.planning import _prepare_closings, _prepare_order
 from app.decision import decide_from_llm, decide_from_risk_engine
 from app.eventlog import EventLog
-from app.evidence import AccountSnapshot, build_evidence_package
+from app.evidence import build_evidence_package
 from app.exits import (
-    ExitEvaluation,
-    evaluate_exit,
     exit_summary_sentences,
-    pair_open_spreads,
 )
-from app.options.chain import fetch_latest_quotes
 from app.orders import (
     OrderSubmissionError,
     submit_mleg_order,
@@ -116,8 +103,6 @@ def main() -> int:
     strategy = cfg.strategy
     clients = build_clients(settings)
     trading = clients.trading
-    option_client = clients.options
-    stock_client = clients.stocks
 
     market = gather_market_evidence(clients, cfg)
     last_price = market.underlying_last
@@ -132,145 +117,26 @@ def main() -> int:
     candidates = market.candidates
     now_et = cfg.now_et
 
-    # --- account ------------------------------------------------------------------
-    account = fetch_account(trading)
-    positions = fetch_positions(trading)
-    clock = fetch_clock(trading)
-
-    # --- R5: open legs paired back into spreads, measured against the exit rules ---------
-    # Exits are mechanical risk management, never LLM-gated: the pairing runs every cycle
-    # and each spread's R5 verdict is persisted like any other check.
-    # Anomalies — naked legs, unparseable positions — and spreads without a computable
-    # entry credit block new entries: the gate must not add risk it cannot size.
-    position_dumps = [p.model_dump(mode="json") for p in positions]
-    open_spreads, position_anomalies = pair_open_spreads(position_dumps)
-
-    leg_symbols = sorted(
-        {sym for spread in open_spreads for sym in (spread.short_symbol, spread.long_symbol)}
-    )
-    leg_quotes: dict[str, tuple[float | None, float | None]] = {}
-    if leg_symbols:
-        try:
-            leg_quotes = fetch_latest_quotes(option_client, leg_symbols)
-        except Exception as exc:  # noqa: BLE001 — unquotable legs must not kill the cycle
-            print(
-                f"WARNING: quotes for open legs unavailable ({describe_exception(exc)}) "
-                "— the P/L exit rules cannot fire this cycle (the ITM rule still can).",
-                file=sys.stderr,
-            )
-
-    exit_cfg = strategy["exit"]
-    exit_evaluations: list[ExitEvaluation] = []
-    underlying_prices = _underlying_prices_for_spreads(stock_client, open_spreads)
-    for spread in open_spreads:
-        short_bid, short_ask = leg_quotes.get(spread.short_symbol, (None, None))
-        long_bid, long_ask = leg_quotes.get(spread.long_symbol, (None, None))
-        exit_evaluations.append(
-            evaluate_exit(
-                spread,
-                short_bid=short_bid,
-                short_ask=short_ask,
-                long_bid=long_bid,
-                long_ask=long_ask,
-                underlying_last=underlying_prices[spread.root],
-                profit_target_pct=exit_cfg["profit_target_pct_of_max_credit"],
-                loss_multiple=exit_cfg["loss_close_credit_multiple"],
-                exit_on_short_itm=exit_cfg["loss_close_on_short_leg_itm"],
-            )
-        )
-    triggered_exits = [e for e in exit_evaluations if e.triggered]
-
-    # Open orders must be visible before anything trades: a resting entry order is
-    # committed-but-invisible risk (not yet a position, so open_positions and
-    # capital_at_risk do not see it) and the resident loop would otherwise stack a new
-    # entry order on top of it every few minutes. A listing failure is fail-closed for
-    # BOTH paths: no closings and no new entries this cycle.
-    open_orders: list[Any] = []
-    open_orders_error = ""
-    if clock.is_open:
-        try:
-            open_orders = list(
-                trading.get_orders(GetOrdersRequest(status=QueryOrderStatus.OPEN, nested=True))
-            )
-        except Exception as exc:  # noqa: BLE001 — unknown order state must not cause more orders
-            open_orders_error = describe_exception(exc)
-            print(
-                "WARNING: cannot list open orders "
-                f"({open_orders_error}) — no closings and no new entries this cycle "
-                "(fail-closed).",
-                file=sys.stderr,
-            )
-        # Always visible in the logs: a resting order the cycle cannot see stays invisible
-        # unless this count is printed every fetch.
-        print(f"open orders listed: {len(open_orders)}", flush=True)
-
-    # The risk gate counts positions in spreads (the strategy's unit), not raw legs.
-    open_position_count = len(open_spreads) + len(position_anomalies)
-    # Each block is tagged with a ``kind`` so the R10 rejection row can tell a resting
-    # order apart from a position anomaly apart from an unreadable order book.
-    entry_blocks: list[dict[str, str]] = [
-        {"kind": "position_anomaly", "reason": str(a["reason"])} for a in position_anomalies
-    ]
-    entry_blocks += [
-        {
-            "kind": "position_anomaly",
-            "reason": (
-                f"open spread {spread.short_symbol}/{spread.long_symbol} has no computable "
-                "entry credit, so its risk cannot be sized"
-            ),
-        }
-        for spread in open_spreads
-        if spread.entry_credit is None
-    ]
-    if open_orders_error:
-        entry_blocks.append(
-            {
-                "kind": "open_orders_unreadable",
-                "reason": (
-                    "open orders could not be listed, so resting entry orders cannot be "
-                    "ruled out — new entries fail closed until the account state is "
-                    "visible again"
-                ),
-            }
-        )
-    elif resting_entry_leg_sets(open_orders):
-        entry_blocks.append(
-            {
-                "kind": "resting_entry_order",
-                "reason": (
-                    "an entry order is already resting on the account — waiting for its "
-                    "outcome before considering any new entry (no stacking of unfilled "
-                    "orders)"
-                ),
-            }
-        )
-    capital_at_risk = round(
-        sum(
-            spread.qty * spread.max_loss_per_spread
-            for spread in open_spreads
-            if spread.max_loss_per_spread is not None
-        ),
-        2,
-    )
-
-    equity = money(account.equity, "equity")
-    last_equity = money(account.last_equity, "last_equity")
-    day_pnl = equity - last_equity
-    daily_stop = equity * strategy["risk"]["daily_drawdown_stop_pct"] / 100
-    # Loss still absorbable today before the daily-drawdown stop trips (never negative).
-    risk_budget_remaining_today = max(0.0, daily_stop + min(0.0, day_pnl))
-
-    account_snapshot = AccountSnapshot(
-        cash=money(account.cash, "cash"),
-        buying_power=money(account.buying_power, "buying_power"),
-        open_positions=open_position_count,
-        day_pnl=round(day_pnl, 2),
-        risk_budget_remaining_today=round(risk_budget_remaining_today, 2),
-    )
+    state = gather_account_state(clients, cfg)
+    clock_is_open = state.market_open
+    positions = state.positions
+    open_spreads = state.open_spreads
+    position_anomalies = state.position_anomalies
+    exit_evaluations = state.exit_evaluations
+    triggered_exits = state.triggered_exits
+    open_orders = state.open_orders
+    open_orders_error = state.open_orders_error
+    open_position_count = state.open_position_count
+    equity = state.equity
+    day_pnl = state.day_pnl
+    account_snapshot = state.snapshot
+    risk_state = state.risk_state
+    capital_at_risk = state.capital_at_risk
+    entry_blocks = state.entry_blocks
 
     package = build_evidence_package(
         as_of=datetime.now(UTC),
-        market_open=clock.is_open,
+        market_open=clock_is_open,
         underlying_symbol=symbol,
         underlying_last=last_price,
         realized_vols=realized_vols,
@@ -322,11 +188,11 @@ def main() -> int:
 
     # --- decision: the LLM weighs the evidence only when it has something to weigh ------
     as_of = datetime.now(UTC)
-    if clock.is_open and any(v.approved for v in verdicts):
+    if clock_is_open and any(v.approved for v in verdicts):
         draft = decide_from_llm(
             as_of=as_of,
             symbol=symbol,
-            market_open=clock.is_open,
+            market_open=clock_is_open,
             equity=round(equity, 2),
             day_pnl=round(day_pnl, 2),
             evidence=package,
@@ -338,7 +204,7 @@ def main() -> int:
         draft = decide_from_risk_engine(
             as_of=as_of,
             symbol=symbol,
-            market_open=clock.is_open,
+            market_open=clock_is_open,
             equity=round(equity, 2),
             day_pnl=round(day_pnl, 2),
             evidence=package,
@@ -352,7 +218,7 @@ def main() -> int:
     # (fail-closed against duplicates) and re-arms next cycle.
     exit_plans: list[dict[str, Any]] = []
     exit_plan_notes = ""
-    if triggered_exits and clock.is_open:
+    if triggered_exits and clock_is_open:
         if open_orders_error:
             print(
                 "WARNING: open orders unavailable — closings are not sent this cycle "
@@ -384,7 +250,7 @@ def main() -> int:
     if vix_size_mult != 1.0:
         draft = replace(draft, summary=draft.summary + " " + vix_size_reason)
 
-    exit_sentences = exit_summary_sentences(exit_evaluations, market_open=clock.is_open)
+    exit_sentences = exit_summary_sentences(exit_evaluations, market_open=clock_is_open)
     if exit_sentences or exit_plan_notes:
         # Open positions come first in the persisted summary: managing them outranks entries.
         draft = replace(draft, summary=exit_sentences + exit_plan_notes + draft.summary)
@@ -587,7 +453,7 @@ def main() -> int:
             status_state = (
                 "trade_executed"
                 if submitted_order is not None or submitted_exits > 0
-                else ("monitoring" if clock.is_open else "idle")
+                else ("monitoring" if clock_is_open else "idle")
             )
             status_detail: dict[str, Any] = {
                 "candidates": len(candidates),
