@@ -80,7 +80,10 @@ export async function restCount(
   const { key } = restBase();
   let res: Response;
   try {
-    res = await fetch(restUrl(table, params), {
+    // `select` is named on purpose. PostgREST defaults a request without one to
+    // `select=*`, which fails outright on a table whose anon SELECT is granted
+    // column by column (0035) — and a count does not need any column's value anyway.
+    res = await fetch(restUrl(table, { select: "id", ...params }), {
       method: "HEAD",
       headers: {
         apikey: key,

@@ -130,7 +130,8 @@ export async function fetchHomepageData(): Promise<HomepageData> {
     }).catch(() => [] as AgentStatusRow[]),
     // Open spreads = short-side legs in `positions`, the same definition the
     // dashboard's open-count badge uses. Anon-readable via 0003.
-    restCount("positions", { side: "eq.short" }).catch(() => 0),
+    // `positions` is keyed by symbol; it has no id column for restCount to name.
+    restCount("positions", { select: "symbol", side: "eq.short" }).catch(() => 0),
   ]);
 
   // A `trade` decision can still be stood down by the marketability gate after

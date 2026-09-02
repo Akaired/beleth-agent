@@ -132,8 +132,13 @@ function withDeadline<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
 }
 
-const DETAIL_COLS =
-  DECISION_COLS + ",agent_version,llm_reasoning,llm_usage,strategy_config";
+/**
+ * The full decision — including `llm_reasoning`, the model's unedited output — comes
+ * from `beleth_decision_detail`, a SECURITY DEFINER reader gated to demo_admin and
+ * master_admin (0034). Selecting the column directly worked only because `decisions`
+ * is anon-readable, which made the UI's gate cosmetic: the anon key and one PostgREST
+ * call returned the same text. 0035 revokes the column; this call keeps working.
+ */
 
 /** Everything the public-user dashboard needs, in one batch. */
 export async function fetchDashboardOverview(): Promise<DashboardOverview> {
@@ -366,7 +371,7 @@ export type DecisionDetail = {
 export async function fetchDecisionDetail(id: string): Promise<DecisionDetail> {
   const supabase = await createClient();
   const [decision, checks, trades] = await Promise.all([
-    supabase.from("decisions").select(DETAIL_COLS).eq("id", id).maybeSingle(),
+    supabase.rpc("beleth_decision_detail", { p_id: id }).maybeSingle(),
     supabase
       .from("risk_checks")
       .select(
