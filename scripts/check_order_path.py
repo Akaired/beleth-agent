@@ -36,17 +36,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from alpaca.trading.requests import GetOrderByIdRequest  # noqa: E402
+from alpaca.trading.requests import GetOrderByIdRequest
 
-from app.alpaca_client import (  # noqa: E402
+from app.alpaca_client import (
     assert_paper_trading,
+    fetch_account,
+    fetch_order,
+    fetch_positions,
     get_option_data_client,
     get_trading_client,
+    money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.options.chain import fetch_chain_for_ladder  # noqa: E402
-from app.options.spreads import SpreadCandidate, build_candidates  # noqa: E402
-from app.orders import (  # noqa: E402
+from app.config import ConfigError, get_settings, load_strategy_config
+from app.options.chain import fetch_chain_for_ladder
+from app.options.spreads import SpreadCandidate, build_candidates
+from app.orders import (
     OrderSubmissionError,
     build_mleg_order,
     compute_quantity,
@@ -54,7 +58,7 @@ from app.orders import (  # noqa: E402
     describe_legs,
     submit_mleg_order,
 )
-from app.risk_check import AccountRiskState, evaluate_candidates  # noqa: E402
+from app.risk_check import AccountRiskState, evaluate_candidates
 
 # The probe demands this much MORE credit than measured, so the order cannot fill under
 # the documented convention (credit = negative limit): it must rest and be cancel-able.
@@ -99,13 +103,13 @@ def main() -> int:
 
     trading = get_trading_client(settings)
     assert_paper_trading(trading)  # never a live endpoint
-    account = trading.get_account()
-    equity = float(account.equity)
-    positions = trading.get_all_positions()
+    account = fetch_account(trading)
+    equity = money(account.equity, "equity")
+    positions = fetch_positions(trading)
     risk_state = AccountRiskState(
         equity=equity,
         open_positions=len(positions),
-        day_pnl=round(equity - float(account.last_equity), 2),
+        day_pnl=round(equity - money(account.last_equity, "last_equity"), 2),
         capital_at_risk=0.0,
     )
 
@@ -135,7 +139,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 0
-    candidate, verdict = found
+    candidate, _verdict = found
     print(
         f"gate-approved candidate: {candidate.right} {candidate.short_strike}/"
         f"{candidate.long_strike} exp {candidate.expiry} "
@@ -147,6 +151,7 @@ def main() -> int:
         # Probe pricing: demand MORE credit than measured — unfillable if (and only if)
         # the documented convention holds. qty is pinned to 1: this is a contract check,
         # not a trade.
+        limit: float | None
         credit = candidate.credit
         if credit is None or credit <= 0:
             print("candidate has no credit to probe with", file=sys.stderr)
@@ -197,17 +202,17 @@ def main() -> int:
         )
         return 1
 
-    order_id = order.get("id")
+    order_id = str(order["id"])
     print(f"submitted: id={order_id} status={order.get('status')}", file=sys.stderr)
 
     time.sleep(2)
     try:
-        current = trading.get_order_by_id(order_id, filter=GetOrderByIdRequest(nested=True))
-        status = current.status
+        current = fetch_order(trading, order_id, filter=GetOrderByIdRequest(nested=True))
+        status = str(current.status)
         filled = float(current.filled_qty or 0)
     except Exception as exc:  # noqa: BLE001 — report and still try to cancel
         print(f"WARNING: read-back failed ({exc}) — cancelling anyway", file=sys.stderr)
-        status, filled = order.get("status"), 0.0
+        status, filled = str(order.get("status")), 0.0
 
     sign_confirmed = filled == 0 and status not in ("filled",)
     print(
@@ -223,7 +228,7 @@ def main() -> int:
     try:
         trading.cancel_order_by_id(order_id)
         time.sleep(2)
-        current = trading.get_order_by_id(order_id, filter=GetOrderByIdRequest(nested=True))
+        current = fetch_order(trading, order_id, filter=GetOrderByIdRequest(nested=True))
         print(f"after cancel: status={current.status} filled_qty={current.filled_qty}", file=sys.stderr)
     except Exception as exc:  # noqa: BLE001 — report loudly, the order may need manual cancel
         print(f"ERROR: cancellation failed ({exc}) — cancel order {order_id} by hand", file=sys.stderr)

@@ -12,10 +12,12 @@ created or written, the runner keeps going with console output only.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TextIO
+from typing import TextIO
 
 DEFAULT_MAX_BYTES = 5_000_000
 DEFAULT_BACKUP_COUNT = 5
@@ -34,7 +36,7 @@ class RotatingLogFile:
         self._path = Path(path)
         self._max_bytes = max(0, int(max_bytes))
         self._backup_count = max(0, int(backup_count))
-        self._stream: TextIO = open(self._path, "a", encoding="utf-8")
+        self._stream: TextIO = open(self._path, "a", encoding="utf-8")  # noqa: SIM115 — the handle outlives __init__ by design
         try:
             self._pos = self._path.stat().st_size
         except OSError:
@@ -55,10 +57,8 @@ class RotatingLogFile:
         self._stream.flush()
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(OSError):
             self._stream.close()
-        except OSError:
-            pass
 
     def _rotate(self) -> None:
         self._stream.close()
@@ -67,23 +67,17 @@ class RotatingLogFile:
         else:
             oldest = self._path.with_name(f"{self._path.name}.{self._backup_count}")
             if oldest.exists():
-                try:
+                with contextlib.suppress(OSError):
                     oldest.unlink()
-                except OSError:
-                    pass
             for i in range(self._backup_count - 1, 0, -1):
                 src = self._path.with_name(f"{self._path.name}.{i}")
                 dst = self._path.with_name(f"{self._path.name}.{i + 1}")
                 if src.exists():
-                    try:
+                    with contextlib.suppress(OSError):
                         os.replace(src, dst)
-                    except OSError:
-                        pass
-            try:
+            with contextlib.suppress(OSError):
                 os.replace(self._path, self._path.with_name(f"{self._path.name}.1"))
-            except OSError:
-                pass
-        self._stream = open(self._path, "a", encoding="utf-8")
+        self._stream = open(self._path, "a", encoding="utf-8")  # noqa: SIM115 — reopened for the lifetime of the object
         self._pos = 0
 
 
@@ -102,18 +96,14 @@ class TeeStream:
 
     def write(self, text: str) -> int:
         written = self._primary.write(text)
-        try:
+        with contextlib.suppress(OSError):
             self._secondary.write(text)
-        except OSError:
-            pass
         return written
 
     def flush(self) -> None:
         self._primary.flush()
-        try:
+        with contextlib.suppress(OSError):
             self._secondary.flush()
-        except OSError:
-            pass
 
     def __getattr__(self, name: str):
         return getattr(self._primary, name)

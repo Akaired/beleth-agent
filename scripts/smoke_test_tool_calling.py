@@ -25,13 +25,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.config import ConfigError, get_settings  # noqa: E402
-from app.llm.client import complete  # noqa: E402
+from app.config import ConfigError, get_settings
+from app.llm.client import complete
 
-TOOLS = [
+TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
@@ -86,7 +87,7 @@ TOOLS = [
 
 FAKE_ACCOUNT = {"cash": "50000.00", "buying_power": "50000.00", "options_trading_level": 3}
 
-FAKE_CHAIN = {
+FAKE_CHAIN: dict[str, Any] = {
     "underlying_symbol": "SPY",
     "contracts": [
         {"symbol": "SPY260905P00640000", "strike": 640, "type": "put", "delta": -0.20, "iv": 0.18},
@@ -128,8 +129,8 @@ def fake_tool_result(name: str, args: dict) -> dict:
 def validate_args(name: str, args: dict) -> list[str]:
     """Return a list of problems with the arguments; empty list means valid."""
     problems = []
-    schema = next(t["function"] for t in TOOLS if t["function"]["name"] == name)
-    required = schema["parameters"]["required"]
+    schema: dict[str, Any] = next(t["function"] for t in TOOLS if t["function"]["name"] == name)
+    required: list[str] = schema["parameters"]["required"]
     for key in required:
         if key not in args:
             problems.append(f"missing required argument {key!r}")

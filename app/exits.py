@@ -26,7 +26,7 @@ per spread closing both legs inside it, never a naked leg.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -130,7 +130,7 @@ def _leg_from_position(dump: Mapping[str, Any]) -> _Leg | None:
 
 
 def pair_open_spreads(
-    position_dumps: list[Mapping[str, Any]],
+    position_dumps: Sequence[Mapping[str, Any]],
 ) -> tuple[list[OpenSpread], list[dict[str, Any]]]:
     """Pair the account's open option legs back into the verticals they form.
 
@@ -206,7 +206,7 @@ def pair_open_spreads(
             # Decrement exactly the paired leg (two longs may share a symbol).
             longs[index] = _Leg(paired.occ, paired.qty - qty, paired.entry_price)
 
-    for short in sorted(shorts, key=lambda l: (l.occ.expiry, l.occ.strike)):
+    for short in sorted(shorts, key=lambda leg: (leg.occ.expiry, leg.occ.strike)):
         _consume(short, short.occ.right)
 
     for leg in longs:

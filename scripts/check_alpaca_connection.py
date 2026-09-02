@@ -15,12 +15,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.alpaca_client import (  # noqa: E402
+from app.alpaca_client import (
     assert_paper_trading,
     describe_account,
+    fetch_account,
+    fetch_positions,
     get_trading_client,
 )
-from app.config import ConfigError, get_settings  # noqa: E402
+from app.config import ConfigError, get_settings
 
 
 def main() -> int:
@@ -39,11 +41,11 @@ def main() -> int:
         return 1
     print("Paper endpoint confirmed (BaseURL.TRADING_PAPER).\n")
 
-    account = client.get_account()
+    account = fetch_account(client)
     print("Account:")
     print(f"  {describe_account(account)}")
 
-    positions = client.get_all_positions()
+    positions = fetch_positions(client)
     print(f"\nOpen positions: {len(positions)}")
     for p in positions:
         print(f"  {p.symbol}: qty={p.qty} market_value={p.market_value}")

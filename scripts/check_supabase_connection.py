@@ -17,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.config import ConfigError, get_settings  # noqa: E402
-from app.persistence import (  # noqa: E402
+from app.config import ConfigError, get_settings
+from app.persistence import (
     EXPECTED_TABLES,
     PersistenceConfigError,
     PersistenceError,

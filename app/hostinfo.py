@@ -22,9 +22,10 @@ import os
 import resource
 import shutil
 import time
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping, TypeVar
+from typing import Any, TypeVar
 
 _T = TypeVar("_T")
 
@@ -38,7 +39,7 @@ def _safe(fn: Callable[[], _T]) -> _T | None:
     """Run ``fn`` and swallow anything it raises — a probe that fails is just absent."""
     try:
         return fn()
-    except Exception:
+    except Exception:  # noqa: BLE001 — a probe that fails is absent, never fatal
         return None
 
 
@@ -116,11 +117,11 @@ def _thermal_c() -> float | None:
     """Warmest CPU/ACPI zone in °C, best effort. Absent on desktops and some VMs."""
     readings: list[float] = []
     for zone in sorted(Path("/sys/class/thermal").glob("thermal_zone*")):
-        raw = _safe(lambda z=zone: int((z / "temp").read_text().strip()))
+        raw = _safe(lambda z=zone: int((z / "temp").read_text().strip()))  # type: ignore[misc]
         if raw is not None and 0 < raw < 200_000:
             readings.append(raw / 1000)
     for hw in sorted(Path("/sys/class/hwmon").glob("hwmon*")):
-        raw = _safe(lambda h=hw: int((h / "temp1_input").read_text().strip()))
+        raw = _safe(lambda h=hw: int((h / "temp1_input").read_text().strip()))  # type: ignore[misc]
         if raw is not None and 0 < raw < 200_000:
             readings.append(raw / 1000)
     return round(max(readings), 1) if readings else None
@@ -152,7 +153,7 @@ def collect_host_metrics(
     (``started_at``, ``cycles``, ``net`` = ``{"supabase_ms", "alpaca_ms"}``)."""
     metrics: dict[str, Any] = {
         "label": os.environ.get("BELETH_HOST_LABEL", "agent-host"),
-        "captured_at": datetime.now(timezone.utc).isoformat(),
+        "captured_at": datetime.now(UTC).isoformat(),
         "platform": _safe(_platform_info),
         "uptime_seconds": _safe(_uptime_seconds),
         "load": _safe(_load),
@@ -203,7 +204,7 @@ def write_runner_stats(stats: Mapping[str, Any]) -> None:
         tmp = RUNNER_STATS_PATH.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(dict(stats)), encoding="utf-8")
         tmp.replace(RUNNER_STATS_PATH)
-    except Exception:
+    except Exception:  # noqa: BLE001 — telemetry must never take the runner down
         pass
 
 
@@ -213,14 +214,14 @@ def read_runner_stats() -> dict[str, Any] | None:
     try:
         data = json.loads(RUNNER_STATS_PATH.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
-    except Exception:
+    except Exception:  # noqa: BLE001 — a missing or corrupt stats file is just absent telemetry
         return None
 
 
 def new_runner_stats() -> dict[str, Any]:
     """Seed the in-memory stats the runner keeps and periodically flushes."""
     return {
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
         "cycles": 0,
         "last_symbol": None,
         "net": {},

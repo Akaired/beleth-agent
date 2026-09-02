@@ -2,7 +2,7 @@
 their summaries. No network: the LLM transport is a scripted fake."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 
 from app.decision import (
@@ -13,7 +13,7 @@ from app.decision import (
     decide_from_risk_engine,
     validate_decision_args,
 )
-from app.risk_check import RuleResult, RiskVerdict
+from app.risk_check import RiskVerdict, RuleResult
 
 
 def _evidence(*, blocks=None, per_tenor=None, term_structure=None):
@@ -63,7 +63,7 @@ def _verdict(*, approved, rules, max_loss=None, candidate=None):
 
 def _decide(**overrides):
     kwargs = {
-        "as_of": datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        "as_of": datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         "symbol": "SPY",
         "market_open": True,
         "equity": 100000.0,
@@ -232,7 +232,7 @@ _APPROVED = [_verdict(approved=True, rules=[("R4", True), ("R6", True), ("R7", T
 
 def _llm_decide(scripted, *, verdicts=None, evidence=None, strategy="STRATEGY"):
     return decide_from_llm(
-        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         symbol="SPY",
         market_open=True,
         equity=100000.0,
@@ -357,7 +357,7 @@ def test_transport_failure_falls_back_to_a_deterministic_no_trade():
         raise RuntimeError("connection refused")
 
     draft = decide_from_llm(
-        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         symbol="SPY",
         market_open=True,
         equity=100000.0,
@@ -435,7 +435,7 @@ _SETTINGS_FB = SimpleNamespace(
 
 def _decide_llm(fake, *, settings=_SETTINGS, sleep_fn=None):
     return decide_from_llm(
-        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        as_of=datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         symbol="SPY",
         market_open=True,
         equity=100000.0,

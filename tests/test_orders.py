@@ -6,9 +6,9 @@ asserted through ``to_request_fields()`` — the exact payload the SDK would POS
 position intents) are pinned against the values verified in the vendored docs.
 """
 
-import pytest
-
 from datetime import date
+
+import pytest
 
 from app.exits import OpenSpread
 from app.options.spreads import SpreadCandidate

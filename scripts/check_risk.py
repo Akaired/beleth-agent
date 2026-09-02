@@ -25,17 +25,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.alpaca_client import (  # noqa: E402
+from app.alpaca_client import (
     assert_paper_trading,
+    fetch_account,
+    fetch_positions,
     get_option_data_client,
     get_stock_data_client,
     get_trading_client,
+    money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.market.underlying import fetch_last_price  # noqa: E402
-from app.options.chain import fetch_chain_for_ladder  # noqa: E402
-from app.options.spreads import build_candidates  # noqa: E402
-from app.risk_check import AccountRiskState, evaluate_candidates  # noqa: E402
+from app.config import ConfigError, get_settings, load_strategy_config
+from app.market.underlying import fetch_last_price
+from app.options.chain import fetch_chain_for_ladder
+from app.options.spreads import build_candidates
+from app.risk_check import AccountRiskState, evaluate_candidates
 
 
 def main() -> int:
@@ -71,10 +74,10 @@ def main() -> int:
         width_max=structure["strike_width_usd_max"],
     )
 
-    account = trading.get_account()
-    positions = trading.get_all_positions()
-    equity = float(account.equity)
-    day_pnl = equity - float(account.last_equity)
+    account = fetch_account(trading)
+    positions = fetch_positions(trading)
+    equity = money(account.equity, "equity")
+    day_pnl = equity - money(account.last_equity, "last_equity")
     state = AccountRiskState(
         equity=equity,
         open_positions=len(positions),

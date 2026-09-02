@@ -11,6 +11,8 @@ the chain's own OCC symbols. Live submission is exercised by the cycle
 a test run must not leave positions behind.
 """
 
+from datetime import datetime
+
 import pytest
 
 from app.alpaca_client import assert_paper_trading, get_option_data_client, get_trading_client
@@ -18,7 +20,6 @@ from app.config import get_settings, load_strategy_config
 from app.options.chain import fetch_chain_for_ladder
 from app.options.spreads import build_candidates
 from app.orders import build_mleg_order, compute_quantity, credit_limit_price
-from datetime import datetime
 
 pytestmark = pytest.mark.integration
 

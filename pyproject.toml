@@ -18,6 +18,49 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
+# A bare `pytest` must never reach a real broker or database. The integration suite is
+# opt-in: `pytest -m integration`.
+addopts = "-m 'not integration'"
 markers = [
     "integration: hits real external APIs (Alpaca paper trading / Supabase) — needs .env credentials.",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", ".claude"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "BLE",  # blind except — every `except Exception` must justify itself
+    "C4",   # comprehensions
+    "SIM",  # simplifications
+    "RUF",
+]
+ignore = [
+    "C408",    # `dict(a=1)` is used deliberately as a keyword bundle, often splatted back with **
+    "E501",    # line length is formatter business, not linter business
+    "RUF001",  # the prose in docstrings uses typographic punctuation on purpose
+    "RUF002",
+    "RUF003",
+]
+
+# `scripts/*.py` push the repo root onto sys.path before importing `app`, so their
+# imports cannot sit at the top of the file. Those lines carry their own `# noqa: E402`
+# rather than a blanket per-file ignore, so the exception stays visible where it applies.
+
+[tool.mypy]
+python_version = "3.11"
+plugins = ["pydantic.mypy"]
+files = ["app", "scripts"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true

@@ -47,44 +47,48 @@ import math
 import sys
 import uuid
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from alpaca.trading.enums import QueryOrderStatus  # noqa: E402
-from alpaca.trading.requests import GetOrdersRequest  # noqa: E402
+from alpaca.trading.enums import QueryOrderStatus
+from alpaca.trading.requests import GetOrdersRequest
 
-from app.alpaca_client import (  # noqa: E402
+from app.alpaca_client import (
+    fetch_account,
+    fetch_clock,
+    fetch_positions,
     get_option_data_client,
     get_stock_data_client,
     get_trading_client,
+    money,
 )
-from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.eventlog import EventLog  # noqa: E402
-from app.hostinfo import collect_host_metrics, read_runner_stats  # noqa: E402
-from app.decision import decide_from_llm, decide_from_risk_engine  # noqa: E402
-from app.evidence import AccountSnapshot, build_evidence_package  # noqa: E402
-from app.exits import (  # noqa: E402
+from app.config import ConfigError, get_settings, load_strategy_config
+from app.decision import decide_from_llm, decide_from_risk_engine
+from app.eventlog import EventLog
+from app.evidence import AccountSnapshot, build_evidence_package
+from app.exits import (
     ExitEvaluation,
     evaluate_exit,
     exit_summary_sentences,
     pair_open_spreads,
 )
-from app.market.calendar import (  # noqa: E402
+from app.hostinfo import collect_host_metrics, read_runner_stats
+from app.market.calendar import (
     EASTERN,
     blocked_tenors,
     load_macro_events,
     next_macro_event,
 )
-from app.market.realized_vol import realized_vol_for_windows  # noqa: E402
-from app.market.term_structure import atm_iv_for_expiry, classify  # noqa: E402
-from app.market.underlying import fetch_daily_closes, fetch_last_price  # noqa: E402
-from app.market.vix import VixDataUnavailable, fetch_vix_history, summarize_regime  # noqa: E402
-from app.options.chain import fetch_chain_for_ladder, fetch_latest_quotes  # noqa: E402
-from app.options.spreads import SpreadCandidate, build_candidates  # noqa: E402
-from app.orders import (  # noqa: E402
+from app.market.realized_vol import realized_vol_for_windows
+from app.market.term_structure import atm_iv_for_expiry, classify
+from app.market.underlying import fetch_daily_closes, fetch_last_price
+from app.market.vix import VixDataUnavailable, fetch_vix_history, summarize_regime
+from app.options.chain import fetch_chain_for_ladder, fetch_latest_quotes
+from app.options.spreads import SpreadCandidate, build_candidates
+from app.orders import (
     OrderSubmissionError,
     build_closing_mleg_order,
     build_mleg_order,
@@ -97,7 +101,7 @@ from app.orders import (  # noqa: E402
     slippage_within_credit_cap,
     submit_mleg_order,
 )
-from app.persistence import (  # noqa: E402
+from app.persistence import (
     PersistenceConfigError,
     PersistenceError,
     agent_status_row,
@@ -110,7 +114,7 @@ from app.persistence import (  # noqa: E402
     supabase_config_from_settings,
     trade_row,
 )
-from app.risk_check import (  # noqa: E402
+from app.risk_check import (
     AccountRiskState,
     apply_aggregate_cap,
     apply_vix_regime,
@@ -118,7 +122,7 @@ from app.risk_check import (  # noqa: E402
     evaluate_candidates,
     vix_size_multiplier,
 )
-from app.vrp import best_tradable_tenor, scan_tenors  # noqa: E402
+from app.vrp import best_tradable_tenor, scan_tenors
 
 
 def _match_candidate(
@@ -391,7 +395,7 @@ def _prepare_order(
     The plan is *not* submitted here: the caller submits only after the decision row is
     persisted, so no order ever goes out unlogged."""
     candidate = _match_candidate(candidates, chosen)
-    if candidate is None:
+    if candidate is None or chosen is None:
         return None, (
             " No order was sent: the decision did not carry a candidate this cycle built "
             "(fail-closed)."
@@ -572,9 +576,9 @@ def main() -> int:
     )
 
     # --- account ------------------------------------------------------------------
-    account = trading.get_account()
-    positions = trading.get_all_positions()
-    clock = trading.get_clock()
+    account = fetch_account(trading)
+    positions = fetch_positions(trading)
+    clock = fetch_clock(trading)
 
     # --- R5: open legs paired back into spreads, measured against the exit rules ---------
     # Exits are mechanical risk management, never LLM-gated: the pairing runs every cycle
@@ -693,23 +697,23 @@ def main() -> int:
         2,
     )
 
-    equity = float(account.equity)
-    last_equity = float(account.last_equity)
+    equity = money(account.equity, "equity")
+    last_equity = money(account.last_equity, "last_equity")
     day_pnl = equity - last_equity
     daily_stop = equity * strategy["risk"]["daily_drawdown_stop_pct"] / 100
     # Loss still absorbable today before the daily-drawdown stop trips (never negative).
     risk_budget_remaining_today = max(0.0, daily_stop + min(0.0, day_pnl))
 
     account_snapshot = AccountSnapshot(
-        cash=float(account.cash),
-        buying_power=float(account.buying_power),
+        cash=money(account.cash, "cash"),
+        buying_power=money(account.buying_power, "buying_power"),
         open_positions=open_position_count,
         day_pnl=round(day_pnl, 2),
         risk_budget_remaining_today=round(risk_budget_remaining_today, 2),
     )
 
     package = build_evidence_package(
-        as_of=datetime.now(timezone.utc),
+        as_of=datetime.now(UTC),
         market_open=clock.is_open,
         underlying_symbol=symbol,
         underlying_last=last_price,
@@ -763,7 +767,7 @@ def main() -> int:
     verdicts = apply_vix_regime(verdicts, vix_size_mult, vix_size_reason)
 
     # --- decision: the LLM weighs the evidence only when it has something to weigh ------
-    as_of = datetime.now(timezone.utc)
+    as_of = datetime.now(UTC)
     if clock.is_open and any(v.approved for v in verdicts):
         draft = decide_from_llm(
             as_of=as_of,
@@ -926,7 +930,7 @@ def main() -> int:
                         # the same position. The rule stays triggered and re-arms.
                         try:
                             trading.cancel_order_by_id(replace_order_id)
-                        except Exception as exc:  # noqa: BLE001 — a duplicate close is worse
+                        except Exception as exc:
                             raise OrderSubmissionError(
                                 f"could not cancel stale closing order {replace_order_id}: "
                                 f"{type(exc).__name__}: {exc}"
@@ -1063,7 +1067,7 @@ def main() -> int:
                 supabase,
                 agent_status_row(
                     state=status_state,
-                    last_cycle_at=datetime.now(timezone.utc),
+                    last_cycle_at=datetime.now(UTC),
                     last_decision_id=decision_id,
                     detail=status_detail,
                 ),

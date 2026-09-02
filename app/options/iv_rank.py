@@ -36,11 +36,8 @@ def compute_iv_rank(
         return IVRankResult(rank=None, history_points=0, lookback_days=lookback_days)
 
     lo, hi = min(history), max(history)
-    if hi == lo:
-        # No variation in the observed window — rank is undefined in the usual sense.
-        rank = 0.0
-    else:
-        rank = (current_iv - lo) / (hi - lo) * 100
+    # No variation in the observed window leaves the rank undefined in the usual sense.
+    rank = 0.0 if hi == lo else (current_iv - lo) / (hi - lo) * 100
 
     return IVRankResult(
         rank=rank, history_points=len(history), lookback_days=lookback_days

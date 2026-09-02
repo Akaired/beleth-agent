@@ -76,4 +76,5 @@ def best_tradable_tenor(tenors: list[TenorVrp]) -> TenorVrp | None:
     passing = [t for t in tenors if t.passes_threshold and t.vrp_vs_rv20 is not None]
     if not passing:
         return None
-    return max(passing, key=lambda t: t.vrp_vs_rv20)
+    # `passes_threshold` already excluded the None VRPs; restate it so the key is total.
+    return max(passing, key=lambda t: t.vrp_vs_rv20 or 0.0)

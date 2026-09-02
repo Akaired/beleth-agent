@@ -6,13 +6,56 @@ client can ever touch a live endpoint must not be a flag anyone can flip.
 
 from __future__ import annotations
 
+from typing import Any, TypeVar
+
 from alpaca.common.enums import BaseURL
 from alpaca.data.historical.option import OptionHistoricalDataClient
 from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.trading.client import TradingClient
-from alpaca.trading.models import TradeAccount
+from alpaca.trading.models import Clock, Order, Position, TradeAccount
 
 from app.config import Settings
+
+_Model = TypeVar("_Model")
+
+
+def model_response(value: _Model | dict[str, Any]) -> _Model:
+    """Narrow alpaca-py's ``Model | RawData`` return type to the model.
+
+    Every alpaca-py read is typed as a union because a client *can* be built with
+    ``raw_data=True``; none of ours is, so the dict arm is unreachable. Saying that once,
+    here, is honest — scattering ``# type: ignore`` over the call sites is not.
+    """
+    if isinstance(value, dict):
+        raise TypeError("alpaca client returned raw data — this project never sets raw_data=True")
+    return value
+
+
+def money(value: str | float | None, field: str) -> float:
+    """Coerce an Alpaca money field to a float, failing loudly instead of on ``None``.
+
+    Alpaca types every money field as an optional string. ``float(None)`` would raise a
+    bare ``TypeError`` deep inside a cycle; this names the field that was missing.
+    """
+    if value is None:
+        raise ValueError(f"Alpaca returned no value for {field!r}")
+    return float(value)
+
+
+def fetch_account(client: TradingClient) -> TradeAccount:
+    return model_response(client.get_account())
+
+
+def fetch_positions(client: TradingClient) -> list[Position]:
+    return model_response(client.get_all_positions())
+
+
+def fetch_clock(client: TradingClient) -> Clock:
+    return model_response(client.get_clock())
+
+
+def fetch_order(client: TradingClient, order_id: str, **kwargs: Any) -> Order:
+    return model_response(client.get_order_by_id(order_id, **kwargs))
 
 
 def get_trading_client(settings: Settings) -> TradingClient:

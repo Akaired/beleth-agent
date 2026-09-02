@@ -22,7 +22,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from app.alpaca_client import get_trading_client  # noqa: E402
+from app.alpaca_client import fetch_clock, get_trading_client  # noqa: E402
 from app.config import ConfigError, get_settings  # noqa: E402
 
 EXIT_SAFE = 0
@@ -62,7 +62,7 @@ def main() -> int:
         return EXIT_ERROR
 
     try:
-        clock = get_trading_client(settings).get_clock()
+        clock = fetch_clock(get_trading_client(settings))
         market_open = bool(clock.is_open)
     except Exception as exc:  # noqa: BLE001 — any clock failure is inconclusive, not a green light
         print(f"ERROR: could not read the Alpaca clock: {exc}", file=sys.stderr)

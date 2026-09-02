@@ -26,14 +26,15 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from app.alpaca_client import get_trading_client  # noqa: E402
+from app.alpaca_client import fetch_clock, get_trading_client  # noqa: E402
 from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
 from app.eventlog import EventLog  # noqa: E402
 from app.hostinfo import (  # noqa: E402
@@ -41,7 +42,6 @@ from app.hostinfo import (  # noqa: E402
     new_runner_stats,
     write_runner_stats,
 )
-from app.runlog import install_run_log  # noqa: E402
 from app.persistence import (  # noqa: E402
     PersistenceError,
     agent_status_row,
@@ -50,6 +50,7 @@ from app.persistence import (  # noqa: E402
     record_host_metrics,
     supabase_config_from_settings,
 )
+from app.runlog import install_run_log  # noqa: E402
 
 CYCLE_SCRIPT = REPO_ROOT / "scripts" / "check_market_data.py"
 
@@ -145,7 +146,7 @@ def send_heartbeat(supabase_config: Any, runner_stats: Mapping[str, Any] | None 
         supabase_config,
         agent_status_row(
             state="idle",
-            last_cycle_at=datetime.now(timezone.utc),
+            last_cycle_at=datetime.now(UTC),
             detail={
                 "runner": "heartbeat",
                 "market_open": False,
@@ -186,7 +187,7 @@ def run_cycle(symbol: str, *, timeout_seconds: float) -> bool:
     The subprocess isolates the loop from anything a cycle does — an unhandled
     exception, an API hang, a hung connection — at the cost of one interpreter start.
     """
-    started = datetime.now(timezone.utc).astimezone()
+    started = datetime.now(UTC).astimezone()
     print(f"--- [{started:%Y-%m-%d %H:%M:%S}] cycle start: {symbol} ---", flush=True)
     try:
         result = subprocess.run(
@@ -290,7 +291,7 @@ def main() -> int:
     while not stop():
         try:
             _t0 = time.monotonic()
-            clock = client.get_clock()
+            clock = fetch_clock(client)
             runner_stats["net"]["alpaca_ms"] = int((time.monotonic() - _t0) * 1000)
             market_open = bool(clock.is_open)
         except Exception as exc:  # noqa: BLE001 — a clock failure must not kill the loop
@@ -350,7 +351,7 @@ def main() -> int:
                 if sent:
                     runner_stats["net"]["supabase_ms"] = int((time.monotonic() - _t0) * 1000)
                 print(
-                    f"[{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%SZ}] market closed — heartbeat "
+                    f"[{datetime.now(UTC):%Y-%m-%d %H:%M:%SZ}] market closed — heartbeat "
                     + ("persisted to agent_status" if sent else "(Supabase off, logged only)"),
                     flush=True,
                 )
@@ -362,7 +363,7 @@ def main() -> int:
             # Near the open, wake at the bell instead of drifting a full heartbeat past it.
             next_open = getattr(clock, "next_open", None)
             if next_open is not None:
-                until_open = (next_open - datetime.now(timezone.utc)).total_seconds() + 30
+                until_open = (next_open - datetime.now(UTC)).total_seconds() + 30
                 sleep_seconds = min(sleep_seconds, max(until_open, 60))
             chunked_sleep(sleep_seconds, should_stop=stop)
 

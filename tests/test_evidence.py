@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from app.evidence import AccountSnapshot, build_evidence_package
 from app.market.calendar import EASTERN, MAJOR, MacroEvent, TenorBlock
@@ -6,7 +6,6 @@ from app.market.realized_vol import RealizedVolResult
 from app.market.term_structure import CONTANGO, TermStructure
 from app.market.vix import VixRegime
 from app.vrp import TenorVrp
-from datetime import date
 
 
 def _rv(w, v):

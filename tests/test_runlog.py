@@ -12,8 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.runlog import RotatingLogFile, TeeStream, install_run_log  # noqa: E402
-
+from app.runlog import RotatingLogFile, TeeStream, install_run_log
 
 # --- RotatingLogFile -------------------------------------------------------------------
 
@@ -110,7 +109,7 @@ def test_tee_attribute_access_falls_through_to_primary():
 
 def test_tee_survives_a_failing_secondary():
     class Boom:
-        def write(self, _text):  # noqa: ANN001
+        def write(self, _text):
             raise OSError("disk full")
 
         def flush(self):

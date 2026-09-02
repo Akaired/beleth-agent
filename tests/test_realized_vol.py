@@ -30,7 +30,7 @@ def test_alternating_returns_match_hand_computation():
     r = math.log(101 / 100)
     closes = []
     price = 100.0
-    for i in range(41):
+    for _ in range(41):
         closes.append(price)
         price = 101.0 if price == 100.0 else 100.0
     result = realized_vol(closes, window_days=20, annualization_trading_days=252)

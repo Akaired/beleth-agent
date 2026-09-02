@@ -6,7 +6,7 @@ cascade from their decision row, so deleting the decision cleans them). The whol
 skips cleanly when Supabase is unconfigured or the migration has not been applied.
 """
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -16,10 +16,10 @@ from app.exits import OpenSpread, evaluate_exit
 from app.persistence import (
     EXPECTED_TABLES,
     PersistenceConfigError,
+    _request,
     agent_status_row,
     delete_decision,
     delete_position,
-    exit_check_rows,
     fetch_agent_status,
     fetch_decision,
     fetch_latest_decision,
@@ -36,8 +36,7 @@ from app.persistence import (
     supabase_config_from_settings,
     trade_row,
 )
-from app.persistence import _request
-from app.risk_check import RuleResult, RiskVerdict
+from app.risk_check import RiskVerdict, RuleResult
 
 pytestmark = pytest.mark.integration
 
@@ -62,7 +61,7 @@ def require_schema(supabase_config):
 
 def _make_draft(**overrides) -> DecisionDraft:
     kwargs = {
-        "as_of": datetime.now(timezone.utc),
+        "as_of": datetime.now(UTC),
         "symbol": "SPY",
         "action": "no_trade",
         "decision_source": "risk_engine",
@@ -132,7 +131,7 @@ def test_agent_status_upsert_keeps_single_row_and_restores_previous(supabase_con
             supabase_config,
             agent_status_row(
                 state="idle",
-                last_cycle_at=datetime.now(timezone.utc),
+                last_cycle_at=datetime.now(UTC),
                 detail={"itest": 1},
             ),
         )
@@ -140,7 +139,7 @@ def test_agent_status_upsert_keeps_single_row_and_restores_previous(supabase_con
             supabase_config,
             agent_status_row(
                 state="monitoring",
-                last_cycle_at=datetime.now(timezone.utc),
+                last_cycle_at=datetime.now(UTC),
                 detail={"itest": 2},
             ),
         )

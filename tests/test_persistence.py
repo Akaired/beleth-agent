@@ -2,7 +2,7 @@
 
 import uuid
 from dataclasses import FrozenInstanceError
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -21,7 +21,7 @@ from app.persistence import (
     supabase_config_from_settings,
     trade_row,
 )
-from app.risk_check import RuleResult, RiskVerdict
+from app.risk_check import RiskVerdict, RuleResult
 
 
 def _settings(**overrides) -> Settings:
@@ -37,7 +37,7 @@ def _settings(**overrides) -> Settings:
 
 def _make_draft(**overrides) -> DecisionDraft:
     kwargs = {
-        "as_of": datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        "as_of": datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         "symbol": "SPY",
         "action": "no_trade",
         "decision_source": "risk_engine",
@@ -145,7 +145,7 @@ def test_decision_row_uses_explicit_agent_version():
 
 
 def test_decision_row_converts_datetime_inside_evidence():
-    row = decision_row(_make_draft(evidence={"ts": datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc)}))
+    row = decision_row(_make_draft(evidence={"ts": datetime(2026, 8, 28, 12, 0, tzinfo=UTC)}))
     assert row["evidence"]["ts"] == "2026-08-28T12:00:00+00:00"
 
 
@@ -230,7 +230,7 @@ def test_position_rows_handles_null_numerics():
 
 
 def test_agent_status_row_pins_id_to_one_and_omits_paused():
-    row = agent_status_row(state="monitoring", last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc))
+    row = agent_status_row(state="monitoring", last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=UTC))
     assert row["id"] == 1
     assert row["state"] == "monitoring"
     assert "paused" not in row
@@ -240,7 +240,7 @@ def test_agent_status_row_pins_id_to_one_and_omits_paused():
 def test_agent_status_row_includes_decision_and_detail():
     row = agent_status_row(
         state="idle",
-        last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=timezone.utc),
+        last_cycle_at=datetime(2026, 8, 28, 14, 0, tzinfo=UTC),
         last_decision_id="abc",
         detail={"candidates": 2},
     )
@@ -250,7 +250,7 @@ def test_agent_status_row_includes_decision_and_detail():
 
 def test_agent_status_row_rejects_unknown_state():
     with pytest.raises(PersistenceError):
-        agent_status_row(state="dancing", last_cycle_at=datetime(2026, 8, 28, tzinfo=timezone.utc))
+        agent_status_row(state="dancing", last_cycle_at=datetime(2026, 8, 28, tzinfo=UTC))
 
 
 # --- trade rows -------------------------------------------------------------------------------
@@ -316,7 +316,7 @@ def test_trade_row_marks_a_submission_failure_without_an_order():
 
 
 def test_trade_row_converts_datetime_values_in_the_order_dump():
-    order = dict(_ORDER_DUMP, submitted_at=datetime(2026, 8, 28, 14, 5, tzinfo=timezone.utc))
+    order = dict(_ORDER_DUMP, submitted_at=datetime(2026, 8, 28, 14, 5, tzinfo=UTC))
     row = trade_row(
         decision_id="dec-1", underlying="SPY", qty=1, credit=0.98, max_loss=400.0, order=order
     )

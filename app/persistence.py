@@ -25,7 +25,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -503,7 +503,7 @@ def record_host_metrics(
         "host_metrics",
         json_body=[{"metrics": _ensure_json_safe(dict(metrics))}],
     )
-    cutoff = (datetime.now(timezone.utc) - timedelta(hours=retention_hours)).isoformat()
+    cutoff = (datetime.now(UTC) - timedelta(hours=retention_hours)).isoformat()
     _request(
         config,
         "DELETE",
@@ -623,7 +623,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
     ``[smoke]`` summary so a leak is identifiable.
     """
     from app.decision import DecisionDraft
-    from app.risk_check import RuleResult, RiskVerdict
+    from app.risk_check import RiskVerdict, RuleResult
 
     results: dict[str, bool] = {}
     smoke_config = replace(config, agent_version="smoke-test")
@@ -648,7 +648,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
         decision_id = persist_decision(
             smoke_config,
             draft=DecisionDraft(
-                as_of=datetime.now(timezone.utc),
+                as_of=datetime.now(UTC),
                 symbol="SPY",
                 action="no_trade",
                 decision_source="risk_engine",
@@ -656,7 +656,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
                 market_open=False,
                 equity=12345.67,
                 day_pnl=-12.34,
-                evidence={"smoke": True, "nested": {"as_of": datetime.now(timezone.utc)}},
+                evidence={"smoke": True, "nested": {"as_of": datetime.now(UTC)}},
                 strategy_config={"smoke": True},
             ),
         )
@@ -701,7 +701,7 @@ def smoke_test(config: SupabaseConfig) -> dict[str, bool]:
             smoke_config,
             agent_status_row(
                 state="idle",
-                last_cycle_at=datetime.now(timezone.utc),
+                last_cycle_at=datetime.now(UTC),
                 last_decision_id=decision_id,
                 detail={"smoke": True},
             ),

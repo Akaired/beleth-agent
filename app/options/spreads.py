@@ -165,10 +165,9 @@ def _build_one_side(
     breakeven: float | None = None
     if credit is not None:
         max_loss = (strike_width - credit) * CONTRACT_MULTIPLIER
-        if right == "P":
-            breakeven = short_leg.strike - credit
-        else:
-            breakeven = short_leg.strike + credit
+        breakeven = (
+            short_leg.strike - credit if right == "P" else short_leg.strike + credit
+        )
 
     net_quote_width: float | None = None
     if short_leg.quote_width is not None and long_leg.quote_width is not None:

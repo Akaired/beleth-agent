@@ -1,3 +1,5 @@
+from datetime import date
+
 import pytest
 
 from app.market.vix import (
@@ -9,7 +11,6 @@ from app.market.vix import (
     rank_of,
     summarize_regime,
 )
-from datetime import date
 
 FRED_CSV = """observation_date,VIXCLS
 2026-08-20,16.01

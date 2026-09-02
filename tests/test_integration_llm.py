@@ -9,14 +9,13 @@ a legitimate outcome of this test, not a failure. What must never happen is a de
 is neither a valid structured LLM choice nor the deterministic fallback.
 """
 
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
 from app.config import get_settings
 from app.decision import decide_from_llm
-from app.risk_check import RuleResult, RiskVerdict
+from app.risk_check import RiskVerdict, RuleResult
 
 pytestmark = pytest.mark.integration
 
@@ -116,7 +115,7 @@ def _evidence() -> dict:
 def test_real_openrouter_cycle_produces_a_valid_decision():
     settings = get_settings()
     draft = decide_from_llm(
-        as_of=datetime.now(timezone.utc),
+        as_of=datetime.now(UTC),
         symbol="SPY",
         market_open=True,
         equity=100000.0,

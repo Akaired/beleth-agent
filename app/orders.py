@@ -306,6 +306,6 @@ def submit_mleg_order(trading_client: Any, request: LimitOrderRequest) -> dict[s
     caller persists the failure; there is no in-module retry."""
     try:
         order = trading_client.submit_order(request)
-    except Exception as exc:  # noqa: BLE001 — a submission failure must reach the caller as one type
+    except Exception as exc:
         raise OrderSubmissionError(f"{type(exc).__name__}: {exc}") from exc
     return order.model_dump(mode="json")

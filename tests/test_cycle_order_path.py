@@ -12,10 +12,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import pytest
 
 from scripts.check_market_data import _match_candidate, _prepare_order
-
 
 _STRATEGY = {
     "risk": {"max_risk_per_trade_pct_of_equity": 2.0},
@@ -323,9 +321,9 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
     # The short-leg ITM rule compares a spread against its OWN underlying: a QQQ cycle
     # must never measure an SPY spread against QQQ's price (it would misread ITM/OTM
     # and could trigger a spurious close).
-    import scripts.check_market_data as cmd
     from datetime import date
 
+    import scripts.check_market_data as cmd
     from app.exits import OpenSpread
 
     calls: list[str] = []
@@ -356,9 +354,9 @@ def test_underlying_prices_are_fetched_per_spread_symbol(monkeypatch):
 
 
 def test_a_failed_underlying_quote_disables_only_the_itm_rule(monkeypatch):
-    import scripts.check_market_data as cmd
     from datetime import date
 
+    import scripts.check_market_data as cmd
     from app.exits import OpenSpread
 
     def failing_fetch_last_price(client, symbol):
@@ -436,8 +434,8 @@ def test_prepare_closings_reprices_a_stale_resting_close():
 
 
 def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
-    from scripts.check_market_data import _prepare_closings
     from app.exits import evaluate_exit
+    from scripts.check_market_data import _prepare_closings
 
     # A blown-out book: marketable debit would be 2.10, but R5's loss-close price on a
     # 0.90 credit at 2x is 1.80 — never bid more than the rule's own defined max.
@@ -457,9 +455,8 @@ def test_prepare_closings_caps_the_limit_at_the_loss_close_price():
 
 
 def test_prepare_closings_fails_closed_without_a_measurable_mark():
-    from scripts.check_market_data import _prepare_closings
-
     from app.exits import evaluate_exit
+    from scripts.check_market_data import _prepare_closings
 
     # The ITM rule fires with no usable leg quotes: the close is triggered but cannot
     # be priced, so no order is built and the fail-closed note lands in the summary.

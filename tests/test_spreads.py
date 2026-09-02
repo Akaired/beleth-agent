@@ -22,7 +22,7 @@ class FakeSnapshot:
 
 
 def occ(expiry: date, right: str, strike: float, root: str = "SPY") -> str:
-    return f"{root}{expiry:%y%m%d}{right}{int(round(strike * 1000)):08d}"
+    return f"{root}{expiry:%y%m%d}{right}{round(strike * 1000):08d}"
 
 
 TODAY = date(2026, 8, 27)

@@ -5,7 +5,7 @@ Marked `integration` — run explicitly with:
     pytest -m integration
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 import pytest
 

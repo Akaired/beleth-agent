@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.run_agent import (  # noqa: E402
+from scripts.run_agent import (
     chunked_sleep,
     read_paused,
     run_cycle,

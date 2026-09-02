@@ -4,12 +4,14 @@ selection. Read-only."""
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from alpaca.data.enums import Adjustment
 from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+
+from app.alpaca_client import model_response
 
 
 def fetch_daily_closes(
@@ -22,14 +24,14 @@ def fetch_daily_closes(
     response) so the caller reliably has enough returns for its longest realized-vol window.
     Split/dividend adjusted so a corporate action doesn't masquerade as a price jump.
     """
-    start = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    start = datetime.now(UTC) - timedelta(days=lookback_days)
     request = StockBarsRequest(
         symbol_or_symbols=symbol,
         timeframe=TimeFrame(1, TimeFrameUnit.Day),
         start=start,
         adjustment=Adjustment.ALL,
     )
-    barset = client.get_stock_bars(request)
+    barset = model_response(client.get_stock_bars(request))
     bars = barset.data.get(symbol, [])
     return [bar.close for bar in bars]
 

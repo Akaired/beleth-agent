@@ -82,7 +82,7 @@ class Project:
         self.ref = project_ref
 
     @classmethod
-    def from_env(cls, env_path: Path | None = None) -> "Project":
+    def from_env(cls, env_path: Path | None = None) -> Project:
         env = load_env(env_path or REPO_ROOT / ".env")
         token = env.get("SUPABASE_ACCESS_TOKEN", "").strip()
         base_url = env.get("SUPABASE_URL", "").strip().rstrip("/")

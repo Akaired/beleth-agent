@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.deploy_guard import deploy_blocked  # noqa: E402
+from scripts.deploy_guard import deploy_blocked
 
 
 def test_market_open_without_force_is_blocked():

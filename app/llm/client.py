@@ -41,7 +41,8 @@ def complete(
         base_url=base_url or settings.openrouter_base_url,
         api_key=api_key or settings.openrouter_key,
     )
-    return client.chat.completions.create(
+    # The SDK overloads cannot see through **kwargs; every argument below is valid.
+    return client.chat.completions.create(  # type: ignore[call-overload]
         model=model or settings.openrouter_model,
         messages=messages,
         tools=tools,

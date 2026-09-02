@@ -608,6 +608,7 @@ def _run_llm_turns(
 
         tool_call = tool_calls[0]
         raw_args = tool_call.function.arguments
+        error: str | None
         try:
             args = json.loads(raw_args)
         except (json.JSONDecodeError, TypeError):

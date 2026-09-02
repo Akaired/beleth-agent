@@ -18,10 +18,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.alpaca_client import get_option_data_client  # noqa: E402
-from app.config import ConfigError, get_settings, load_strategy_config  # noqa: E402
-from app.options.chain import fetch_chain_for_ladder  # noqa: E402
-from app.options.filter import filter_relevant_contracts  # noqa: E402
+from app.alpaca_client import get_option_data_client
+from app.config import ConfigError, get_settings, load_strategy_config
+from app.options.chain import fetch_chain_for_ladder
+from app.options.filter import filter_relevant_contracts
 
 
 def main() -> int:
