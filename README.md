@@ -209,6 +209,8 @@ Both are expanded in [`docs/strategy.md`](docs/strategy.md), notes C2 and C5.
 │   ├── decision.py        # deterministic verdict + LLM decision layer
 │   ├── orders.py          # sizing, pricing, submission of the one mleg order
 │   ├── exits.py           # R5 — pair open legs into spreads, measure against targets
+│   ├── redact.py          # scrub credentials out of anything bound for the database
+│   ├── cycle/             # one trading cycle, a module per stage (context.py has the types)
 │   ├── market/            # VIX (FRED), realized vol, IV term structure, macro calendar
 │   ├── options/           # chain fetch, delta filter, spread-candidate builder
 │   └── llm/               # OpenAI SDK → OpenRouter client (+ fallback)
@@ -217,7 +219,7 @@ Both are expanded in [`docs/strategy.md`](docs/strategy.md), notes C2 and C5.
 │   └── macro_events.yaml  # known macro events for the contest window (R3 gate)
 ├── docs/strategy.md       # strategy reasoning by reliability tier, with sources
 ├── db/                    # Supabase schema migrations + data dictionary
-├── scripts/               # read-only checks, the resident runner, the deploy guard
+├── scripts/               # the cycle CLI, the resident runner, checks, the migration runner
 ├── tests/                 # unit tests (fast) + integration (`pytest -m integration`)
 ├── webapp/                # the Next.js dashboard (see webapp/README.md)
 └── Dockerfile / compose.yaml
