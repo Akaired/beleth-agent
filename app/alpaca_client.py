@@ -59,11 +59,20 @@ def fetch_order(client: TradingClient, order_id: str, **kwargs: Any) -> Order:
 
 
 def get_trading_client(settings: Settings) -> TradingClient:
-    return TradingClient(
+    """The only way this project builds a trading client — and it verifies itself.
+
+    ``assert_paper_trading`` used to be the caller's job, and the caller that actually
+    submits orders never did it: the guarantee rested on the ``paper=True`` literal
+    below and nothing else. Asserting here means no present or future call site can
+    forget, and the check runs before the client is ever handed out.
+    """
+    client = TradingClient(
         api_key=settings.alpaca_api_key,
         secret_key=settings.alpaca_secret_key,
         paper=True,
     )
+    assert_paper_trading(client)
+    return client
 
 
 def get_option_data_client(settings: Settings) -> OptionHistoricalDataClient:
