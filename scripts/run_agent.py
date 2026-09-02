@@ -139,8 +139,13 @@ def read_paused(supabase_config: Any) -> bool:
 
 def send_heartbeat(supabase_config: Any, runner_stats: Mapping[str, Any] | None = None) -> bool:
     """Upsert ``agent_status`` state='idle' outside market hours so the dashboard can
-    tell "alive, market closed" from "agent down". Never writes ``paused``. Carries the
-    host snapshot so the backoffice "Host" panel stays live while the market is closed.
+    tell "alive, market closed" from "agent down". Never writes ``paused``.
+
+    Deliberately carries no host snapshot: ``agent_status`` is readable anonymously, and
+    the machine block names the host and its kernel. The backoffice panel reads the
+    newest ``host_metrics`` row instead, which is written on the same cadence by
+    ``record_host_history`` and is gated to master_admin.
+
     Returns True when persisted; False when Supabase is not configured."""
     if supabase_config is None:
         return False
@@ -149,11 +154,7 @@ def send_heartbeat(supabase_config: Any, runner_stats: Mapping[str, Any] | None 
         agent_status_row(
             state="idle",
             last_cycle_at=datetime.now(UTC),
-            detail={
-                "runner": "heartbeat",
-                "market_open": False,
-                "host": collect_host_metrics(runner_stats),
-            },
+            detail={"runner": "heartbeat", "market_open": False},
         ),
     )
     return True
@@ -172,9 +173,9 @@ def emit_runner_event(
 
 
 def record_host_history(supabase_config: Any, runner_stats: Mapping[str, Any]) -> None:
-    """Append one trailing ``host_metrics`` row (fail-open). The live value is written
-    into ``agent_status.detail['host']`` by the heartbeat and by every cycle; this is
-    only the 48 h history the backoffice sparklines read."""
+    """Append one ``host_metrics`` row (fail-open) — the only place host telemetry is
+    published. Written every loop iteration, open or closed, so the newest row is both
+    the live value the backoffice panel shows and the 48 h trail its sparklines read."""
     if supabase_config is None:
         return
     try:

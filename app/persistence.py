@@ -491,10 +491,12 @@ def record_host_metrics(
 ) -> None:
     """Append one ``host_metrics`` row and prune anything older than ``retention_hours``.
 
-    The live panel reads ``agent_status.detail['host']``; this table is only the
-    trailing history the sparklines need. ``captured_at`` is DB-owned. The prune is a
-    single indexed DELETE — cheap enough to run on every append (once per runner loop,
-    a few times an hour), so no separate cron is needed.
+    This table is the *only* place host telemetry is published: it is gated to
+    master_admin, whereas ``agent_status`` is readable anonymously. The newest row is
+    the live value the backoffice panel shows; the rest is the trail its sparklines
+    read. ``captured_at`` is DB-owned. The prune is a single indexed DELETE — cheap
+    enough to run on every append (once per runner loop, a few times an hour), so no
+    separate cron is needed.
     """
     _request(
         config,

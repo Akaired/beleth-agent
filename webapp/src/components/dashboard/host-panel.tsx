@@ -4,7 +4,7 @@ import {
   formatMb,
   formatUptime,
   isStale,
-  parseHostMetrics,
+  latestHostMetrics,
   usageTone,
   type HostHistoryPoint,
   type HostMetrics,
@@ -127,15 +127,16 @@ function Spark({
 }
 
 export function HostPanel({
-  detail,
   history,
   lastCycleAt,
 }: {
-  detail: Record<string, unknown> | null | undefined;
   history: HostHistoryPoint[];
   lastCycleAt: string | null;
 }) {
-  const host: HostMetrics | null = parseHostMetrics(detail);
+  // The live snapshot is the newest history row. It used to come from
+  // `agent_status.detail.host`, which anonymous readers can read — and it names the
+  // machine and its kernel. `host_metrics` is gated to master_admin.
+  const host: HostMetrics | null = latestHostMetrics(history);
 
   const title = (
     <span className="flex items-center gap-1.5">

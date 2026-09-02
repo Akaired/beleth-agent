@@ -75,7 +75,6 @@ from app.exits import (
     exit_summary_sentences,
     pair_open_spreads,
 )
-from app.hostinfo import collect_host_metrics, read_runner_stats
 from app.market.calendar import (
     EASTERN,
     blocked_tenors,
@@ -1049,7 +1048,6 @@ def main() -> int:
                 )
             if exit_outcomes:
                 status_detail["closings"] = exit_outcomes
-            status_detail["host"] = collect_host_metrics(read_runner_stats())
             persist_agent_status(
                 supabase,
                 agent_status_row(

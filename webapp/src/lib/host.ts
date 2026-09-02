@@ -1,12 +1,13 @@
 /**
  * Client-safe types + formatting for the backoffice "Host" panel.
  *
- * The resident runner is a container on a private host. Every
- * heartbeat/cycle the agent folds a machine snapshot into
- * `agent_status.detail.host` (app/hostinfo.py); a 48 h trail of the same shape is
- * appended to the `host_metrics` table for the sparklines. This module only
- * describes and formats that shape — no `server-only` import, so a Client
- * Component can use it.
+ * The resident runner is a container on a private host. Every loop iteration the
+ * agent appends a machine snapshot (app/hostinfo.py) to the `host_metrics` table:
+ * the newest row is the live value, the rest is the 48 h trail the sparklines read.
+ * It is deliberately not folded into `agent_status.detail` any more — that row is
+ * readable anonymously, and the snapshot names the machine and its kernel.
+ * This module only describes and formats that shape — no `server-only` import, so a
+ * Client Component can use it.
  */
 
 export type HostMetrics = {
@@ -47,13 +48,17 @@ export type HostMetrics = {
 
 export type HostHistoryPoint = { captured_at: string; metrics: HostMetrics };
 
-/** Pull the host block out of `agent_status.detail`, tolerating an absent/old shape. */
-export function parseHostMetrics(
-  detail: Record<string, unknown> | null | undefined,
+/**
+ * The live snapshot: the newest point of an ascending history, tolerating an empty
+ * table or an older row shape.
+ */
+export function latestHostMetrics(
+  history: readonly HostHistoryPoint[] | null | undefined,
 ): HostMetrics | null {
-  const host = detail?.["host"];
-  if (!host || typeof host !== "object") return null;
-  return host as HostMetrics;
+  const newest = history?.[history.length - 1];
+  const metrics = newest?.metrics;
+  if (!metrics || typeof metrics !== "object") return null;
+  return { ...metrics, captured_at: metrics.captured_at ?? newest.captured_at };
 }
 
 export function formatUptime(seconds: number | null): string {
